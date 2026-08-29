@@ -774,11 +774,15 @@ function bind() {
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) { /* algunos navegadores bloquean la descarga */ }
-    openModal('Copia de seguridad', json, null);
+    openModal('Copia de seguridad', json,
+      'Ya está copiada en el portapapeles: pegala en una nota, un mail o donde la tengas a mano. ' +
+      'Si abriste la app desde tu propia carpeta, además se descargó como archivo .json.');
   });
 
   $('#btnImport').addEventListener('click', () => {
-    openModal('Pegá acá tu copia', '', txt => {
+    openModal('Restaurar una copia', '',
+      'Pegá el contenido de una copia anterior, o elegí el archivo .json que exportaste. ' +
+      'Esto reemplaza todo lo que tengas cargado ahora.', txt => {
       try {
         const data = JSON.parse(txt);
         if (!data || typeof data !== 'object') throw new Error('formato');
@@ -810,11 +814,12 @@ function bind() {
 }
 
 /* modal simple para exportar / importar texto */
-function openModal(title, value, onConfirm) {
+function openModal(title, value, note, onConfirm) {
   const back = document.createElement('div');
   back.style.cssText = 'position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.65);display:grid;place-items:center;padding:18px';
   back.innerHTML = `<div style="background:#1b1e25;border:1px solid #2c303a;border-radius:16px;padding:16px;width:100%;max-width:520px">
-    <h2 style="font-size:15px;margin:0 0 10px">${esc(title)}</h2>
+    <h2 style="font-size:15px;margin:0 0 6px">${esc(title)}</h2>
+    <p style="font-size:12.5px;color:#93949e;margin:0 0 10px">${esc(note || '')}</p>
     <textarea id="modalText" style="width:100%;height:190px;background:#131519;color:#ece8e1;border:1px solid #2c303a;border-radius:10px;padding:10px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;resize:vertical">${esc(value)}</textarea>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
       <button class="btn" data-close>Cerrar</button>
@@ -840,5 +845,6 @@ function init() {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 }
-document.addEventListener('DOMContentLoaded', init);
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+else init();
 })();
