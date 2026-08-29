@@ -969,43 +969,70 @@ function aplicarRango(r) {
   renderImport();
 }
 
-function renderImport() {
-  const box = $('#importPreview');
-  const nuevosPesos = pendingWeights.filter(w => !S.weights.some(x => x.date === w.date));
-  if (!pending.length && !nuevosPesos.length) {
-    box.innerHTML = (importNote ? `<p class="import-note">${esc(importNote)}</p>` : '')
-      + (lastScan ? `<label class="import-rango">Traer desde
-          <select id="impRango">${RANGOS.map(([v, t]) =>
-            `<option value="${v}"${v === importRango ? ' selected' : ''}>${t} · ${cuentaEn(v)}</option>`).join('')}</select>
-        </label>` : '');
+let headFor = null;
+
+/* El selector de rango vive en su propio contenedor y NO se reconstruye
+   cuando cambian las filas. Rehacerlo con innerHTML mientras el usuario lo
+   está tocando destruye el elemento en pleno gesto: en iOS el selector
+   puede quedar mostrando una opción que la app nunca llegó a aplicar. */
+function renderRangoSelector() {
+  const head = $('#impHead');
+  if (!head) return;
+  if (!lastScan) { head.innerHTML = ''; headFor = null; return; }
+  if (headFor === lastScan) {
+    const sel = $('#impRango');
+    if (sel && sel.value !== importRango) sel.value = importRango;
     return;
   }
+  headFor = lastScan;
+  head.innerHTML = `<label class="import-rango">Traer desde
+    <select id="impRango">${RANGOS.map(([v, t]) =>
+      `<option value="${v}"${v === importRango ? ' selected' : ''}>${t} · ${cuentaEn(v)}</option>`).join('')}</select>
+  </label>`;
+}
+
+function filaImportada(c, i) {
   const opts = [['bici','🚴 Bici'],['soga','🪢 Soga'],['futbol','⚽ Fútbol'],
                 ['fuerza','💪 Fuerza'],['movilidad','🚶 Caminata'],['otro','✳️ Otro']];
-  const selector = lastScan ? `<label class="import-rango">Traer desde
-      <select id="impRango">${RANGOS.map(([v, t]) =>
-        `<option value="${v}"${v === importRango ? ' selected' : ''}>${t} · ${cuentaEn(v)}</option>`).join('')}</select>
-    </label>` : '';
-  box.innerHTML = (importNote ? `<p class="import-note">${esc(importNote)}</p>` : '') + selector
-    + pending.slice(0, MAX_ROWS).map((c, i) => {
-    const dup = isDuplicate(c);
-    const bits = [fmtMin(c.minutes)];
-    if (c.distance) bits.push(c.distance + ' km');
-    if (c.hrAvg) bits.push(c.hrAvg + ' ppm medio');
-    if (c.hrMax) bits.push('máx ' + c.hrMax);
-    bits.push(sessionKcal(c) + ' kcal' + (kcalSource(c) ? ' ' + kcalSource(c) : ''));
-    return `<article class="entry imported ${dup ? 'is-dup' : ''}">
-      <div class="entry-ico">${ICON[c.type] || '•'}</div>
-      <div class="entry-body">
-        <div class="entry-title">${fmtDate(c.date)} · ${esc(bits.join(' · '))}</div>
-        <div class="entry-sub">${esc(c.label)}${dup ? ' · ya la tenías cargada' : ''}</div>
-        <select class="imp-type" data-i="${i}">
-          ${opts.map(o => `<option value="${o[0]}"${o[0] === c.type ? ' selected' : ''}>${o[1]}</option>`).join('')}
-        </select>
-      </div>
-      <button class="entry-del" data-drop="${i}" aria-label="Descartar">×</button>
-    </article>`;
-  }).join('')
+  const dup = isDuplicate(c);
+  const bits = [fmtMin(c.minutes)];
+  if (c.distance) bits.push(c.distance + ' km');
+  if (c.hrAvg) bits.push(c.hrAvg + ' ppm medio');
+  if (c.hrMax) bits.push('máx ' + c.hrMax);
+  bits.push(sessionKcal(c) + ' kcal' + (kcalSource(c) ? ' ' + kcalSource(c) : ''));
+  return `<article class="entry imported ${dup ? 'is-dup' : ''}">
+    <div class="entry-ico">${ICON[c.type] || '•'}</div>
+    <div class="entry-body">
+      <div class="entry-title">${fmtDate(c.date)} · ${esc(bits.join(' · '))}</div>
+      <div class="entry-sub">${esc(c.label)}${dup ? ' · ya la tenías cargada' : ''}</div>
+      <select class="imp-type" data-i="${i}">
+        ${opts.map(o => `<option value="${o[0]}"${o[0] === c.type ? ' selected' : ''}>${o[1]}</option>`).join('')}
+      </select>
+    </div>
+    <button class="entry-del" data-drop="${i}" aria-label="Descartar">×</button>
+  </article>`;
+}
+
+function renderImport() {
+  const box = $('#importPreview');
+  if (!box) return;
+  if (!$('#impHead')) box.innerHTML = '<div id="impHead"></div><div id="impBody" class="stack"></div>';
+  renderRangoSelector();
+
+  const body = $('#impBody');
+  const nuevosPesos = pendingWeights.filter(w => !S.weights.some(x => x.date === w.date));
+  const nota = importNote ? `<p class="import-note">${esc(importNote)}</p>` : '';
+
+  if (!pending.length && !nuevosPesos.length) {
+    // Estado explícito: sin esto la tarjeta se corta y parece que se rompió.
+    body.innerHTML = nota + (lastScan
+      ? `<div class="empty">No hay nada para agregar en este rango. Elegí uno más amplio en «Traer desde».</div>`
+      : '');
+    return;
+  }
+
+  body.innerHTML = nota
+    + pending.slice(0, MAX_ROWS).map(filaImportada).join('')
     + (pending.length > MAX_ROWS
         ? `<p class="muted small">…y ${pending.length - MAX_ROWS} entrenamientos más, que también se van a agregar.</p>` : '')
     + (nuevosPesos.length
@@ -1271,7 +1298,7 @@ function bind() {
       if (!cuentaEn(r)) r = ['90', '365', 'todo'].find(x => cuentaEn(x)) || 'inicio';
       aplicarRango(r);
     } catch (err) {
-      pending = []; pendingWeights = []; lastScan = null;
+      pending = []; pendingWeights = []; lastScan = null; headFor = null;
       importNote = 'No pude leer el archivo: ' + err.message;
       renderImport();
     }
@@ -1291,25 +1318,27 @@ function bind() {
       if (parsed) pending.push(parsed); else malos++;
     }
     pending.sort((a, b) => a.date < b.date ? -1 : 1);
-    importNote = ''; lastScan = null;
+    importNote = ''; lastScan = null; headFor = null;
     renderImport();
     if (malos) toast(`${malos} archivo${malos > 1 ? 's' : ''} sin datos legibles (¿es .fit?)`);
     else if (pending.length) toast(`${pending.length} actividad${pending.length > 1 ? 'es' : ''} lista${pending.length > 1 ? 's' : ''}`);
   });
 
-  document.addEventListener('change', e => {
+  const alCambiar = e => {
     const rango = e.target.closest('#impRango');
-    if (rango) { aplicarRango(rango.value); return; }
+    if (rango) { if (rango.value !== importRango) aplicarRango(rango.value); return; }
     const sel = e.target.closest('.imp-type');
     if (!sel) return;
     pending[Number(sel.dataset.i)].type = sel.value;
     renderImport();
-  });
+  };
+  document.addEventListener('change', alCambiar);
+  document.addEventListener('input', alCambiar);
 
   document.addEventListener('click', e => {
     const drop = e.target.closest('[data-drop]');
     if (drop) { pending.splice(Number(drop.dataset.drop), 1); renderImport(); return; }
-    if (e.target.closest('#btnClearImport')) { pending = []; pendingWeights = []; importNote = ''; renderImport(); return; }
+    if (e.target.closest('#btnClearImport')) { pending = []; pendingWeights = []; importNote = ''; lastScan = null; headFor = null; renderImport(); return; }
     if (e.target.closest('#btnAddImported')) {
       let nuevas = 0, repetidas = 0;
       pending.forEach(c => {
@@ -1334,7 +1363,7 @@ function bind() {
         if (S.weights.some(x => x.date === w.date)) return;
         S.weights.push(w); pesos++;
       });
-      pending = []; pendingWeights = []; importNote = ''; lastScan = null;
+      pending = []; pendingWeights = []; importNote = ''; lastScan = null; headFor = null;
       save(); render(); renderImport();
       // Para que se vea dónde quedaron, en vez de dejar la pantalla igual.
       const lista = $('#logList');
@@ -1476,7 +1505,7 @@ function bind() {
       () => {
         S = clonar(DEFAULTS);
         S.profile.startDate = today();
-        save(); planWeek = null; pending = []; pendingWeights = []; lastScan = null;
+        save(); planWeek = null; pending = []; pendingWeights = []; lastScan = null; headFor = null;
         render(); renderImport(); toast('Todo borrado');
       });
   });

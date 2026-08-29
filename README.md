@@ -130,6 +130,18 @@ gasto diario suma el gasto base (×1,35) más el promedio real de entrenamiento 
 
 Son estimaciones orientativas. Ninguna fórmula reemplaza un control médico ni a un nutricionista.
 
+## Pruebas
+
+```
+python3 tests/fixtures.py tmp      # genera los archivos de ejemplo
+node tests/e2e.js tmp              # 43 comprobaciones, sale con 1 si algo falla
+```
+
+`tests/e2e.js` recorre la app como un usuario, en viewport de iPhone y con eventos táctiles reales.
+Los fixtures reproducen lo que entregan Salud y Zepp de verdad: exportación en español
+(`exportación.xml`) y en inglés, un export sin entrenamientos, un `.zip` que no es de Salud, y
+actividades sueltas en TCX. Requiere Playwright.
+
 ## Estructura
 
 ```
@@ -139,6 +151,7 @@ assets/app.js       plan, cálculos, gráficos SVG y persistencia
 sw.js               service worker para uso sin conexión
 manifest.json       instalación como app
 tools/              utilidades de build
+tests/              recorrido de extremo a extremo y generador de fixtures
 ```
 
 Sin dependencias, sin build step ni pedidos de red: los `.zip` se abren con `DecompressionStream` y
