@@ -72,13 +72,23 @@
     <!-- ============ REGISTRO ============ -->
     <section class="view" id="view-log" hidden>
       <div class="card" id="importCard">
-        <div class="card-head"><h2>Traer del reloj</h2><span class="muted small">GPX · TCX</span></div>
-        <p class="muted small">En Zepp: abrí la actividad → menú <b>···</b> arriba a la derecha → <b>Exportar</b> → elegí <b>TCX</b> (trae pulso y calorías) o <b>GPX</b>. Después seleccioná el archivo acá. Podés elegir varios de una vez.</p>
-        <p class="muted small">Se leen duración, distancia, pulso y calorías. Los saltos de soga no vienen en el archivo: se estiman a partir del tiempo. El formato <b>FIT</b> es binario y no se puede leer sin conexión, por eso exportá TCX o GPX.</p>
-        <div class="btn-row">
-          <button class="btn primary" id="btnPickTrack" type="button">Elegir archivos</button>
+        <h2>Traer entrenamientos</h2>
+
+        <div class="source">
+          <div class="source-head"><b>Salud (iPhone)</b><span class="pill">todo de una</span></div>
+          <p class="muted small">Activá primero la sincronización con Salud en la app de Zepp. Después: <b>Salud</b> → tu foto arriba a la derecha → <b>Exportar todos los datos de salud</b>. Guardá el <b>.zip</b> en Archivos y elegilo acá — no hace falta descomprimirlo. Traigo entrenamientos y registros de peso desde el inicio del desafío.</p>
+          <button class="btn primary" id="btnPickHealth" type="button">Elegir exportación de Salud</button>
+          <input type="file" id="fileHealth" accept=".zip,.xml" hidden>
+        </div>
+
+        <div class="source">
+          <div class="source-head"><b>Zepp, actividad por actividad</b><span class="pill">GPX · TCX</span></div>
+          <p class="muted small">Abrí la actividad en Zepp → menú <b>···</b> → <b>Exportar</b> → <b>TCX</b> (trae pulso y calorías) o GPX. Podés elegir varios archivos de una vez. El formato <b>FIT</b> es binario y no se puede leer sin conexión.</p>
+          <button class="btn" id="btnPickTrack" type="button">Elegir archivos del reloj</button>
           <input type="file" id="fileTrack" accept=".gpx,.tcx,.xml,application/gpx+xml" multiple hidden>
         </div>
+
+        <p class="muted small import-foot">Los saltos de soga no vienen en ningún formato: se estiman a partir del tiempo.</p>
         <div id="importPreview" class="stack" style="margin-top:12px"></div>
       </div>
 

@@ -497,6 +497,194 @@ function parseTrackFile(fileName, text) {
   return null;
 }
 
+/* ---------------- exportación de Salud (Apple Health) ----------------
+   Salud entrega un .zip con un export.xml que puede pesar cientos de MB:
+   todo lo que registró el teléfono desde siempre. Por eso no se carga
+   entero en memoria — se descomprime y se recorre de a trozos, quedándonos
+   solo con los entrenamientos y los pesos.
+
+   El zip se abre con DecompressionStream, que ya viene en el navegador, así
+   que sigue sin hacer falta ninguna librería. */
+
+const HK_ACTIVITY = [
+  [/Cycling/i, 'bici'],
+  [/JumpRope/i, 'soga'],
+  [/Soccer/i, 'futbol'],
+  [/StrengthTraining|CoreTraining|Flexibility|Yoga|Pilates/i, 'fuerza'],
+  [/Walking|Hiking/i, 'movilidad']
+];
+function hkType(t) {
+  for (const [re, v] of HK_ACTIVITY) if (re.test(t || '')) return v;
+  return 'otro';
+}
+function hkLabel(t) {
+  return String(t || '').replace(/^HKWorkoutActivityType/, '') || 'Entrenamiento';
+}
+function tagAttrs(tag) {
+  const o = {}; const re = /([\w:]+)="([^"]*)"/g; let m;
+  while ((m = re.exec(tag))) o[m[1]] = m[2];
+  return o;
+}
+const toMinutes = (v, u) => !v ? 0 : /sec/i.test(u || '') ? v / 60 : /h/i.test(u || '') ? v * 60 : v;
+const toKm      = (v, u) => !v ? 0 : /mi/i.test(u || '') ? v * 1.609344 : v;
+/* Las fechas vienen como "2026-08-24 18:30:00 -0300"; los primeros diez
+   caracteres ya son la fecha local del registro. */
+const hkDate = v => (String(v || '').slice(0, 10).match(/^\d{4}-\d{2}-\d{2}$/) || [''])[0];
+
+function parseWorkout(block, fileName) {
+  const head = block.slice(0, block.indexOf('>') + 1);
+  const a = tagAttrs(head);
+  const date = hkDate(a.startDate);
+  if (!date) return null;
+
+  let minutes = Math.round(toMinutes(parseFloat(a.duration), a.durationUnit));
+  let km = toKm(parseFloat(a.totalDistance), a.totalDistanceUnit);
+  let kcal = parseFloat(a.totalEnergyBurned) || 0;
+  let hrAvg = 0, hrMax = 0;
+
+  // Desde iOS 15 la distancia, la energía y el pulso viajan en hijos
+  // <WorkoutStatistics> en vez de en los atributos del propio <Workout>.
+  const st = /<WorkoutStatistics\s[^>]*\/?>/g; let m;
+  while ((m = st.exec(block))) {
+    const s2 = tagAttrs(m[0]);
+    const t = s2.type || '';
+    if (/Distance/i.test(t)) km = km || toKm(parseFloat(s2.sum), s2.unit);
+    else if (/ActiveEnergyBurned/i.test(t)) kcal = kcal || Math.round(parseFloat(s2.sum) || 0);
+    else if (/HeartRate/i.test(t)) {
+      hrAvg = Math.round(parseFloat(s2.average) || 0);
+      hrMax = Math.round(parseFloat(s2.maximum) || 0);
+    }
+  }
+  if (!minutes) return null;
+
+  return {
+    date, minutes,
+    distance: Math.round(km * 10) / 10,
+    watchKcal: Math.round(kcal) || 0,
+    hrAvg, hrMax, zones: null,
+    type: hkType(a.workoutActivityType),
+    label: hkLabel(a.workoutActivityType) + (a.sourceName ? ' · ' + a.sourceName : ''),
+    file: fileName
+  };
+}
+
+const BODY_MASS = 'HKQuantityTypeIdentifierBodyMass';
+function scanWeights(text, out) {
+  let i = 0;
+  while ((i = text.indexOf(BODY_MASS, i)) !== -1) {
+    const open = text.lastIndexOf('<Record', i);
+    const close = text.indexOf('>', i);
+    if (open === -1 || close === -1) { i += BODY_MASS.length; continue; }
+    const a = tagAttrs(text.slice(open, close + 1));
+    const date = hkDate(a.startDate);
+    let kg = parseFloat(a.value);
+    if (date && isFinite(kg)) {
+      if (/lb/i.test(a.unit || '')) kg *= 0.45359237;
+      out.push({ date, kg: Math.round(kg * 10) / 10 });
+    }
+    i = close + 1;
+  }
+}
+
+/* Recorre un trozo de texto y devuelve lo que quedó a medias para el
+   siguiente. TAIL protege los registros cortados por el borde del trozo. */
+const TAIL = 600;
+function consumeChunk(buf, workouts, weights, fileName, final) {
+  let p = 0;
+  for (;;) {
+    const wi = buf.indexOf('<Workout ', p);
+    if (wi === -1) break;
+    const headEnd = buf.indexOf('>', wi);
+    if (headEnd === -1) break;
+    const selfClosing = buf[headEnd - 1] === '/';
+    let end;
+    if (selfClosing) {
+      end = headEnd + 1;
+    } else {
+      const close = buf.indexOf('</Workout>', headEnd);
+      if (close === -1) break;
+      end = close + 10;
+    }
+    scanWeights(buf.slice(p, wi), weights);
+    const w = parseWorkout(buf.slice(wi, end), fileName);
+    if (w) workouts.push(w);
+    p = end;
+  }
+  const wi = buf.indexOf('<Workout ', p);
+  const safe = final ? buf.length : Math.max(p, (wi === -1 ? buf.length - TAIL : wi));
+  scanWeights(buf.slice(p, Math.max(p, safe)), weights);
+  return final ? '' : buf.slice(Math.max(p, safe > p ? safe : p));
+}
+
+/* --- lectura del .zip sin librerías --- */
+async function zipEntryStream(file, nameRe) {
+  const tailLen = Math.min(file.size, 66560);
+  const tail = new DataView(await file.slice(file.size - tailLen).arrayBuffer());
+  let eocd = -1;
+  for (let i = tail.byteLength - 22; i >= 0; i--) {
+    if (tail.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd === -1) throw new Error('El archivo no parece un .zip válido.');
+  const count = tail.getUint16(eocd + 10, true);
+  const cdSize = tail.getUint32(eocd + 12, true);
+  const cdOff = tail.getUint32(eocd + 16, true);
+  if (cdOff === 0xffffffff || cdSize === 0xffffffff) {
+    throw new Error('El .zip usa formato ZIP64. Descomprimilo en el teléfono y elegí el export.xml.');
+  }
+
+  const cd = new DataView(await file.slice(cdOff, cdOff + cdSize).arrayBuffer());
+  const dec = new TextDecoder();
+  let off = 0, found = null;
+  for (let n = 0; n < count && off + 46 <= cd.byteLength; n++) {
+    if (cd.getUint32(off, true) !== 0x02014b50) break;
+    const nameLen = cd.getUint16(off + 28, true);
+    const extraLen = cd.getUint16(off + 30, true);
+    const commentLen = cd.getUint16(off + 32, true);
+    const name = dec.decode(new Uint8Array(cd.buffer, cd.byteOffset + off + 46, nameLen));
+    if (!found && nameRe.test(name)) {
+      found = {
+        name,
+        method: cd.getUint16(off + 10, true),
+        compressedSize: cd.getUint32(off + 20, true),
+        localOffset: cd.getUint32(off + 42, true)
+      };
+    }
+    off += 46 + nameLen + extraLen + commentLen;
+  }
+  if (!found) throw new Error('No encontré el export.xml dentro del .zip.');
+
+  const lh = new DataView(await file.slice(found.localOffset, found.localOffset + 30).arrayBuffer());
+  if (lh.getUint32(0, true) !== 0x04034b50) throw new Error('El .zip está dañado.');
+  const start = found.localOffset + 30 + lh.getUint16(26, true) + lh.getUint16(28, true);
+  const blob = file.slice(start, start + found.compressedSize);
+  if (found.method === 0) return blob.stream();
+  if (found.method !== 8) throw new Error('El .zip usa una compresión que no puedo leer.');
+  if (typeof DecompressionStream === 'undefined') {
+    throw new Error('Tu navegador no puede abrir .zip. Descomprimilo y elegí el export.xml.');
+  }
+  return blob.stream().pipeThrough(new DecompressionStream('deflate-raw'));
+}
+
+async function readHealthExport(file, onProgress) {
+  const isZip = /\.zip$/i.test(file.name);
+  const stream = isZip ? await zipEntryStream(file, /export\.xml$/i) : file.stream();
+  const reader = stream.getReader();
+  const dec = new TextDecoder('utf-8');
+  const workouts = [], weights = [];
+  let buf = '', bytes = 0, last = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+    buf += dec.decode(value, { stream: true });
+    buf = consumeChunk(buf, workouts, weights, file.name, false);
+    if (onProgress && bytes - last > 4e6) { last = bytes; onProgress(bytes); await new Promise(r => setTimeout(r)); }
+  }
+  buf += dec.decode();
+  consumeChunk(buf, workouts, weights, file.name, true);
+  return { workouts, weights, bytes };
+}
+
 function isDuplicate(c) {
   return S.sessions.some(x => x.date === c.date && Math.abs(x.minutes - c.minutes) <= 2 && x.type === c.type);
 }
@@ -707,12 +895,21 @@ function renderPlan() {
 }
 
 let pending = [];
+let pendingWeights = [];
+let importNote = '';
+const MAX_ROWS = 40;
+
 function renderImport() {
   const box = $('#importPreview');
-  if (!pending.length) { box.innerHTML = ''; return; }
+  const nuevosPesos = pendingWeights.filter(w => !S.weights.some(x => x.date === w.date));
+  if (!pending.length && !nuevosPesos.length) {
+    box.innerHTML = importNote ? `<p class="import-note">${esc(importNote)}</p>` : '';
+    return;
+  }
   const opts = [['bici','🚴 Bici'],['soga','🪢 Soga'],['futbol','⚽ Fútbol'],
                 ['fuerza','💪 Fuerza'],['movilidad','🚶 Caminata'],['otro','✳️ Otro']];
-  box.innerHTML = pending.map((c, i) => {
+  box.innerHTML = (importNote ? `<p class="import-note">${esc(importNote)}</p>` : '')
+    + pending.slice(0, MAX_ROWS).map((c, i) => {
     const dup = isDuplicate(c);
     const bits = [fmtMin(c.minutes)];
     if (c.distance) bits.push(c.distance + ' km');
@@ -730,8 +927,16 @@ function renderImport() {
       </div>
       <button class="entry-del" data-drop="${i}" aria-label="Descartar">×</button>
     </article>`;
-  }).join('') + `<div class="btn-row">
-      <button class="btn primary" id="btnAddImported" type="button">Agregar ${pending.length} ${pending.length === 1 ? 'sesión' : 'sesiones'}</button>
+  }).join('')
+    + (pending.length > MAX_ROWS
+        ? `<p class="muted small">…y ${pending.length - MAX_ROWS} entrenamientos más, que también se van a agregar.</p>` : '')
+    + (nuevosPesos.length
+        ? `<article class="entry"><div class="entry-ico">⚖️</div><div class="entry-body">
+             <div class="entry-title">${nuevosPesos.length} registro${nuevosPesos.length > 1 ? 's' : ''} de peso</div>
+             <div class="entry-sub">de ${fmtDate(nuevosPesos[0].date)} a ${fmtDate(nuevosPesos[nuevosPesos.length - 1].date)}</div>
+           </div></article>` : '')
+    + `<div class="btn-row">
+      <button class="btn primary" id="btnAddImported" type="button">Agregar${pending.length ? ' ' + pending.length + (pending.length === 1 ? ' sesión' : ' sesiones') : ''}${nuevosPesos.length ? (pending.length ? ' y ' : ' ') + nuevosPesos.length + ' peso' + (nuevosPesos.length > 1 ? 's' : '') : ''}</button>
       <button class="btn" id="btnClearImport" type="button">Descartar todo</button>
     </div>`;
 }
@@ -968,6 +1173,38 @@ function bind() {
     }
   });
 
+  // --- importar la exportación de Salud ---
+  $('#btnPickHealth').addEventListener('click', () => $('#fileHealth').click());
+  $('#fileHealth').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    const box = $('#importPreview');
+    const mb = n => (n / 1048576).toFixed(0);
+    box.innerHTML = `<div class="import-progress"><i></i><span id="impProg">Leyendo ${esc(f.name)}…</span></div>`;
+    try {
+      const res = await readHealthExport(f, b => {
+        const el = $('#impProg');
+        if (el) el.textContent = `Leyendo ${esc(f.name)} · ${mb(b)} MB`;
+      });
+      const desde = S.profile.startDate;
+      const viejos = res.workouts.filter(w => w.date < desde).length;
+      pending = res.workouts.filter(w => w.date >= desde).sort((a, b) => a.date < b.date ? -1 : 1);
+      pendingWeights = res.weights.filter(w => w.date >= desde)
+        .sort((a, b) => a.date < b.date ? -1 : 1);
+      importNote = `Leí ${mb(res.bytes)} MB de ${esc(f.name)}. `
+        + (pending.length || pendingWeights.length
+            ? `Encontré ${pending.length} entrenamiento${pending.length === 1 ? '' : 's'} y ${pendingWeights.length} peso${pendingWeights.length === 1 ? '' : 's'} desde el inicio del desafío.`
+            : 'No hay entrenamientos ni pesos desde el inicio del desafío.')
+        + (viejos ? ` Omití ${viejos} entrenamiento${viejos === 1 ? '' : 's'} anterior${viejos === 1 ? '' : 'es'} a esa fecha.` : '');
+      renderImport();
+    } catch (err) {
+      pending = []; pendingWeights = [];
+      importNote = 'No pude leer el archivo: ' + err.message;
+      renderImport();
+    }
+  });
+
   // --- importar actividades del reloj ---
   $('#btnPickTrack').addEventListener('click', () => $('#fileTrack').click());
   $('#fileTrack').addEventListener('change', async e => {
@@ -982,6 +1219,7 @@ function bind() {
       if (parsed) pending.push(parsed); else malos++;
     }
     pending.sort((a, b) => a.date < b.date ? -1 : 1);
+    importNote = '';
     renderImport();
     if (malos) toast(`${malos} archivo${malos > 1 ? 's' : ''} sin datos legibles (¿es .fit?)`);
     else if (pending.length) toast(`${pending.length} actividad${pending.length > 1 ? 'es' : ''} lista${pending.length > 1 ? 's' : ''}`);
@@ -997,7 +1235,7 @@ function bind() {
   document.addEventListener('click', e => {
     const drop = e.target.closest('[data-drop]');
     if (drop) { pending.splice(Number(drop.dataset.drop), 1); renderImport(); return; }
-    if (e.target.closest('#btnClearImport')) { pending = []; renderImport(); return; }
+    if (e.target.closest('#btnClearImport')) { pending = []; pendingWeights = []; importNote = ''; renderImport(); return; }
     if (e.target.closest('#btnAddImported')) {
       let nuevas = 0, repetidas = 0;
       pending.forEach(c => {
@@ -1017,8 +1255,14 @@ function bind() {
         S.sessions.push(o);
         nuevas++;
       });
-      pending = [];
+      let pesos = 0;
+      pendingWeights.forEach(w => {
+        if (S.weights.some(x => x.date === w.date)) return;
+        S.weights.push(w); pesos++;
+      });
+      pending = []; pendingWeights = []; importNote = '';
       save(); render(); renderImport();
+      if (pesos) toast(`${pesos} registro${pesos > 1 ? 's' : ''} de peso agregado${pesos > 1 ? 's' : ''}`);
       toast(nuevas
         ? `${nuevas} sesión${nuevas > 1 ? 'es' : ''} agregada${nuevas > 1 ? 's' : ''}${repetidas ? ` · ${repetidas} repetida${repetidas > 1 ? 's' : ''} omitida${repetidas > 1 ? 's' : ''}` : ''}`
         : 'Ya las tenías todas cargadas');

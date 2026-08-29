@@ -22,7 +22,7 @@ usá "Agregar a pantalla de inicio". Queda como una app nativa y funciona sin se
 |---|---|
 | **Hoy** | Progreso del desafío, peso, racha, y las sesiones de la semana ordenadas desde hoy. Botones para marcar hecho o registrar. |
 | **Plan** | Las 12 semanas completas, con el detalle de cada sesión, volumen y calorías estimadas. |
-| **Registro** | Importación de actividades del reloj (GPX/TCX) y carga manual de sesiones (tipo, duración, distancia, saltos, pulso, RPE, sensación, notas) con cálculo automático de calorías, más la bitácora filtrable. |
+| **Registro** | Importación de la exportación de Salud (.zip/.xml) y de actividades sueltas (GPX/TCX), más carga manual de sesiones (tipo, duración, distancia, saltos, pulso, RPE, sensación, notas) con cálculo automático de calorías, más la bitácora filtrable. |
 | **Peso** | Registro de peso con gráfico de evolución, tendencia de 7 días, línea de meta, IMC, metabolismo basal y objetivo calórico. |
 | **Progreso** | Totales acumulados, mapa de constancia de 13 semanas, minutos por semana, tiempo en zonas de pulso, 18 logros desbloqueables y tests de control. |
 | **Ajustes** | Perfil, día de fútbol y de descanso, FC máxima, exportar/importar/borrar datos y las advertencias de seguridad. |
@@ -57,11 +57,34 @@ sesiones duras pegadas y la víspera del partido caiga siempre suave.
 
 ## Traer los datos del reloj
 
-Zepp no tiene API pública, así que la app no puede leer el reloj sola. Lo que sí hace es leer los
-archivos que Zepp exporta, sin subir nada a ningún lado.
+Ni Zepp ni Apple ofrecen una API que una página web pueda consumir: Zepp no tiene API pública, y
+HealthKit es un framework nativo de iOS sin equivalente en la nube. Así que la app trabaja sobre los
+archivos que ambos exportan, y no sube nada a ningún lado.
+
+### Exportación de Salud (iPhone) — todo de una
+
+Con la sincronización de Zepp → Salud activada, esta es la vía que trae todo junto.
+
+En **Salud** → tu foto arriba a la derecha → **Exportar todos los datos de salud** sale un `.zip`.
+Elegilo tal cual en Registro → *Traer entrenamientos*: no hace falta descomprimirlo.
+
+Ese archivo contiene el historial completo del teléfono y puede pesar cientos de MB, así que **no se
+carga en memoria**: el `.zip` se abre con `DecompressionStream` (nativa del navegador, sin
+librerías) y el XML se recorre de a trozos, quedándonos solo con los elementos `<Workout>` y los
+registros de peso. Un export de 184 MB se procesa en menos de dos segundos y no pasa de ~70 MB de
+memoria.
+
+Se leen los dos formatos que usó Apple a lo largo del tiempo: el viejo, con la distancia y la
+energía como atributos del `<Workout>`, y el actual, con hijos `<WorkoutStatistics>` que además
+traen la FC media y máxima. Millas y libras se convierten solas.
+
+Para no ensuciar la bitácora con años de caminatas, solo se importa lo que pasó **desde el inicio
+del desafío**; la app te dice cuántos entrenamientos anteriores omitió.
+
+### Archivos sueltos de Zepp
 
 En la app de Zepp: abrí la actividad → menú **···** arriba a la derecha → **Exportar** → elegí
-**TCX** o **GPX**. Después, en Registro → *Traer del reloj*, seleccioná uno o varios archivos.
+**TCX** o **GPX**. Después, en Registro → *Traer entrenamientos*, seleccioná uno o varios archivos.
 
 | Formato | Qué trae |
 |---|---|
@@ -69,11 +92,13 @@ En la app de Zepp: abrí la actividad → menú **···** arriba a la derecha �
 | **GPX** | Recorrido y tiempo; el pulso solo si el archivo trae la extensión `TrackPointExtension`. |
 | **FIT** | No soportado: es binario y necesitaría una librería externa. Exportá TCX. |
 
-La app deduce el tipo de sesión del deporte declarado en el archivo (y si no, de la velocidad
-media), lo muestra para que lo corrijas antes de confirmar, y descarta las actividades que ya
-tenías cargadas comparando fecha, tipo y duración.
+En cualquiera de las dos vías, la app deduce el tipo de sesión, lo muestra para que lo corrijas antes
+de confirmar, y descarta lo que ya tenías cargado.
 
-Los saltos de soga no vienen en el archivo: se estiman a partir del tiempo.
+El tipo se deduce del deporte declarado en el archivo y, si no viene, de la velocidad media. Las
+actividades repetidas se detectan comparando fecha, tipo y duración.
+
+Los saltos de soga no vienen en ningún formato: se estiman a partir del tiempo.
 
 ### Zonas de frecuencia cardíaca
 
@@ -111,8 +136,8 @@ manifest.json       instalación como app
 tools/              utilidades de build
 ```
 
-Sin dependencias, sin build step ni pedidos de red: los archivos del reloj se leen con `DOMParser`
-en el navegador, los gráficos son SVG generados a mano y las
+Sin dependencias, sin build step ni pedidos de red: los `.zip` se abren con `DecompressionStream` y
+los archivos del reloj se leen con `DOMParser`, todo en el navegador, los gráficos son SVG generados a mano y las
 tipografías (Chivo y Karla, subconjunto latino, SIL Open Font License 1.1) van incrustadas en el
 CSS para que la app conserve su identidad también sin conexión.
 
