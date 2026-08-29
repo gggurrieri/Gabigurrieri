@@ -74,6 +74,11 @@ librerías) y el XML se recorre de a trozos, quedándonos solo con los elementos
 registros de peso. Un export de 184 MB se procesa en menos de dos segundos y no pasa de ~70 MB de
 memoria.
 
+Salud **traduce el nombre del archivo** al idioma del teléfono: `export.xml` en inglés,
+`exportación.xml` en español. Por eso el XML no se busca por nombre sino eligiendo el más grande
+del `.zip`, descartando el documento clínico `…_cda.xml`. Si no hay ninguno, el error enumera lo
+que sí había adentro.
+
 Se leen los dos formatos que usó Apple a lo largo del tiempo: el viejo, con la distancia y la
 energía como atributos del `<Workout>`, y el actual, con hijos `<WorkoutStatistics>` que además
 traen la FC media y máxima. Millas y libras se convierten solas.

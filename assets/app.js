@@ -622,7 +622,7 @@ function consumeChunk(buf, workouts, weights, fileName, final) {
 }
 
 /* --- lectura del .zip sin librerías --- */
-async function zipEntryStream(file, nameRe) {
+async function zipEntryStream(file) {
   const tailLen = Math.min(file.size, 66560);
   const tail = new DataView(await file.slice(file.size - tailLen).arrayBuffer());
   let eocd = -1;
@@ -639,27 +639,42 @@ async function zipEntryStream(file, nameRe) {
 
   const cd = new DataView(await file.slice(cdOff, cdOff + cdSize).arrayBuffer());
   const dec = new TextDecoder();
-  let off = 0, found = null;
+  const entries = [];
+  let off = 0;
   for (let n = 0; n < count && off + 46 <= cd.byteLength; n++) {
     if (cd.getUint32(off, true) !== 0x02014b50) break;
     const nameLen = cd.getUint16(off + 28, true);
     const extraLen = cd.getUint16(off + 30, true);
     const commentLen = cd.getUint16(off + 32, true);
-    const name = dec.decode(new Uint8Array(cd.buffer, cd.byteOffset + off + 46, nameLen));
-    if (!found && nameRe.test(name)) {
-      found = {
-        name,
-        method: cd.getUint16(off + 10, true),
-        compressedSize: cd.getUint32(off + 20, true),
-        localOffset: cd.getUint32(off + 42, true)
-      };
-    }
+    entries.push({
+      name: dec.decode(new Uint8Array(cd.buffer, cd.byteOffset + off + 46, nameLen)),
+      method: cd.getUint16(off + 10, true),
+      compressedSize: cd.getUint32(off + 20, true),
+      size: cd.getUint32(off + 24, true),
+      localOffset: cd.getUint32(off + 42, true)
+    });
     off += 46 + nameLen + extraLen + commentLen;
   }
-  if (!found) throw new Error('No encontré el export.xml dentro del .zip.');
+
+  /* Salud traduce el nombre del archivo al idioma del teléfono: export.xml
+     en inglés, exportación.xml en español, y así. Por eso elegimos el XML
+     más grande en vez de buscar un nombre fijo. Se descarta el documento
+     clínico (…_cda.xml), que es otra cosa y a veces es el único que sobra. */
+  const xmls = entries
+    .filter(e => /\.xml$/i.test(e.name) && !/cda/i.test(e.name) && e.size > 0)
+    .sort((a, b) => b.size - a.size);
+  const found = xmls[0];
+  if (!found) {
+    const lista = entries.map(e => e.name).filter(Boolean).slice(0, 6).join(', ');
+    throw new Error('El .zip no contiene ningún archivo XML de datos. '
+      + (lista ? `Adentro hay: ${lista}. ¿Seguro que es el que genera Salud?` : 'Parece estar vacío.'));
+  }
+  if (found.compressedSize === 0xffffffff || found.size === 0xffffffff) {
+    throw new Error('El archivo usa formato ZIP64. Descomprimilo en el teléfono y elegí el XML.');
+  }
 
   const lh = new DataView(await file.slice(found.localOffset, found.localOffset + 30).arrayBuffer());
-  if (lh.getUint32(0, true) !== 0x04034b50) throw new Error('El .zip está dañado.');
+  if (lh.getUint32(0, true) !== 0x04034b50) throw new Error(`No pude ubicar «${found.name}» dentro del .zip.`);
   const start = found.localOffset + 30 + lh.getUint16(26, true) + lh.getUint16(28, true);
   const blob = file.slice(start, start + found.compressedSize);
   if (found.method === 0) return blob.stream();
@@ -672,7 +687,7 @@ async function zipEntryStream(file, nameRe) {
 
 async function readHealthExport(file, onProgress) {
   const isZip = /\.zip$/i.test(file.name);
-  const stream = isZip ? await zipEntryStream(file, /export\.xml$/i) : file.stream();
+  const stream = isZip ? await zipEntryStream(file) : file.stream();
   const reader = stream.getReader();
   const dec = new TextDecoder('utf-8');
   const workouts = [], weights = [];
