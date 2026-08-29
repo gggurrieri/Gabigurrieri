@@ -2341,7 +2341,7 @@ function bind() {
      Sirve para no cargar veinte valores a mano en el teléfono. */
   $('#btnPegarLab').addEventListener('click', () => {
     openModal('Pegar valores de un estudio', '',
-      'Pegá acá el estudio en formato JSON: {"date":"2026-06-06","lugar":"...","values":{"hb":16.3, ...}}. '
+      'Pegá acá el estudio en formato JSON: {"date":"2026-01-31","lugar":"...","values":{"hb":15.0, ...}}. '
       + 'Se agrega a los que ya tengas, no borra nada. Acepta también una lista de estudios.',
       txt => {
         let datos;
