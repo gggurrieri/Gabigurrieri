@@ -237,9 +237,9 @@ tools/              utilidades de build
 tests/              recorrido de extremo a extremo y generador de fixtures
 ```
 
-El ícono es una rueda de bicicleta dorada sobre negro: una sola forma, pensada para leerse a 60 px
-entre íconos planos y saturados, donde el fondo negro es justamente lo que lo distingue. El
-encabezado usa la misma marca con el aro más grueso, porque a 38 px el trazo fino se pierde.
+El ícono es un anillo de progreso dorado con una curva ascendente sobre negro. Vive en
+`assets/icon.svg` y es la única fuente: de ahí salen los PNG y el que la app rasteriza en runtime
+para el ícono de pantalla de inicio, así que cambiarlo en un solo lugar lo cambia en todos.
 
 Sin dependencias, sin build step ni pedidos de red: los `.zip` se abren con `DecompressionStream` y
 los archivos del reloj se leen con `DOMParser`, todo en el navegador, los gráficos son SVG generados a mano y las
