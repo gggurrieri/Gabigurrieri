@@ -817,6 +817,17 @@ const BADGES = [
   { i: '💯', t: '100 sesiones',    f: s => s.count >= 100 },
   { i: '📅', t: 'Semana perfecta', f: s => s.perfectWeeks >= 1 },
   { i: '🗓️', t: '4 semanas ok',    f: s => s.perfectWeeks >= 4 },
+  { i: '🎽', t: 'Al día',          f: () => { const h = hitoActual(); return !!h && h.estado !== 'atrasado' && h.estado !== 'sin-datos'; } },
+  { i: '📌', t: '4 hitos seguidos', f: () => {
+      let r = 0;
+      for (let w = 1; w <= 12; w++) {
+        const e = estadoSemana(w);
+        if (!e || !e.cerrada || e.estado === 'sin-datos') continue;
+        r = (e.estado === 'atrasado') ? 0 : r + 1;
+        if (r >= 4) return true;
+      }
+      return false;
+    } },
   { i: '⚖️', t: '-2 kg',           f: s => s.lost >= 2 },
   { i: '📉', t: '-5 kg',           f: s => s.lost >= 5 },
   { i: '🎯', t: 'Meta alcanzada',  f: () => currentWeight() <= S.profile.goalWeight },
@@ -1003,6 +1014,86 @@ function hayAlerta() {
   return est ? hallazgos(est).some(h => h.critico) : false;
 }
 
+
+/* ==================== hitos de peso por semana ====================
+   El desafío reparte la bajada total en las 12 semanas de forma pareja.
+   Se compara contra una banda, no contra un número exacto: el peso de un
+   día concreto tiene ruido de sobra —agua, comida, hora— y exigir un valor
+   puntual convierte una semana buena en una decepción. */
+const TOLERANCIA = 1.0;   // kg de margen a cada lado
+
+function bajadaTotal() {
+  const p = S.profile;
+  const t = p.startWeight - p.goalWeight;
+  return t > 0 ? t : 0;
+}
+/* Peso objetivo al día d del desafío (0 = arranque, 84 = final). */
+function objetivoDia(d) {
+  return S.profile.startWeight - bajadaTotal() * (clamp(d, 0, 84) / 84);
+}
+const objetivoSemana = n => objetivoDia(n * 7);
+
+/* Último peso registrado hasta el cierre de la semana n. */
+function pesoHastaSemana(n) {
+  const fin = addDays(S.profile.startDate, n * 7 - 1);
+  const c = S.weights.filter(w => w.date <= fin).sort((a, b) => a.date < b.date ? 1 : -1);
+  return c.length ? c[0] : null;
+}
+
+/* Estado de una semana ya cerrada, o de la que está en curso. */
+function estadoSemana(n) {
+  if (!bajadaTotal()) return null;
+  const obj = objetivoSemana(n);
+  const reg = pesoHastaSemana(n);
+  const cerrada = daysBetween(S.profile.startDate, today()) >= n * 7;
+  if (!reg) return { n, obj, cerrada, estado: 'sin-datos' };
+  const dif = reg.kg - obj;
+  let estado;
+  if (dif <= -TOLERANCIA) estado = 'adelantado';
+  else if (dif <= TOLERANCIA) estado = 'en-camino';
+  else estado = 'atrasado';
+  return { n, obj, cerrada, estado, kg: reg.kg, dif, fecha: reg.date };
+}
+
+function hitoActual() {
+  const n = currentWeek();
+  const e = estadoSemana(n);
+  if (!e) return null;
+  const p = S.profile;
+  const bajado = p.startWeight - currentWeight();
+  const deberia = p.startWeight - objetivoSemana(n);
+  return Object.assign(e, { bajado, deberia });
+}
+
+const TEXTO_ESTADO = {
+  'adelantado': 'Vas por delante del objetivo',
+  'en-camino': 'Estás en el objetivo de la semana',
+  'atrasado': 'Vas por detrás del objetivo',
+  'sin-datos': 'Todavía no registraste tu peso'
+};
+
+/* El consejo cambia según dónde estés parado, y las tres primeras semanas
+   llevan una advertencia aparte: al empezar a entrenar los músculos retienen
+   agua y la balanza puede quedarse quieta aunque estés perdiendo grasa. */
+function consejoHito(h) {
+  if (!h) return '';
+  if (h.n <= 3) {
+    return 'Ojo con las primeras semanas: al empezar a entrenar los músculos retienen agua y '
+      + 'glucógeno, y la balanza puede quedarse quieta o hasta subir aunque estés perdiendo grasa. '
+      + 'Mirá la línea de tendencia, no el número del día.';
+  }
+  if (h.estado === 'atrasado') {
+    return 'Entrenando quemás entre 2.600 y 4.000 kcal por semana, que son unos 400 gramos. '
+      + 'El resto sale de la comida: si el peso no se mueve, la palanca está ahí, no en sumar sesiones. '
+      + 'Antes de cambiar nada, fijate que estés haciendo la salida larga completa.';
+  }
+  if (h.estado === 'adelantado') {
+    return 'Vas bien, pero no aceleres: bajar más rápido que un kilo por semana suele costar músculo '
+      + 'además de grasa, y eso baja tu metabolismo justo cuando lo necesitás alto.';
+  }
+  return 'Vas justo donde tenés que ir. Sostener esto once semanas más es todo el desafío.';
+}
+
 /* ------------------------------ render ----------------------------- */
 function render() {
   renderTopbar();
@@ -1011,6 +1102,7 @@ function render() {
   renderLog();
   renderWeight();
   renderProgress();
+  renderHitos();
   renderLabs();
   renderProfile();
 }
@@ -1279,6 +1371,53 @@ function renderLog() {
   }).join('') : `<div class="empty">Todavía no registraste nada. Empezá por la primera salida en bici.</div>`;
 }
 
+function renderHitos() {
+  const card = $('#hitoCard'), mini = $('#hitoHoy');
+  if (!card) return;
+  const h = hitoActual();
+  if (!h) {                       // sin bajada por delante no hay nada que repartir
+    card.hidden = true; if (mini) mini.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  $('#hitoSemana').textContent = `semana ${h.n} de 12`;
+
+  const kg = v => v.toFixed(1).replace('.', ',');
+  const clase = 'e-' + h.estado;
+  const falta = h.dif == null ? null : Math.abs(h.dif);
+
+  $('#hitoAhora').innerHTML = `<div class="hito-estado ${clase}">
+      <b>${kg(h.obj)} kg</b><em>${esc(TEXTO_ESTADO[h.estado])}</em>
+    </div>
+    <p class="hito-detalle">${h.estado === 'sin-datos'
+      ? `Para esta altura del desafío tendrías que estar en <b>${kg(h.obj)} kg</b>, o sea <b>${kg(h.deberia)} kg</b> menos que al empezar. Registrá tu peso para ver cómo vas.`
+      : `Estás en <b>${kg(h.kg)} kg</b>: ${h.dif > 0
+          ? `te faltan <b>${kg(falta)} kg</b> para el objetivo de esta semana.`
+          : `vas <b>${kg(falta)} kg</b> por debajo del objetivo.`} Bajaste ${kg(h.bajado)} de los ${kg(h.deberia)} previstos hasta acá.`}</p>`;
+
+  $('#hitoGrilla').innerHTML = WEEKS.map(w => {
+    const e = estadoSemana(w.w);
+    let cls = '';
+    if (w.w === h.n) cls = 'h-hoy';
+    else if (e.cerrada && e.estado && e.estado !== 'sin-datos')
+      cls = (e.estado === 'atrasado') ? 'h-no' : 'h-ok';
+    return `<div class="${cls}" title="Semana ${w.w}: ${kg(e.obj)} kg">
+      <b>S${w.w}</b><span>${kg(e.obj)}</span></div>`;
+  }).join('');
+
+  $('#hitoConsejo').textContent = consejoHito(h);
+
+  if (mini) {
+    mini.hidden = false;
+    mini.className = `card hito-mini ${clase}`;
+    mini.innerHTML = `<i></i><div>
+      <b>Semana ${h.n}: ${kg(h.obj)} kg</b>
+      <span>${h.estado === 'sin-datos' ? 'Registrá tu peso para ver cómo vas'
+        : (h.dif > 0 ? `te faltan ${kg(falta)} kg` : `vas ${kg(falta)} kg por debajo`)}</span>
+    </div>`;
+  }
+}
+
 function renderWeight() {
   const p = S.profile, w = currentWeight();
   const sorted = S.weights.slice().sort((a, b) => a.date < b.date ? -1 : 1);
@@ -1286,9 +1425,16 @@ function renderWeight() {
   const labels = pts.length > 1
     ? [{ x: pts[0].x, text: fmtDate(sorted[0].date) }, { x: pts[pts.length - 1].x, text: fmtDate(sorted[sorted.length - 1].date) }]
     : [];
+  // Línea del plan, acotada al tramo que abarcan los registros para no
+  // aplastar la curva real contra el borde izquierdo del gráfico.
+  const plan = bajadaTotal() && pts.length > 1
+    ? [{ x: pts[0].x, y: objetivoDia(pts[0].x) },
+       { x: pts[pts.length - 1].x, y: objetivoDia(pts[pts.length - 1].x) }]
+    : [];
   $('#weightChart').innerHTML = lineChart([
     { points: pts, color: '#4ec9e8', width: 1.6, dots: pts.length <= 40 },
-    { points: movingAvg(pts, 7), color: '#ff6a2b', width: 2.4 }
+    { points: movingAvg(pts, 7), color: '#ff6a2b', width: 2.4 },
+    { points: plan, color: '#93949e', width: 1.6, dash: '5 5' }
   ], { goal: p.goalWeight, labels });
 
   $('#wStart').textContent = p.startWeight.toFixed(1);

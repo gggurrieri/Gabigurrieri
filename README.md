@@ -61,6 +61,23 @@ los dos: los cinco días restantes se llenan siempre en el mismo orden (suave �
 intervalos → ligero) empezando el día después del descanso, de manera que nunca queden dos
 sesiones duras pegadas y la víspera del partido caiga siempre suave.
 
+## Hitos de peso
+
+El desafío reparte la bajada total en las 12 semanas de forma pareja: de 91 a 83 kg son unos
+670 gramos por semana, así que la semana 2 pide 89,7 kg y la 12 llega a la meta. En **Cuerpo** se ve
+el objetivo de la semana en curso, cuánto falta, y la grilla de las doce con las cerradas marcadas
+según se hayan cumplido o no. El resumen aparece también en **Hoy**, y el gráfico de evolución suma
+la línea del plan punteada junto a la curva real.
+
+La comparación es contra una **banda de ±1 kg**, no contra un número exacto: el peso de un día
+puntual tiene demasiado ruido —agua, comida, hora— y exigir un valor clavado convierte una semana
+buena en una decepción.
+
+Las tres primeras semanas llevan una advertencia propia: al empezar a entrenar los músculos retienen
+agua y glucógeno, y la balanza puede quedarse quieta o subir aunque se esté perdiendo grasa. El
+consejo también cambia según el estado — ir por detrás apunta a la comida, que es donde está la
+palanca real, e ir por delante advierte que bajar más de un kilo por semana suele costar músculo.
+
 ## Traer los datos del reloj
 
 Ni Zepp ni Apple ofrecen una API que una página web pueda consumir: Zepp no tiene API pública, y
@@ -180,6 +197,7 @@ cuota; como todo lo demás, no salen del dispositivo.
 python3 tests/fixtures.py tmp      # genera los archivos de ejemplo
 node tests/e2e.js tmp              # 43 comprobaciones, sale con 1 si algo falla
 node tests/labs.js                 # 27 comprobaciones sobre los estudios
+node tests/hitos.js                # 18 comprobaciones sobre los hitos de peso
 ```
 
 `tests/e2e.js` recorre la app como un usuario, en viewport de iPhone y con eventos táctiles reales.

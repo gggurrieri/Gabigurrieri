@@ -66,6 +66,7 @@
         <div class="card mini"><b id="statWeekSessions">0</b><span>sesiones esta semana</span></div>
         <div class="card mini"><b id="statWeekMin">0'</b><span>minutos esta semana</span></div>
       </div>
+      <div class="card hito-mini" id="hitoHoy" hidden></div>
 
       <h2 class="section-title">Semana <span id="todayWeekNum">1</span> · <span id="todayBlock">—</span></h2>
       <p class="tip" id="todayTip"></p>
@@ -196,10 +197,17 @@
         </div>
       </form>
 
+      <div class="card" id="hitoCard">
+        <div class="card-head"><h2>Objetivo de la semana</h2><span class="muted small" id="hitoSemana"></span></div>
+        <div id="hitoAhora"></div>
+        <div id="hitoGrilla" class="hitos"></div>
+        <p class="muted small" id="hitoConsejo"></p>
+      </div>
+
       <div class="card">
         <div class="card-head">
           <h2>Evolución</h2>
-          <span class="muted small">línea suave = tendencia 7 días</span>
+          <span class="muted small">punteada = el plan · suave = tu tendencia</span>
         </div>
         <div id="weightChart" class="chart"></div>
         <div class="row-3">
