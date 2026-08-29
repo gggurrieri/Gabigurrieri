@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1116">
+<title>Desafío 12 Semanas · Bici + Soga</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">12</span>
+      <div>
+        <h1>Desafío Bici + Soga</h1>
+        <p id="topbarSub">—</p>
+      </div>
+    </div>
+    <button class="icon-btn" id="btnSettings" title="Ajustes" aria-label="Ajustes">⚙</button>
+  </header>
+
+  <main>
+
+    <!-- ============ HOY ============ -->
+    <section class="view" id="view-hoy">
+      <div class="hero card">
+        <div class="hero-ring">
+          <svg viewBox="0 0 120 120" class="ring">
+            <circle cx="60" cy="60" r="52" class="ring-bg"></circle>
+            <circle cx="60" cy="60" r="52" class="ring-fg" id="ringProgress"></circle>
+          </svg>
+          <div class="ring-label">
+            <strong id="ringDay">1</strong>
+            <span>de 84 días</span>
+          </div>
+        </div>
+        <div class="hero-stats">
+          <div><b id="statWeight">—</b><span>peso actual</span></div>
+          <div><b id="statLost">—</b><span>variación</span></div>
+          <div><b id="statStreak">—</b><span>racha</span></div>
+        </div>
+      </div>
+
+      <div class="row-2">
+        <div class="card mini"><b id="statWeekSessions">0</b><span>sesiones esta semana</span></div>
+        <div class="card mini"><b id="statWeekMin">0'</b><span>minutos esta semana</span></div>
+      </div>
+
+      <h2 class="section-title">Semana <span id="todayWeekNum">1</span> · <span id="todayBlock">—</span></h2>
+      <p class="tip" id="todayTip"></p>
+      <div id="todayList" class="stack"></div>
+
+      <h2 class="section-title">Registro rápido</h2>
+      <div class="card">
+        <div class="quick-grid" id="quickGrid"></div>
+      </div>
+    </section>
+
+    <!-- ============ PLAN ============ -->
+    <section class="view" id="view-plan" hidden>
+      <div class="card intro">
+        <h2>Plan de 12 semanas</h2>
+        <p>Cuatro bloques progresivos. Las semanas 3, 6 y 9 son de <b>descarga</b>: bajan el volumen para que el cuerpo asimile. La semana 12 cierra con tests para medir cuánto mejoraste.</p>
+      </div>
+      <div class="week-nav" id="weekNav"></div>
+      <div id="planDetail" class="stack"></div>
+    </section>
+
+    <!-- ============ REGISTRO ============ -->
+    <section class="view" id="view-log" hidden>
+      <form class="card form" id="formSession">
+        <h2>Nueva sesión</h2>
+        <div class="grid-2">
+          <label>Fecha
+            <input type="date" name="date" id="sesDate" required>
+          </label>
+          <label>Tipo
+            <select name="type" id="sesType">
+              <option value="bici">🚴 Bici</option>
+              <option value="soga">🪢 Soga</option>
+              <option value="futbol">⚽ Fútbol</option>
+              <option value="fuerza">💪 Fuerza / core</option>
+              <option value="movilidad">🚶 Caminata / movilidad</option>
+              <option value="otro">✳️ Otro</option>
+            </select>
+          </label>
+          <label>Duración (min)
+            <input type="number" name="minutes" id="sesMin" min="1" max="600" required>
+          </label>
+          <label>Intensidad
+            <select name="intensity" id="sesInt">
+              <option value="suave">Suave (charlo tranquilo)</option>
+              <option value="moderado" selected>Moderado (respiro fuerte)</option>
+              <option value="fuerte">Fuerte (no puedo hablar)</option>
+            </select>
+          </label>
+          <label class="f-bici">Distancia (km)
+            <input type="number" name="distance" id="sesKm" min="0" max="500" step="0.1" placeholder="opcional">
+          </label>
+          <label class="f-soga">Saltos
+            <input type="number" name="jumps" id="sesJumps" min="0" max="50000" placeholder="se estiman solos">
+          </label>
+          <label>Esfuerzo percibido (RPE 1-10)
+            <input type="range" name="rpe" id="sesRpe" min="1" max="10" value="6">
+            <output id="rpeOut">6</output>
+          </label>
+          <label>Sensación
+            <select name="mood" id="sesMood">
+              <option value="3">🙂 Bien</option>
+              <option value="4">💪 Excelente</option>
+              <option value="2">😐 Justo</option>
+              <option value="1">😵 Muy duro</option>
+            </select>
+          </label>
+        </div>
+        <label>Notas
+          <input type="text" name="notes" id="sesNotes" maxlength="140" placeholder="Ruta, clima, molestias, lo que quieras">
+        </label>
+        <input type="hidden" id="sesPlanId">
+        <div class="form-actions">
+          <span class="kcal-preview" id="kcalPreview">≈ 0 kcal</span>
+          <button type="submit" class="btn primary">Guardar sesión</button>
+        </div>
+      </form>
+
+      <h2 class="section-title">Bitácora <span class="muted" id="logCount"></span></h2>
+      <div class="filters" id="logFilters">
+        <button class="chip active" data-f="all">Todo</button>
+        <button class="chip" data-f="bici">🚴 Bici</button>
+        <button class="chip" data-f="soga">🪢 Soga</button>
+        <button class="chip" data-f="futbol">⚽ Fútbol</button>
+        <button class="chip" data-f="fuerza">💪 Fuerza</button>
+      </div>
+      <div id="logList" class="stack"></div>
+    </section>
+
+    <!-- ============ PESO ============ -->
+    <section class="view" id="view-peso" hidden>
+      <form class="card form" id="formWeight">
+        <h2>Registrar peso</h2>
+        <div class="grid-2">
+          <label>Fecha<input type="date" name="date" id="wDate" required></label>
+          <label>Peso (kg)<input type="number" name="kg" id="wKg" step="0.1" min="30" max="250" required></label>
+        </div>
+        <div class="form-actions">
+          <span class="muted small">Pesate en ayunas, siempre el mismo día y con la misma balanza.</span>
+          <button type="submit" class="btn primary">Guardar</button>
+        </div>
+      </form>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Evolución</h2>
+          <span class="muted small">línea suave = tendencia 7 días</span>
+        </div>
+        <div id="weightChart" class="chart"></div>
+        <div class="row-3">
+          <div class="mini"><b id="wStart">—</b><span>inicio</span></div>
+          <div class="mini"><b id="wNow">—</b><span>hoy</span></div>
+          <div class="mini"><b id="wGoal">—</b><span>meta</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Composición y energía</h2>
+        <div class="kv"><span>IMC actual</span><b id="bmiNow">—</b></div>
+        <div class="kv"><span>IMC en la meta</span><b id="bmiGoal">—</b></div>
+        <div class="kv"><span>Metabolismo basal (est.)</span><b id="bmr">—</b></div>
+        <div class="kv"><span>Gasto diario estimado</span><b id="tdee">—</b></div>
+        <div class="kv"><span>Objetivo para bajar ~0,5 kg por semana</span><b id="target">—</b></div>
+        <div class="kv"><span>Proteína sugerida</span><b id="protein">—</b></div>
+        <p class="muted small">Estimaciones orientativas (fórmula Mifflin-St Jeor). No reemplazan a un nutricionista ni a un control médico.</p>
+      </div>
+
+      <div class="card" id="weightLogCard">
+        <h2>Historial</h2>
+        <div id="weightList" class="stack tight"></div>
+      </div>
+    </section>
+
+    <!-- ============ PROGRESO ============ -->
+    <section class="view" id="view-progreso" hidden>
+      <div class="card">
+        <h2>Totales del desafío</h2>
+        <div class="totals" id="totals"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Constancia</h2><span class="muted small">últimas 13 semanas</span></div>
+        <div id="heatmap" class="heatmap"></div>
+        <div class="heat-legend"><span>menos</span><i class="h0"></i><i class="h1"></i><i class="h2"></i><i class="h3"></i><i class="h4"></i><span>más</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Minutos por semana</h2></div>
+        <div id="weekChart" class="chart"></div>
+      </div>
+
+      <div class="card">
+        <h2>Logros</h2>
+        <div id="badges" class="badges"></div>
+      </div>
+
+      <form class="card form" id="formTest">
+        <h2>Test de control</h2>
+        <p class="muted small">Hacelo en la semana 1 y repetilo en la 6 y en la 12, en las mismas condiciones.</p>
+        <div class="grid-2">
+          <label>Fecha<input type="date" id="tDate" required></label>
+          <label>Bici: km en 12 min<input type="number" id="tBike" step="0.1" min="0" placeholder="km"></label>
+          <label>Soga: saltos en 1 min<input type="number" id="tJump" min="0" placeholder="saltos"></label>
+          <label>Plancha: máximo (seg)<input type="number" id="tPlank" min="0" placeholder="seg"></label>
+        </div>
+        <div class="form-actions"><span></span><button class="btn primary" type="submit">Guardar test</button></div>
+      </form>
+      <div id="testList" class="stack tight"></div>
+    </section>
+
+    <!-- ============ AJUSTES ============ -->
+    <section class="view" id="view-ajustes" hidden>
+      <form class="card form" id="formProfile">
+        <h2>Tu perfil</h2>
+        <div class="grid-2">
+          <label>Nombre<input type="text" id="pName" placeholder="Gabi"></label>
+          <label>Edad<input type="number" id="pAge" min="14" max="99"></label>
+          <label>Altura (cm)<input type="number" id="pHeight" min="120" max="230"></label>
+          <label>Sexo
+            <select id="pSex"><option value="m">Masculino</option><option value="f">Femenino</option></select>
+          </label>
+          <label>Peso inicial (kg)<input type="number" id="pStart" step="0.1"></label>
+          <label>Peso objetivo (kg)<input type="number" id="pGoal" step="0.1"></label>
+          <label>Inicio del desafío<input type="date" id="pDate"></label>
+          <label>Día de fútbol
+            <select id="pFootball">
+              <option value="6">Domingo</option><option value="5">Sábado</option>
+              <option value="4">Viernes</option><option value="3">Jueves</option>
+              <option value="2">Miércoles</option><option value="1">Martes</option><option value="0">Lunes</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-actions"><span></span><button class="btn primary" type="submit">Guardar perfil</button></div>
+      </form>
+
+      <div class="card">
+        <h2>Tus datos</h2>
+        <p class="muted small">Todo se guarda solo en este navegador. Exportá de vez en cuando para no perder nada si cambiás de teléfono o limpiás el navegador.</p>
+        <div class="btn-row">
+          <button class="btn" id="btnExport">Exportar copia</button>
+          <button class="btn" id="btnImport">Importar copia</button>
+          <button class="btn danger" id="btnReset">Borrar todo</button>
+        </div>
+        <input type="file" id="fileImport" accept="application/json" hidden>
+      </div>
+
+      <div class="card">
+        <h2>Antes de arrancar</h2>
+        <ul class="notes">
+          <li><b>La soga pega fuerte.</b> A 91 kg el impacto en gemelos, tendón de Aquiles y rodillas es real. Saltá bajo (2-3 cm), sobre superficie que amortigüe (goma, madera, pasto firme — nunca cemento pelado) y con zapatillas con amortiguación. Si aparece dolor puntual en el tendón, esa semana lo reemplazás por bici.</li>
+          <li><b>La bici es tu volumen.</b> Es donde vas a acumular la mayor parte del gasto calórico sin castigar las articulaciones. Si un día no llegás a todo, priorizá la bici.</li>
+          <li><b>Progresión antes que heroísmo.</b> El plan sube ~10% por semana. Saltearse escalones es la forma más rápida de lesionarse y perder un mes.</li>
+          <li><b>Consultá al médico</b> antes de empezar si tenés presión alta, dolor de pecho, mareos, problemas articulares o hace mucho que no hacés un chequeo.</li>
+        </ul>
+      </div>
+    </section>
+
+  </main>
+
+  <nav class="tabbar">
+    <button class="tab active" data-view="hoy"><span>🏠</span>Hoy</button>
+    <button class="tab" data-view="plan"><span>📋</span>Plan</button>
+    <button class="tab" data-view="log"><span>➕</span>Registro</button>
+    <button class="tab" data-view="peso"><span>⚖️</span>Peso</button>
+    <button class="tab" data-view="progreso"><span>📈</span>Progreso</button>
+  </nav>
+
+  <div class="toast" id="toast" hidden></div>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>
