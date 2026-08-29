@@ -713,10 +713,12 @@ function isDuplicate(c) {
 function lineChart(series, opts) {
   opts = opts || {};
   const W = 320, H = 150, ml = 34, mr = 8, mt = 12, mb = 22;
-  const all = series.flatMap(s => s.points);
-  if (all.length < 2) {
+  /* Se mide sobre la serie principal: sumando la tendencia, un solo peso
+     daban dos puntos y el gráfico salía degenerado. */
+  if (!series.length || series[0].points.length < 2) {
     return `<div class="empty">Cargá al menos dos pesos para ver la curva.</div>`;
   }
+  const all = series.flatMap(s => s.points);
   const xs = all.map(p => p.x), ys = all.map(p => p.y);
   let y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
   if (opts.goal != null) { y0 = Math.min(y0, opts.goal); y1 = Math.max(y1, opts.goal); }
@@ -917,18 +919,74 @@ function renderPlan() {
 let pending = [];
 let pendingWeights = [];
 let importNote = '';
+let lastScan = null;          // última exploración de un archivo de Salud
+let importRango = 'inicio';
 const MAX_ROWS = 40;
+
+const RANGOS = [
+  ['inicio', 'el inicio del desafío'],
+  ['90',     'los últimos 3 meses'],
+  ['365',    'el último año'],
+  ['todo',   'siempre']
+];
+function rangoDesde(r) {
+  if (r === 'todo') return '0000-01-01';
+  if (r === '90') return addDays(today(), -90);
+  if (r === '365') return addDays(today(), -365);
+  return S.profile.startDate;
+}
+function cuentaEn(r) {
+  if (!lastScan) return 0;
+  const d = rangoDesde(r);
+  return lastScan.workouts.filter(w => w.date >= d).length;
+}
+
+/* Re-filtra lo ya leído del archivo: cambiar el rango no vuelve a abrirlo. */
+function aplicarRango(r) {
+  if (!lastScan) return;
+  importRango = r;
+  const desde = rangoDesde(r);
+  const orden = (a, b) => a.date < b.date ? -1 : 1;
+  pending = lastScan.workouts.filter(w => w.date >= desde).sort(orden);
+  pendingWeights = lastScan.weights.filter(w => w.date >= desde).sort(orden);
+
+  const total = lastScan.workouts.length;
+  const cabeza = `Leí ${lastScan.mb} MB de ${lastScan.nombre}: ${total} entrenamiento${total === 1 ? '' : 's'} en total. `;
+  if (!total) {
+    importNote = cabeza + 'Salud no tiene ninguno guardado. Revisá que en Zepp esté activada la '
+      + 'sincronización con Apple Salud (Perfil → Ajustes → Apple Salud) y que hayas elegido el .zip '
+      + 'que genera Salud. Mientras tanto podés traer las actividades una por una en TCX desde Zepp.'
+      + (pendingWeights.length ? ` Los ${pendingWeights.length} registros de peso sí están.` : '');
+  } else if (!pending.length && !pendingWeights.length) {
+    importNote = cabeza + `Ninguno es posterior al ${fmtDate(desde)}. Ampliá el rango acá abajo para traerlos.`;
+  } else {
+    const fuera = total - pending.length;
+    importNote = cabeza + `Listos para agregar: ${pending.length}`
+      + (pendingWeights.length ? ` y ${pendingWeights.length} registro${pendingWeights.length === 1 ? '' : 's'} de peso` : '')
+      + '.'
+      + (fuera ? ` Quedan ${fuera} fuera del rango: ampliá abajo si los querés.` : '');
+  }
+  renderImport();
+}
 
 function renderImport() {
   const box = $('#importPreview');
   const nuevosPesos = pendingWeights.filter(w => !S.weights.some(x => x.date === w.date));
   if (!pending.length && !nuevosPesos.length) {
-    box.innerHTML = importNote ? `<p class="import-note">${esc(importNote)}</p>` : '';
+    box.innerHTML = (importNote ? `<p class="import-note">${esc(importNote)}</p>` : '')
+      + (lastScan ? `<label class="import-rango">Traer desde
+          <select id="impRango">${RANGOS.map(([v, t]) =>
+            `<option value="${v}"${v === importRango ? ' selected' : ''}>${t} · ${cuentaEn(v)}</option>`).join('')}</select>
+        </label>` : '');
     return;
   }
   const opts = [['bici','🚴 Bici'],['soga','🪢 Soga'],['futbol','⚽ Fútbol'],
                 ['fuerza','💪 Fuerza'],['movilidad','🚶 Caminata'],['otro','✳️ Otro']];
-  box.innerHTML = (importNote ? `<p class="import-note">${esc(importNote)}</p>` : '')
+  const selector = lastScan ? `<label class="import-rango">Traer desde
+      <select id="impRango">${RANGOS.map(([v, t]) =>
+        `<option value="${v}"${v === importRango ? ' selected' : ''}>${t} · ${cuentaEn(v)}</option>`).join('')}</select>
+    </label>` : '';
+  box.innerHTML = (importNote ? `<p class="import-note">${esc(importNote)}</p>` : '') + selector
     + pending.slice(0, MAX_ROWS).map((c, i) => {
     const dup = isDuplicate(c);
     const bits = [fmtMin(c.minutes)];
@@ -1207,36 +1265,13 @@ function bind() {
         const el = $('#impProg');
         if (el) el.textContent = `Leyendo ${esc(f.name)} · ${mb(b)} MB`;
       });
-      const desde = S.profile.startDate;
-      const total = res.workouts.length;
-      const viejos = res.workouts.filter(w => w.date < desde).length;
-      pending = res.workouts.filter(w => w.date >= desde).sort((a, b) => a.date < b.date ? -1 : 1);
-      pendingWeights = res.weights.filter(w => w.date >= desde)
-        .sort((a, b) => a.date < b.date ? -1 : 1);
-
-      const leido = `Leí ${mb(res.bytes)} MB de ${esc(f.name)} y encontré ${total} entrenamiento${total === 1 ? '' : 's'} en total. `;
-      if (!total) {
-        // Ni un solo entrenamiento: casi siempre es que Salud no los tiene.
-        importNote = leido + 'Salud no tiene ningún entrenamiento guardado. '
-          + 'Revisá que en Zepp esté activada la sincronización con Apple Salud (Perfil → Ajustes → Apple Salud) '
-          + 'y que hayas elegido el .zip que genera Salud, no otro archivo. Mientras tanto podés traer las '
-          + 'actividades una por una en TCX desde Zepp.'
-          + (pendingWeights.length
-              ? ` Los ${pendingWeights.length} registro${pendingWeights.length === 1 ? '' : 's'} de peso sí están y los podés agregar igual.`
-              : '');
-      } else if (!pending.length && !pendingWeights.length) {
-        importNote = leido + `Todos son anteriores al ${fmtDate(desde)}, el inicio de tu desafío, así que no traje ninguno. `
-          + 'Si querés incluirlos, cambiá la fecha de inicio en Ajustes y volvé a importar.';
-      } else {
-        importNote = leido
-          + `Traigo ${pending.length} desde el ${fmtDate(desde)}`
-          + (pendingWeights.length ? ` y ${pendingWeights.length} registro${pendingWeights.length === 1 ? '' : 's'} de peso` : '')
-          + '.'
-          + (viejos ? ` Los ${viejos} anteriores a esa fecha quedaron afuera.` : '');
-      }
-      renderImport();
+      lastScan = { workouts: res.workouts, weights: res.weights, mb: mb(res.bytes), nombre: f.name };
+      // Si nada entra en el rango por defecto, se abre al que sí trae algo.
+      let r = 'inicio';
+      if (!cuentaEn(r)) r = ['90', '365', 'todo'].find(x => cuentaEn(x)) || 'inicio';
+      aplicarRango(r);
     } catch (err) {
-      pending = []; pendingWeights = [];
+      pending = []; pendingWeights = []; lastScan = null;
       importNote = 'No pude leer el archivo: ' + err.message;
       renderImport();
     }
@@ -1256,13 +1291,15 @@ function bind() {
       if (parsed) pending.push(parsed); else malos++;
     }
     pending.sort((a, b) => a.date < b.date ? -1 : 1);
-    importNote = '';
+    importNote = ''; lastScan = null;
     renderImport();
     if (malos) toast(`${malos} archivo${malos > 1 ? 's' : ''} sin datos legibles (¿es .fit?)`);
     else if (pending.length) toast(`${pending.length} actividad${pending.length > 1 ? 'es' : ''} lista${pending.length > 1 ? 's' : ''}`);
   });
 
   document.addEventListener('change', e => {
+    const rango = e.target.closest('#impRango');
+    if (rango) { aplicarRango(rango.value); return; }
     const sel = e.target.closest('.imp-type');
     if (!sel) return;
     pending[Number(sel.dataset.i)].type = sel.value;
@@ -1297,8 +1334,11 @@ function bind() {
         if (S.weights.some(x => x.date === w.date)) return;
         S.weights.push(w); pesos++;
       });
-      pending = []; pendingWeights = []; importNote = '';
+      pending = []; pendingWeights = []; importNote = ''; lastScan = null;
       save(); render(); renderImport();
+      // Para que se vea dónde quedaron, en vez de dejar la pantalla igual.
+      const lista = $('#logList');
+      if (lista && nuevas) lista.scrollIntoView({ behavior: 'smooth', block: 'start' });
       if (pesos) toast(`${pesos} registro${pesos > 1 ? 's' : ''} de peso agregado${pesos > 1 ? 's' : ''}`);
       toast(nuevas
         ? `${nuevas} sesión${nuevas > 1 ? 'es' : ''} agregada${nuevas > 1 ? 's' : ''}${repetidas ? ` · ${repetidas} repetida${repetidas > 1 ? 's' : ''} omitida${repetidas > 1 ? 's' : ''}` : ''}`
@@ -1431,11 +1471,35 @@ function bind() {
   });
 
   $('#btnReset').addEventListener('click', () => {
-    if (!confirm('Esto borra todas tus sesiones, pesos y tests. ¿Seguro?')) return;
-    S = clonar(DEFAULTS);
-    S.profile.startDate = today();
-    save(); planWeek = null; render(); toast('Todo borrado');
+    confirmar('¿Borrar todo?',
+      'Se van a perder todas tus sesiones, pesos y tests. Si no exportaste una copia, no hay vuelta atrás.',
+      () => {
+        S = clonar(DEFAULTS);
+        S.profile.startDate = today();
+        save(); planWeek = null; pending = []; pendingWeights = []; lastScan = null;
+        render(); renderImport(); toast('Todo borrado');
+      });
   });
+}
+
+/* Diálogo de confirmación propio: los cuadros nativos del navegador
+   quedan bloqueados cuando la página se embebe, y ahí el botón no haría
+   nada sin avisar. */
+function confirmar(titulo, texto, onOk) {
+  const back = document.createElement('div');
+  back.style.cssText = 'position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.65);display:grid;place-items:center;padding:18px';
+  back.innerHTML = `<div style="background:#1b1e25;border:1px solid #2c303a;border-radius:16px;padding:18px;width:100%;max-width:400px">
+    <h2 style="font-size:15px;margin:0 0 8px">${esc(titulo)}</h2>
+    <p style="font-size:13px;color:#93949e;margin:0 0 16px">${esc(texto)}</p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn" data-no>Cancelar</button>
+      <button class="btn danger" data-si>Borrar todo</button>
+    </div></div>`;
+  back.addEventListener('click', e => {
+    if (e.target === back || e.target.closest('[data-no]')) back.remove();
+    if (e.target.closest('[data-si]')) { back.remove(); onOk(); }
+  });
+  document.body.appendChild(back);
 }
 
 /* modal simple para exportar / importar texto */
@@ -1460,6 +1524,9 @@ function openModal(title, value, note, onConfirm) {
 
 /* ------------------------------- init ------------------------------ */
 function init() {
+  /* Sin esto el estado vive solo en memoria hasta la primera acción, y la
+     fecha de inicio del desafío se recalcula a "hoy" en cada apertura. */
+  if (!localStorage.getItem(KEY)) save();
   $('#sesDate').value = today();
   $('#wDate').value = today();
   $('#tDate').value = today();
