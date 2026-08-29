@@ -312,13 +312,13 @@ function lineChart(series, opts) {
   let g = '';
   for (let i = 0; i <= 3; i++) {
     const v = y0 + (y1 - y0) * i / 3, y = py(v);
-    g += `<line x1="${ml}" y1="${y.toFixed(1)}" x2="${W - mr}" y2="${y.toFixed(1)}" stroke="#2a323d" stroke-width="1"/>`;
-    g += `<text x="${ml - 5}" y="${(y + 3.5).toFixed(1)}" fill="#8d9aab" font-size="9" text-anchor="end">${v.toFixed(1)}</text>`;
+    g += `<line x1="${ml}" y1="${y.toFixed(1)}" x2="${W - mr}" y2="${y.toFixed(1)}" stroke="#2c303a" stroke-width="1"/>`;
+    g += `<text x="${ml - 5}" y="${(y + 3.5).toFixed(1)}" fill="#93949e" font-size="9" text-anchor="end">${v.toFixed(1)}</text>`;
   }
   if (opts.goal != null && opts.goal >= y0 && opts.goal <= y1) {
     const y = py(opts.goal);
-    g += `<line x1="${ml}" y1="${y.toFixed(1)}" x2="${W - mr}" y2="${y.toFixed(1)}" stroke="#4ade80" stroke-width="1.4" stroke-dasharray="4 4"/>`;
-    g += `<text x="${W - mr}" y="${(y - 4).toFixed(1)}" fill="#4ade80" font-size="9" text-anchor="end">meta</text>`;
+    g += `<line x1="${ml}" y1="${y.toFixed(1)}" x2="${W - mr}" y2="${y.toFixed(1)}" stroke="#5cd68a" stroke-width="1.4" stroke-dasharray="4 4"/>`;
+    g += `<text x="${W - mr}" y="${(y - 4).toFixed(1)}" fill="#5cd68a" font-size="9" text-anchor="end">meta</text>`;
   }
   series.forEach(s => {
     const d = s.points.map((p, i) => (i ? 'L' : 'M') + px(p.x).toFixed(1) + ' ' + py(p.y).toFixed(1)).join(' ');
@@ -327,7 +327,7 @@ function lineChart(series, opts) {
   });
   const lab = (opts.labels || []);
   lab.forEach(l => {
-    g += `<text x="${px(l.x).toFixed(1)}" y="${H - 5}" fill="#8d9aab" font-size="9" text-anchor="middle">${esc(l.text)}</text>`;
+    g += `<text x="${px(l.x).toFixed(1)}" y="${H - 5}" fill="#93949e" font-size="9" text-anchor="middle">${esc(l.text)}</text>`;
   });
   return `<svg viewBox="0 0 ${W} ${H}" role="img">${g}</svg>`;
 }
@@ -340,16 +340,16 @@ function barChart(items) {
   let g = '';
   for (let i = 0; i <= 2; i++) {
     const v = max * i / 2, y = mt + (1 - i / 2) * (H - mt - mb);
-    g += `<line x1="${ml}" y1="${y.toFixed(1)}" x2="${W - mr}" y2="${y.toFixed(1)}" stroke="#2a323d" stroke-width="1"/>`;
-    g += `<text x="${ml - 4}" y="${(y + 3.5).toFixed(1)}" fill="#8d9aab" font-size="9" text-anchor="end">${Math.round(v)}</text>`;
+    g += `<line x1="${ml}" y1="${y.toFixed(1)}" x2="${W - mr}" y2="${y.toFixed(1)}" stroke="#2c303a" stroke-width="1"/>`;
+    g += `<text x="${ml - 4}" y="${(y + 3.5).toFixed(1)}" fill="#93949e" font-size="9" text-anchor="end">${Math.round(v)}</text>`;
   }
   items.forEach((it, i) => {
     const h = (it.value / max) * (H - mt - mb);
     const x = ml + i * bw + bw * 0.18, w = bw * 0.64;
     const y = mt + (H - mt - mb) - h;
-    g += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(1, h).toFixed(1)}" rx="2.5" fill="${it.current ? '#4ade80' : '#2f6f4a'}"/>`;
+    g += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(1, h).toFixed(1)}" rx="2.5" fill="${it.current ? '#ff6a2b' : '#8a3d1c'}"/>`;
     if (items.length <= 14 || i % 2 === 0)
-      g += `<text x="${(x + w / 2).toFixed(1)}" y="${H - 5}" fill="#8d9aab" font-size="8.5" text-anchor="middle">${esc(it.label)}</text>`;
+      g += `<text x="${(x + w / 2).toFixed(1)}" y="${H - 5}" fill="#93949e" font-size="8.5" text-anchor="middle">${esc(it.label)}</text>`;
   });
   return `<svg viewBox="0 0 ${W} ${H}" role="img">${g}</svg>`;
 }
@@ -436,7 +436,7 @@ function renderToday() {
   $('#statWeight').textContent = w.toFixed(1) + ' kg';
   const diff = w - p.startWeight;
   $('#statLost').textContent = (diff > 0 ? '+' : '') + diff.toFixed(1) + ' kg';
-  $('#statLost').style.color = diff <= 0 ? 'var(--accent)' : 'var(--danger)';
+  $('#statLost').style.color = diff <= 0 ? 'var(--good)' : 'var(--danger)';
   $('#statStreak').textContent = st.streak + (st.streak === 1 ? ' día' : ' días');
 
   const ws = weekSummary();
@@ -523,8 +523,8 @@ function renderWeight() {
     ? [{ x: pts[0].x, text: fmtDate(sorted[0].date) }, { x: pts[pts.length - 1].x, text: fmtDate(sorted[sorted.length - 1].date) }]
     : [];
   $('#weightChart').innerHTML = lineChart([
-    { points: pts, color: '#38bdf8', width: 1.6, dots: pts.length <= 40 },
-    { points: movingAvg(pts, 7), color: '#4ade80', width: 2.4 }
+    { points: pts, color: '#4ec9e8', width: 1.6, dots: pts.length <= 40 },
+    { points: movingAvg(pts, 7), color: '#ff6a2b', width: 2.4 }
   ], { goal: p.goalWeight, labels });
 
   $('#wStart').textContent = p.startWeight.toFixed(1);
@@ -813,9 +813,9 @@ function bind() {
 function openModal(title, value, onConfirm) {
   const back = document.createElement('div');
   back.style.cssText = 'position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.65);display:grid;place-items:center;padding:18px';
-  back.innerHTML = `<div style="background:#181e26;border:1px solid #2a323d;border-radius:16px;padding:16px;width:100%;max-width:520px">
+  back.innerHTML = `<div style="background:#1b1e25;border:1px solid #2c303a;border-radius:16px;padding:16px;width:100%;max-width:520px">
     <h2 style="font-size:15px;margin:0 0 10px">${esc(title)}</h2>
-    <textarea id="modalText" style="width:100%;height:190px;background:#0e1116;color:#e7edf5;border:1px solid #2a323d;border-radius:10px;padding:10px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;resize:vertical">${esc(value)}</textarea>
+    <textarea id="modalText" style="width:100%;height:190px;background:#131519;color:#ece8e1;border:1px solid #2c303a;border-radius:10px;padding:10px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;resize:vertical">${esc(value)}</textarea>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
       <button class="btn" data-close>Cerrar</button>
       ${onConfirm ? '<button class="btn primary" data-ok>Importar</button>' : ''}

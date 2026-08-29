@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
-  <rect width="192" height="192" rx="42" fill="#0e1116"/>
-  <circle cx="96" cy="96" r="62" fill="none" stroke="#1f2630" stroke-width="14"/>
-  <circle cx="96" cy="96" r="62" fill="none" stroke="#4ade80" stroke-width="14"
+  <rect width="192" height="192" rx="42" fill="#131519"/>
+  <circle cx="96" cy="96" r="62" fill="none" stroke="#2b3039" stroke-width="14"/>
+  <circle cx="96" cy="96" r="62" fill="none" stroke="#ff6a2b" stroke-width="14"
           stroke-linecap="round" stroke-dasharray="290 100" transform="rotate(-90 96 96)"/>
   <text x="96" y="112" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif"
-        font-size="52" font-weight="700" fill="#e7edf5" text-anchor="middle">12</text>
+        font-size="52" font-weight="700" fill="#ece8e1" text-anchor="middle">12</text>
 </svg>

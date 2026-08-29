@@ -71,4 +71,9 @@ manifest.json       instalación como app
 tools/              utilidades de build
 ```
 
-Sin dependencias, sin build step. Los gráficos son SVG generados a mano.
+Sin dependencias, sin build step ni pedidos de red: los gráficos son SVG generados a mano y las
+tipografías (Chivo y Karla, subconjunto latino, SIL Open Font License 1.1) van incrustadas en el
+CSS para que la app conserve su identidad también sin conexión.
+
+`tools/build-artifact.sh` genera una versión de un solo archivo en `dist/` por si querés publicarla
+o compartirla sin la carpeta entera.
