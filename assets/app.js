@@ -440,7 +440,7 @@ function parseGpx(doc, fileName) {
     hrAvg: hs.avg, hrMax: hs.max,
     zones: zonesFromSamples(samples),
     type: guessType(label, km, minutes),
-    label: (label || '').trim() || fileName, file: fileName
+    label: (label || '').trim() || fileName, origin: 'reloj', file: fileName
   };
 }
 
@@ -482,7 +482,7 @@ function parseTcx(doc, fileName) {
     zones: zonesFromSamples(samples),
     watchKcal: Math.round(cal) || 0,
     type: guessType(label, km, minutes),
-    label: label.trim() || fileName, file: fileName
+    label: label.trim() || fileName, origin: 'reloj', file: fileName
   };
 }
 
@@ -564,7 +564,7 @@ function parseWorkout(block, fileName) {
     hrAvg, hrMax, zones: null,
     type: hkType(a.workoutActivityType),
     label: hkLabel(a.workoutActivityType) + (a.sourceName ? ' · ' + a.sourceName : ''),
-    file: fileName
+    origin: 'salud', file: fileName
   };
 }
 
@@ -957,7 +957,7 @@ function renderLog() {
       <div class="entry-ico">${ICON[s.type] || '•'}</div>
       <div class="entry-body">
         <div class="entry-title">${fmtDate(s.date)} · ${esc(bits.join(' · '))}</div>
-        <div class="entry-sub">${esc(s.notes || (s.intensity ? 'Intensidad ' + s.intensity : ''))}${s.source === 'reloj' ? ' · ⌚ del reloj' : ''}</div>
+        <div class="entry-sub">${esc(s.notes || (s.intensity ? 'Intensidad ' + s.intensity : ''))}${s.source === 'reloj' ? ' · ⌚ del reloj' : s.source === 'salud' ? ' · ❤️ de Salud' : ''}</div>
       </div>
       <button class="entry-del" data-del="${s.id}" aria-label="Borrar">×</button>
     </article>`;
@@ -1188,15 +1188,32 @@ function bind() {
         if (el) el.textContent = `Leyendo ${esc(f.name)} · ${mb(b)} MB`;
       });
       const desde = S.profile.startDate;
+      const total = res.workouts.length;
       const viejos = res.workouts.filter(w => w.date < desde).length;
       pending = res.workouts.filter(w => w.date >= desde).sort((a, b) => a.date < b.date ? -1 : 1);
       pendingWeights = res.weights.filter(w => w.date >= desde)
         .sort((a, b) => a.date < b.date ? -1 : 1);
-      importNote = `Leí ${mb(res.bytes)} MB de ${esc(f.name)}. `
-        + (pending.length || pendingWeights.length
-            ? `Encontré ${pending.length} entrenamiento${pending.length === 1 ? '' : 's'} y ${pendingWeights.length} peso${pendingWeights.length === 1 ? '' : 's'} desde el inicio del desafío.`
-            : 'No hay entrenamientos ni pesos desde el inicio del desafío.')
-        + (viejos ? ` Omití ${viejos} entrenamiento${viejos === 1 ? '' : 's'} anterior${viejos === 1 ? '' : 'es'} a esa fecha.` : '');
+
+      const leido = `Leí ${mb(res.bytes)} MB de ${esc(f.name)} y encontré ${total} entrenamiento${total === 1 ? '' : 's'} en total. `;
+      if (!total) {
+        // Ni un solo entrenamiento: casi siempre es que Salud no los tiene.
+        importNote = leido + 'Salud no tiene ningún entrenamiento guardado. '
+          + 'Revisá que en Zepp esté activada la sincronización con Apple Salud (Perfil → Ajustes → Apple Salud) '
+          + 'y que hayas elegido el .zip que genera Salud, no otro archivo. Mientras tanto podés traer las '
+          + 'actividades una por una en TCX desde Zepp.'
+          + (pendingWeights.length
+              ? ` Los ${pendingWeights.length} registro${pendingWeights.length === 1 ? '' : 's'} de peso sí están y los podés agregar igual.`
+              : '');
+      } else if (!pending.length && !pendingWeights.length) {
+        importNote = leido + `Todos son anteriores al ${fmtDate(desde)}, el inicio de tu desafío, así que no traje ninguno. `
+          + 'Si querés incluirlos, cambiá la fecha de inicio en Ajustes y volvé a importar.';
+      } else {
+        importNote = leido
+          + `Traigo ${pending.length} desde el ${fmtDate(desde)}`
+          + (pendingWeights.length ? ` y ${pendingWeights.length} registro${pendingWeights.length === 1 ? '' : 's'} de peso` : '')
+          + '.'
+          + (viejos ? ` Los ${viejos} anteriores a esa fecha quedaron afuera.` : '');
+      }
       renderImport();
     } catch (err) {
       pending = []; pendingWeights = [];
@@ -1249,7 +1266,7 @@ function bind() {
           hrAvg: c.hrAvg || 0, hrMax: c.hrMax || 0, watchKcal: c.watchKcal || 0,
           zones: c.zones && c.zones.some(Boolean) ? c.zones : null,
           rpe: c.hrAvg ? clamp(Math.round(zoneOf(c.hrAvg) * 2), 1, 10) : 6,
-          mood: 3, notes: c.label || '', source: 'reloj'
+          mood: 3, notes: c.label || '', source: c.origin || 'reloj'
         };
         o.kcal = sessionKcal(o);
         S.sessions.push(o);
