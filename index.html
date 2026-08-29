@@ -71,6 +71,17 @@
 
     <!-- ============ REGISTRO ============ -->
     <section class="view" id="view-log" hidden>
+      <div class="card" id="importCard">
+        <div class="card-head"><h2>Traer del reloj</h2><span class="muted small">GPX · TCX</span></div>
+        <p class="muted small">En Zepp: abrí la actividad → menú <b>···</b> arriba a la derecha → <b>Exportar</b> → elegí <b>TCX</b> (trae pulso y calorías) o <b>GPX</b>. Después seleccioná el archivo acá. Podés elegir varios de una vez.</p>
+        <p class="muted small">Se leen duración, distancia, pulso y calorías. Los saltos de soga no vienen en el archivo: se estiman a partir del tiempo. El formato <b>FIT</b> es binario y no se puede leer sin conexión, por eso exportá TCX o GPX.</p>
+        <div class="btn-row">
+          <button class="btn primary" id="btnPickTrack" type="button">Elegir archivos</button>
+          <input type="file" id="fileTrack" accept=".gpx,.tcx,.xml,application/gpx+xml" multiple hidden>
+        </div>
+        <div id="importPreview" class="stack" style="margin-top:12px"></div>
+      </div>
+
       <form class="card form" id="formSession">
         <h2>Nueva sesión</h2>
         <div class="grid-2">
@@ -102,6 +113,12 @@
           </label>
           <label class="f-soga">Saltos
             <input type="number" name="jumps" id="sesJumps" min="0" max="50000" placeholder="se estiman solos">
+          </label>
+          <label>FC media (ppm)
+            <input type="number" name="hrAvg" id="sesHrAvg" min="60" max="220" placeholder="del reloj, opcional">
+          </label>
+          <label>FC máxima (ppm)
+            <input type="number" name="hrMax" id="sesHrMax" min="60" max="230" placeholder="opcional">
           </label>
           <label>Esfuerzo percibido (RPE 1-10)
             <input type="range" name="rpe" id="sesRpe" min="1" max="10" value="6">
@@ -200,6 +217,12 @@
       </div>
 
       <div class="card">
+        <div class="card-head"><h2>Zonas de pulso</h2><span class="muted small" id="hrMaxLabel">—</span></div>
+        <div id="zoneWeek"></div>
+        <div id="zoneTable" class="zones"></div>
+      </div>
+
+      <div class="card">
         <h2>Logros</h2>
         <div id="badges" class="badges"></div>
       </div>
@@ -233,13 +256,16 @@
           <label>Peso objetivo (kg)<input type="number" id="pGoal" step="0.1"></label>
           <label>Inicio del desafío<input type="date" id="pDate"></label>
           <label>Día de fútbol
-            <select id="pFootball">
-              <option value="6">Domingo</option><option value="5">Sábado</option>
-              <option value="4">Viernes</option><option value="3">Jueves</option>
-              <option value="2">Miércoles</option><option value="1">Martes</option><option value="0">Lunes</option>
-            </select>
+            <select id="pFootball"><option value="0">Lunes</option><option value="1">Martes</option><option value="2">Miércoles</option><option value="3">Jueves</option><option value="4">Viernes</option><option value="5">Sábado</option><option value="6">Domingo</option></select>
+          </label>
+          <label>Día de descanso total
+            <select id="pRest"><option value="0">Lunes</option><option value="1">Martes</option><option value="2">Miércoles</option><option value="3">Jueves</option><option value="4">Viernes</option><option value="5">Sábado</option><option value="6">Domingo</option></select>
+          </label>
+          <label>FC máxima (ppm)
+            <input type="number" id="pHrMax" min="120" max="220" placeholder="se estima por edad">
           </label>
         </div>
+        <p class="muted small">El plan se reordena solo alrededor del partido y del descanso: la víspera del partido siempre queda suave y el día siguiente, libre. Dejá la FC máxima vacía si no la conocés — se estima con tu edad.</p>
         <div class="form-actions"><span></span><button class="btn primary" type="submit">Guardar perfil</button></div>
       </form>
 

@@ -48,7 +48,7 @@ const DEFAULTS = {
   profile: {
     name: '', age: 32, sex: 'm', height: 176,
     startWeight: 91, goalWeight: 83,
-    startDate: today(), footballDay: 6
+    startDate: today(), footballDay: 5, restDay: 6, hrMax: 0
   },
   sessions: [],   // {id,date,type,minutes,intensity,distance,jumps,rpe,mood,notes,kcal}
   weights: [],    // {date,kg}
@@ -63,8 +63,13 @@ function load() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return structuredClone(DEFAULTS);
     const parsed = JSON.parse(raw);
+    const prof = Object.assign({}, DEFAULTS.profile, parsed.profile);
+    if (parsed.profile && parsed.profile.restDay == null) {
+      // Antes el fútbol caía el domingo y no había día de descanso fijo.
+      prof.footballDay = 5; prof.restDay = 6;
+    }
     return {
-      profile: Object.assign({}, DEFAULTS.profile, parsed.profile),
+      profile: prof,
       sessions: parsed.sessions || [],
       weights: parsed.weights || [],
       tests: parsed.tests || [],
@@ -140,61 +145,70 @@ function intText(x) {
 }
 function intMinutes(x) { return Math.round(12 + x.r * (x.on + x.off) / 60 + 6); }
 
-/* Construye las 7 sesiones de una semana (índice 0 = lunes). */
+/* Construye las 7 sesiones de una semana (índice 0 = lunes).
+
+   La semana se ordena alrededor de dos días fijos que elegís vos: el del
+   partido y el de descanso total. Los cinco días restantes se llenan en este
+   orden, arrancando el día siguiente al descanso, para que nunca queden dos
+   sesiones duras pegadas y la víspera del partido sea siempre suave. */
 function buildWeek(wn) {
   const p = WEEKS[wn - 1];
-  const s = [];
 
-  // Lunes — bici suave
-  s.push({ type: 'bici', title: `Bici suave · ${p.z2} min`, minutes: p.z2,
-    detail: `Ritmo cómodo y continuo (RPE 3-4): podés hablar de corrido todo el rato. Cadencia alta y ligera, no fuerces el plato.` });
+  const suave = { type: 'bici', title: `Bici suave · ${p.z2} min`, minutes: p.z2,
+    detail: 'Ritmo cómodo y continuo (RPE 3-4): podés hablar de corrido todo el rato. Cadencia alta y ligera, no fuerces el plato.' };
 
-  // Martes — soga + core
   const minA = p.ropeA ? ropeMinutes(p.ropeA) + 12 : 0;
-  s.push(p.ropeA
+  const sogaA = p.ropeA
     ? { type: 'soga', title: `Soga · ${p.ropeA.r} series + fuerza`, minutes: minA,
         met: blendMet(p.ropeA.r * p.ropeA.on, minA),
         detail: `5 min de entrada en calor (movilidad de tobillo y saltos sin soga). Después ${ropeText(p.ropeA)}. Cerrá con: ${CORE}` }
-    : { type: 'fuerza', title: 'Fuerza y core', minutes: 25, detail: CORE });
+    : { type: 'fuerza', title: 'Fuerza y core', minutes: 25, detail: CORE };
 
-  // Miércoles — descanso activo
-  s.push({ type: 'movilidad', title: 'Descanso activo', minutes: 30, optional: true,
-    detail: 'Caminata de 30-40 min a paso vivo, o movilidad y elongación. Es opcional pero suma muchísimo: es gasto calórico sin fatiga.' });
+  const larga = { type: 'bici', title: `Bici larga · ${p.long} min`, minutes: p.long,
+    detail: 'La sesión más importante de la semana para bajar de peso. Ritmo cómodo y constante de principio a fin. Llevá agua y, si pasás la hora, algo para comer.' };
 
-  // Jueves — intervalos de bici (o segunda salida suave / test)
+  let intervalos;
   if (p.finalTest) {
-    s.push({ type: 'bici', title: 'TEST · 12 minutos máximos', minutes: 35,
-      detail: 'Calentá 15 min. Después andá 12 minutos a la máxima intensidad que puedas sostener sin explotar, y anotá los km recorridos en Progreso → Test de control. Aflojá 8 min al final.' });
+    intervalos = { type: 'bici', title: 'TEST · 12 minutos máximos', minutes: 35,
+      detail: 'Calentá 15 min. Después andá 12 minutos a la máxima intensidad que puedas sostener sin explotar, y anotá los km recorridos en Progreso → Test de control. Aflojá 8 min al final.' };
   } else if (p.ints) {
-    s.push({ type: 'bici', title: `Bici intervalos · ${intText(p.ints)}`, minutes: intMinutes(p.ints),
-      detail: `12 min de calentamiento progresivo. Después ${intText(p.ints)} — en los tramos fuertes vas a RPE 7-8, en los suaves pedaleás casi sin resistencia. 6 min de vuelta a la calma.` });
+    intervalos = { type: 'bici', title: `Bici intervalos · ${intText(p.ints)}`, minutes: intMinutes(p.ints),
+      detail: `12 min de calentamiento progresivo. Después ${intText(p.ints)} — en los tramos fuertes vas a RPE 7-8, en los suaves pedaleás casi sin resistencia. 6 min de vuelta a la calma.` };
   } else {
-    s.push({ type: 'bici', title: `Bici suave · ${Math.round(p.z2 * 0.8)} min`, minutes: Math.round(p.z2 * 0.8),
-      detail: 'Segunda salida tranquila de la semana. Todavía estamos construyendo base: sin intervalos, solo rodar.' });
+    intervalos = { type: 'bici', title: `Bici suave · ${Math.round(p.z2 * 0.8)} min`, minutes: Math.round(p.z2 * 0.8),
+      detail: 'Segunda salida tranquila de la semana. Todavía estamos construyendo base: sin intervalos, solo rodar.' };
   }
 
-  // Viernes — soga corta + core (o movilidad)
   const minB = p.ropeB ? ropeMinutes(p.ropeB) + 10 : 0;
-  s.push(p.ropeB
-    ? { type: 'soga', title: `Soga · ${p.ropeB.r} series + core`, minutes: minB, optional: !!p.ropeBOpt,
-        met: blendMet(p.ropeB.r * p.ropeB.on, minB),
-        detail: `${ropeText(p.ropeB)}. Después 2 vueltas del circuito de fuerza. ${p.ropeBOpt ? 'Esta semana es opcional: si venís cargado, cambiala por una caminata.' : ''}` }
-    : { type: 'movilidad', title: 'Movilidad y elongación', minutes: 25, optional: true,
-        detail: 'Semana de descarga: nada de impacto. 20-25 min de movilidad de cadera, tobillo y columna, más elongación de gemelos y cuádriceps.' });
+  const ligero = p.ropeB
+    ? { type: 'soga', title: `Soga · ${p.ropeB.r} series + core`, minutes: minB,
+        met: blendMet(p.ropeB.r * p.ropeB.on, minB), eve: true,
+        detail: `${ropeText(p.ropeB)}. Después 2 vueltas del circuito de fuerza. Es la víspera del partido: si llegás cargado, cambiala por una caminata.` }
+    : { type: 'movilidad', title: 'Movilidad y caminata', minutes: 30, optional: true, eve: true,
+        detail: 'Víspera de partido en semana de descarga: nada de impacto. Caminata a paso vivo, movilidad de cadera y tobillo, y elongación de gemelos y cuádriceps.' };
 
-  // Sábado — bici larga
-  s.push({ type: 'bici', title: `Bici larga · ${p.long} min`, minutes: p.long,
-    detail: 'La sesión más importante de la semana para bajar de peso. Ritmo cómodo y constante de principio a fin. Llevá agua y, si pasás la hora, algo para comer.' });
+  const futbol = { type: 'futbol', title: 'Fútbol', minutes: 60,
+    detail: 'Tu partido de siempre. Entrá en calor 10 minutos antes de arrancar — es el día con más riesgo de tirón de toda la semana.' };
 
-  // Domingo — fútbol
-  s.push({ type: 'futbol', title: 'Fútbol', minutes: 60,
-    detail: 'Tu partido de siempre. Entrá en calor 10 minutos antes de arrancar — es el día con más riesgo de tirón de toda la semana.' });
+  const descanso = { type: 'descanso', title: 'Descanso total', minutes: 0, rest: true,
+    detail: 'Día libre después del partido. El descanso no es lo que interrumpe el progreso: es donde pasa. Comé bien, hidratate y dormí.' };
 
-  // Reubicar el fútbol al día elegido
   const fd = clamp(Number(S.profile.footballDay), 0, 6);
-  if (fd !== 6) { const t = s[fd]; s[fd] = s[6]; s[6] = t; }
+  let rd = clamp(Number(S.profile.restDay), 0, 6);
+  if (rd === fd) rd = (fd + 1) % 7;
 
-  return s.map((x, i) => Object.assign(x, { id: `w${wn}-${i}`, day: i, week: wn }));
+  const week = new Array(7);
+  week[fd] = futbol;
+  week[rd] = descanso;
+
+  const roles = [suave, sogaA, larga, intervalos, ligero];
+  let i = 0;
+  for (let k = 1; k <= 7 && i < roles.length; k++) {
+    const d = (rd + k) % 7;
+    if (!week[d]) week[d] = roles[i++];
+  }
+
+  return week.map((x, idx) => Object.assign({}, x, { id: `w${wn}-${idx}`, day: idx, week: wn }));
 }
 
 function currentWeek() {
@@ -241,6 +255,56 @@ function avgTrainingKcal(days) {
 }
 function tdee(kg) { return baseExpenditure(kg) + avgTrainingKcal(14); }
 
+/* ---- frecuencia cardíaca ----
+   Sin FC máxima medida se estima con Tanaka (208 - 0,7 x edad), más fiable
+   que el viejo 220 - edad para mayores de 30. */
+function hrMax() { return S.profile.hrMax || Math.round(208 - 0.7 * S.profile.age); }
+
+const ZONES = [
+  { n: 1, name: 'Recuperación', lo: 0.50, hi: 0.60, color: 'var(--movilidad)',
+    use: 'Caminatas y vuelta a la calma. No entrena, pero acelera la recuperación.' },
+  { n: 2, name: 'Base aeróbica', lo: 0.60, hi: 0.70, color: 'var(--bici)',
+    use: 'Tu zona principal: la bici suave y la larga van acá. Es donde más grasa usás como combustible.' },
+  { n: 3, name: 'Aeróbico fuerte', lo: 0.70, hi: 0.80, color: 'var(--good)',
+    use: 'Ritmo sostenido incómodo. Aparece sola en la bici larga y en el fútbol.' },
+  { n: 4, name: 'Umbral', lo: 0.80, hi: 0.90, color: 'var(--soga)',
+    use: 'Los tramos fuertes de los intervalos y las series largas de soga.' },
+  { n: 5, name: 'Máximo', lo: 0.90, hi: 1.01, color: 'var(--accent)',
+    use: 'Solo picos cortos. Si vivís acá, estás entrenando de más.' }
+];
+
+function zoneOf(hr) {
+  const r = hr / hrMax();
+  if (r < ZONES[0].lo) return 0;
+  for (let i = ZONES.length - 1; i >= 0; i--) if (r >= ZONES[i].lo) return i + 1;
+  return 0;
+}
+
+/* Calorías a partir del pulso medio (Keytel et al., 2005). Bastante más
+   ajustado que los METs cuando el reloj te dio la FC real de la sesión. */
+function kcalFromHr(hrAvg, minutes, kg) {
+  const a = S.profile.age;
+  const perMin = S.profile.sex === 'm'
+    ? (-55.0969 + 0.6309 * hrAvg + 0.1988 * kg + 0.2017 * a) / 4.184
+    : (-20.4022 + 0.4472 * hrAvg - 0.1263 * kg + 0.0740 * a) / 4.184;
+  return Math.max(0, Math.round(perMin * minutes));
+}
+
+/* Orden de preferencia: lo que midió el reloj, después el pulso medio, y
+   como último recurso los METs. Respetar el número del reloj evita que la
+   app y Zepp muestren cifras distintas de la misma sesión. */
+function sessionKcal(o, kg) {
+  kg = kg || currentWeight();
+  if (o.watchKcal) return o.watchKcal;
+  if (o.hrAvg) return kcalFromHr(o.hrAvg, o.minutes, kg);
+  return kcal(o.type, o.intensity, o.minutes, kg);
+}
+function kcalSource(o) {
+  if (o.watchKcal) return 'del reloj';
+  if (o.hrAvg) return 'por pulso';
+  return '';
+}
+
 /* Media móvil por ventana de días reales (x = día del desafío), no por
    cantidad de registros: si te pesás salteado la tendencia sigue siendo correcta. */
 function movingAvg(points, winDays) {
@@ -277,7 +341,7 @@ function perfectWeeks() {
   // semanas del plan con todas las sesiones no opcionales marcadas
   let n = 0;
   for (let w = 1; w <= 12; w++) {
-    const req = buildWeek(w).filter(s => !s.optional);
+    const req = buildWeek(w).filter(s => !s.optional && !s.rest);
     if (req.length && req.every(s => S.done[s.id])) n++;
   }
   return n;
@@ -290,6 +354,151 @@ function weekSummary() {
     minutes: ses.reduce((a, b) => a + (b.minutes || 0), 0),
     kcal: ses.reduce((a, b) => a + (b.kcal || 0), 0)
   };
+}
+
+/* -------------------- importar actividades del reloj ----------------
+   Zepp exporta cada actividad como GPX, TCX o FIT. Leemos los dos formatos
+   XML; el binario FIT necesitaría una librería y queda afuera a propósito
+   para que la app siga sin dependencias. */
+
+function byLocal(root, name) {
+  const out = [];
+  const all = root.getElementsByTagName('*');
+  for (let i = 0; i < all.length; i++) if (all[i].localName === name) out.push(all[i]);
+  return out;
+}
+const num = (el, d) => { const v = el && parseFloat(el.textContent); return isFinite(v) ? v : (d || 0); };
+
+const SPORT_MAP = [
+  [/(cycl|bik|ride|bici|spin)/i, 'bici'],
+  [/(rope|skip|soga|salt)/i, 'soga'],
+  [/(soccer|football|f[uú]tbol)/i, 'futbol'],
+  [/(strength|weight|gym|fuerza|elliptical)/i, 'fuerza'],
+  [/(walk|hik|camin)/i, 'movilidad']
+];
+function guessType(label, km, minutes) {
+  for (const [re, t] of SPORT_MAP) if (re.test(label || '')) return t;
+  if (km > 3 && minutes > 0) {
+    const kmh = km / (minutes / 60);
+    if (kmh >= 9 && kmh <= 50) return 'bici';
+  }
+  return 'otro';
+}
+
+function haversine(a, b) {
+  const R = 6371, rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad, dLon = (b.lon - a.lon) * rad;
+  const la1 = a.lat * rad, la2 = b.lat * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/* Acumula segundos por zona a partir de una serie de {t, hr}. */
+function zonesFromSamples(samples) {
+  const secs = [0, 0, 0, 0, 0];
+  for (let i = 1; i < samples.length; i++) {
+    const dt = (samples[i].t - samples[i - 1].t) / 1000;
+    if (!(dt > 0) || dt > 120) continue;
+    const hr = samples[i - 1].hr;
+    if (!hr) continue;
+    const z = zoneOf(hr);
+    if (z) secs[z - 1] += dt;
+  }
+  return secs.map(v => Math.round(v / 60));
+}
+function hrStats(samples) {
+  let sum = 0, n = 0, max = 0;
+  samples.forEach(s => { if (s.hr) { sum += s.hr; n++; if (s.hr > max) max = s.hr; } });
+  return { avg: n ? Math.round(sum / n) : 0, max };
+}
+
+function parseGpx(doc, fileName) {
+  const pts = byLocal(doc, 'trkpt');
+  if (!pts.length) return null;
+  let km = 0, prev = null;
+  const samples = [];
+  pts.forEach(pt => {
+    const lat = parseFloat(pt.getAttribute('lat')), lon = parseFloat(pt.getAttribute('lon'));
+    const tEl = byLocal(pt, 'time')[0];
+    const t = tEl ? Date.parse(tEl.textContent) : NaN;
+    const hrEl = byLocal(pt, 'hr')[0];
+    const hr = hrEl ? parseInt(hrEl.textContent, 10) : 0;
+    if (isFinite(lat) && isFinite(lon)) {
+      const cur = { lat, lon };
+      if (prev) km += haversine(prev, cur);
+      prev = cur;
+    }
+    if (isFinite(t)) samples.push({ t, hr });
+  });
+  if (!samples.length) return null;
+  const minutes = Math.max(1, Math.round((samples[samples.length - 1].t - samples[0].t) / 60000));
+  const label = (byLocal(doc, 'type')[0] || byLocal(doc, 'name')[0] || {}).textContent || fileName;
+  const hs = hrStats(samples);
+  return {
+    date: toISO(new Date(samples[0].t)), minutes,
+    distance: Math.round(km * 10) / 10,
+    hrAvg: hs.avg, hrMax: hs.max,
+    zones: zonesFromSamples(samples),
+    type: guessType(label, km, minutes),
+    label: (label || '').trim() || fileName, file: fileName
+  };
+}
+
+function parseTcx(doc, fileName) {
+  const act = byLocal(doc, 'Activity')[0];
+  if (!act) return null;
+  const laps = byLocal(act, 'Lap');
+  let secs = 0, meters = 0, cal = 0, hrWeighted = 0, hrTime = 0, maxHr = 0;
+  laps.forEach(l => {
+    const t = num(byLocal(l, 'TotalTimeSeconds')[0]);
+    secs += t;
+    meters += num(byLocal(l, 'DistanceMeters')[0]);
+    cal += num(byLocal(l, 'Calories')[0]);
+    const avg = num(byLocal(byLocal(l, 'AverageHeartRateBpm')[0] || l, 'Value')[0]);
+    if (avg) { hrWeighted += avg * t; hrTime += t; }
+    const mx = num(byLocal(byLocal(l, 'MaximumHeartRateBpm')[0] || l, 'Value')[0]);
+    if (mx > maxHr) maxHr = mx;
+  });
+  const samples = [];
+  byLocal(act, 'Trackpoint').forEach(tp => {
+    const t = Date.parse((byLocal(tp, 'Time')[0] || {}).textContent || '');
+    const hrNode = byLocal(tp, 'HeartRateBpm')[0];
+    const hr = hrNode ? num(byLocal(hrNode, 'Value')[0]) : 0;
+    if (isFinite(t)) samples.push({ t, hr });
+  });
+  const hs = hrStats(samples);
+  const startTxt = (byLocal(act, 'Id')[0] || {}).textContent
+    || (laps[0] && laps[0].getAttribute('StartTime')) || '';
+  const start = Date.parse(startTxt);
+  if (!secs && samples.length) secs = (samples[samples.length - 1].t - samples[0].t) / 1000;
+  const minutes = Math.max(1, Math.round(secs / 60));
+  const km = Math.round(meters / 100) / 10;
+  const label = act.getAttribute('Sport') || fileName;
+  return {
+    date: toISO(isFinite(start) ? new Date(start) : (samples[0] ? new Date(samples[0].t) : new Date())),
+    minutes, distance: km,
+    hrAvg: hs.avg || (hrTime ? Math.round(hrWeighted / hrTime) : 0),
+    hrMax: Math.max(maxHr, hs.max),
+    zones: zonesFromSamples(samples),
+    watchKcal: Math.round(cal) || 0,
+    type: guessType(label, km, minutes),
+    label: label.trim() || fileName, file: fileName
+  };
+}
+
+function parseTrackFile(fileName, text) {
+  let doc;
+  try { doc = new DOMParser().parseFromString(text, 'application/xml'); }
+  catch (e) { return null; }
+  if (!doc || doc.getElementsByTagName('parsererror').length) return null;
+  const root = (doc.documentElement && doc.documentElement.localName || '').toLowerCase();
+  if (root === 'gpx') return parseGpx(doc, fileName);
+  if (root === 'trainingcenterdatabase') return parseTcx(doc, fileName);
+  return null;
+}
+
+function isDuplicate(c) {
+  return S.sessions.some(x => x.date === c.date && Math.abs(x.minutes - c.minutes) <= 2 && x.type === c.type);
 }
 
 /* ------------------------------ gráficos --------------------------- */
@@ -405,22 +614,25 @@ function sessionCard(s, opts) {
   opts = opts || {};
   const done = !!S.done[s.id];
   const isToday = opts.todayIdx === s.day;
-  return `<article class="sess t-${s.type} ${done ? 'is-done' : ''} ${isToday ? 'is-today' : ''}">
+  const meta = s.rest ? '' : `<div class="sess-meta">
+        <span class="pill">≈ ${fmtMin(s.minutes)}</span>
+        <span class="pill">≈ ${planKcal(s)} kcal</span>
+        ${s.eve ? '<span class="pill eve">víspera de partido</span>' : ''}
+        ${s.optional ? '<span class="pill opt">opcional</span>' : ''}
+      </div>`;
+  const actions = s.rest ? '' : `<div class="sess-actions">
+      <button class="check ${done ? 'on' : ''}" data-check="${s.id}" title="Marcar como hecha">✓</button>
+      <button class="check" data-quick="${s.type}" data-min="${s.minutes}" title="Registrar sesión">＋</button>
+    </div>`;
+  return `<article class="sess t-${s.type} ${done ? 'is-done' : ''} ${isToday ? 'is-today' : ''} ${s.rest ? 'is-rest' : ''}">
     <div class="sess-ico">${ICON[s.type] || '•'}</div>
     <div class="sess-body">
       <div class="sess-day">${DAYS[s.day]}${isToday ? ' · hoy' : ''}</div>
       <div class="sess-title">${esc(s.title)}</div>
       <div class="sess-detail">${esc(s.detail)}</div>
-      <div class="sess-meta">
-        <span class="pill">≈ ${fmtMin(s.minutes)}</span>
-        <span class="pill">≈ ${planKcal(s)} kcal</span>
-        ${s.optional ? '<span class="pill opt">opcional</span>' : ''}
-      </div>
+      ${meta}
     </div>
-    <div class="sess-actions">
-      <button class="check ${done ? 'on' : ''}" data-check="${s.id}" title="Marcar como hecha">✓</button>
-      <button class="check" data-quick="${s.type}" data-min="${s.minutes}" title="Registrar sesión">＋</button>
-    </div>
+    ${actions}
   </article>`;
 }
 
@@ -474,8 +686,9 @@ function renderPlan() {
 
   const p = WEEKS[planWeek - 1];
   const sessions = buildWeek(planWeek);
-  const totalMin = sessions.filter(s => !s.optional).reduce((a, b) => a + b.minutes, 0);
-  const totalKcal = sessions.filter(s => !s.optional).reduce((a, b) => a + planKcal(b), 0);
+  const key = sessions.filter(s => !s.optional && !s.rest);
+  const totalMin = key.reduce((a, b) => a + b.minutes, 0);
+  const totalKcal = key.reduce((a, b) => a + planKcal(b), 0);
 
   $('#planDetail').innerHTML = `
     <div class="card">
@@ -485,12 +698,42 @@ function renderPlan() {
       </div>
       <p class="tip">${esc(p.tip)}</p>
       <div class="row-3">
-        <div class="mini"><b>${sessions.filter(s => !s.optional).length}</b><span>sesiones clave</span></div>
+        <div class="mini"><b>${key.length}</b><span>sesiones clave</span></div>
         <div class="mini"><b>${Math.round(totalMin / 60 * 10) / 10} h</b><span>volumen</span></div>
         <div class="mini"><b>${totalKcal}</b><span>kcal aprox.</span></div>
       </div>
     </div>
     ${sessions.map(s => sessionCard(s, { todayIdx: planWeek === cur ? dowIndex(today()) : -1 })).join('')}`;
+}
+
+let pending = [];
+function renderImport() {
+  const box = $('#importPreview');
+  if (!pending.length) { box.innerHTML = ''; return; }
+  const opts = [['bici','🚴 Bici'],['soga','🪢 Soga'],['futbol','⚽ Fútbol'],
+                ['fuerza','💪 Fuerza'],['movilidad','🚶 Caminata'],['otro','✳️ Otro']];
+  box.innerHTML = pending.map((c, i) => {
+    const dup = isDuplicate(c);
+    const bits = [fmtMin(c.minutes)];
+    if (c.distance) bits.push(c.distance + ' km');
+    if (c.hrAvg) bits.push(c.hrAvg + ' ppm medio');
+    if (c.hrMax) bits.push('máx ' + c.hrMax);
+    bits.push(sessionKcal(c) + ' kcal' + (kcalSource(c) ? ' ' + kcalSource(c) : ''));
+    return `<article class="entry imported ${dup ? 'is-dup' : ''}">
+      <div class="entry-ico">${ICON[c.type] || '•'}</div>
+      <div class="entry-body">
+        <div class="entry-title">${fmtDate(c.date)} · ${esc(bits.join(' · '))}</div>
+        <div class="entry-sub">${esc(c.label)}${dup ? ' · ya la tenías cargada' : ''}</div>
+        <select class="imp-type" data-i="${i}">
+          ${opts.map(o => `<option value="${o[0]}"${o[0] === c.type ? ' selected' : ''}>${o[1]}</option>`).join('')}
+        </select>
+      </div>
+      <button class="entry-del" data-drop="${i}" aria-label="Descartar">×</button>
+    </article>`;
+  }).join('') + `<div class="btn-row">
+      <button class="btn primary" id="btnAddImported" type="button">Agregar ${pending.length} ${pending.length === 1 ? 'sesión' : 'sesiones'}</button>
+      <button class="btn" id="btnClearImport" type="button">Descartar todo</button>
+    </div>`;
 }
 
 let logFilter = 'all';
@@ -502,13 +745,14 @@ function renderLog() {
     const bits = [fmtMin(s.minutes)];
     if (s.distance) bits.push(s.distance + ' km');
     if (s.jumps) bits.push(s.jumps.toLocaleString('es-AR') + ' saltos');
+    if (s.hrAvg) bits.push(s.hrAvg + ' ppm');
     bits.push(s.kcal + ' kcal');
     if (s.rpe) bits.push('RPE ' + s.rpe);
     return `<article class="entry">
       <div class="entry-ico">${ICON[s.type] || '•'}</div>
       <div class="entry-body">
         <div class="entry-title">${fmtDate(s.date)} · ${esc(bits.join(' · '))}</div>
-        <div class="entry-sub">${esc(s.notes || (s.intensity ? 'Intensidad ' + s.intensity : ''))}</div>
+        <div class="entry-sub">${esc(s.notes || (s.intensity ? 'Intensidad ' + s.intensity : ''))}${s.source === 'reloj' ? ' · ⌚ del reloj' : ''}</div>
       </div>
       <button class="entry-del" data-del="${s.id}" aria-label="Borrar">×</button>
     </article>`;
@@ -588,6 +832,8 @@ function renderProgress() {
   }
   $('#weekChart').innerHTML = barChart(bars);
 
+  renderZones();
+
   $('#badges').innerHTML = BADGES.map(b =>
     `<div class="badge ${b.f(st) ? 'on' : ''}"><b>${b.i}</b><span>${esc(b.t)}</span></div>`).join('');
 
@@ -604,6 +850,33 @@ function renderProgress() {
   }).join('') : '';
 }
 
+function renderZones() {
+  const hm = hrMax();
+  $('#hrMaxLabel').textContent = `FC máx ${hm} ppm${S.profile.hrMax ? '' : ' (estimada)'}`;
+
+  const mon = mondayOf(today());
+  const week = S.sessions.filter(s => s.date >= mon && s.zones);
+  const tot = [0, 0, 0, 0, 0];
+  week.forEach(s => s.zones.forEach((m, i) => { tot[i] += m; }));
+  const sum = tot.reduce((a, b) => a + b, 0);
+
+  $('#zoneWeek').innerHTML = sum
+    ? `<div class="zone-bar">${tot.map((m, i) =>
+         m ? `<span style="flex:${m};background:${ZONES[i].color}" title="Z${i + 1}: ${m} min"></span>` : ''
+       ).join('')}</div>
+       <p class="muted small" style="margin-top:7px">${sum} min con pulso registrado esta semana · ${tot[1]} min en Z2, tu zona de base.</p>`
+    : `<p class="muted small">Importá una actividad con pulso desde el reloj y acá vas a ver cuánto tiempo pasaste en cada zona.</p>`;
+
+  $('#zoneTable').innerHTML = ZONES.map(z =>
+    `<div class="zone-row">
+       <i style="background:${z.color}"></i>
+       <div>
+         <b>Z${z.n} · ${esc(z.name)}</b>
+         <span class="muted small">${Math.round(z.lo * hm)}-${Math.round(Math.min(z.hi, 1) * hm)} ppm · ${esc(z.use)}</span>
+       </div>
+     </div>`).join('');
+}
+
 function renderProfile() {
   const p = S.profile;
   $('#pName').value = p.name || '';
@@ -614,6 +887,8 @@ function renderProfile() {
   $('#pGoal').value = p.goalWeight;
   $('#pDate').value = p.startDate;
   $('#pFootball').value = String(p.footballDay);
+  $('#pRest').value = String(p.restDay);
+  $('#pHrMax').value = p.hrMax || '';
 }
 
 /* ----------------------------- interacción ------------------------- */
@@ -634,7 +909,9 @@ function updateKcalPreview() {
   const type = $('#sesType').value;
   const min = Number($('#sesMin').value) || 0;
   const int = $('#sesInt').value;
-  $('#kcalPreview').textContent = '≈ ' + kcal(type, int, min, currentWeight()) + ' kcal';
+  const hr = Number($('#sesHrAvg').value) || 0;
+  $('#kcalPreview').textContent = '≈ ' + sessionKcal({ type, intensity: int, minutes: min, hrAvg: hr })
+    + ' kcal' + (hr ? ' por pulso' : '');
   $('.f-bici').style.display = type === 'bici' ? '' : 'none';
   $('.f-soga').style.display = type === 'soga' ? '' : 'none';
 }
@@ -691,7 +968,64 @@ function bind() {
     }
   });
 
-  ['#sesType', '#sesMin', '#sesInt'].forEach(sel =>
+  // --- importar actividades del reloj ---
+  $('#btnPickTrack').addEventListener('click', () => $('#fileTrack').click());
+  $('#fileTrack').addEventListener('change', async e => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    let malos = 0;
+    for (const f of files) {
+      let parsed = null;
+      try { parsed = parseTrackFile(f.name, await f.text()); }
+      catch (err) { parsed = null; }
+      if (parsed) pending.push(parsed); else malos++;
+    }
+    pending.sort((a, b) => a.date < b.date ? -1 : 1);
+    renderImport();
+    if (malos) toast(`${malos} archivo${malos > 1 ? 's' : ''} sin datos legibles (¿es .fit?)`);
+    else if (pending.length) toast(`${pending.length} actividad${pending.length > 1 ? 'es' : ''} lista${pending.length > 1 ? 's' : ''}`);
+  });
+
+  document.addEventListener('change', e => {
+    const sel = e.target.closest('.imp-type');
+    if (!sel) return;
+    pending[Number(sel.dataset.i)].type = sel.value;
+    renderImport();
+  });
+
+  document.addEventListener('click', e => {
+    const drop = e.target.closest('[data-drop]');
+    if (drop) { pending.splice(Number(drop.dataset.drop), 1); renderImport(); return; }
+    if (e.target.closest('#btnClearImport')) { pending = []; renderImport(); return; }
+    if (e.target.closest('#btnAddImported')) {
+      let nuevas = 0, repetidas = 0;
+      pending.forEach(c => {
+        if (isDuplicate(c)) { repetidas++; return; }
+        const o = {
+          id: Date.now() + nuevas,
+          date: c.date, type: c.type, minutes: c.minutes,
+          intensity: c.hrAvg ? (zoneOf(c.hrAvg) >= 4 ? 'fuerte' : zoneOf(c.hrAvg) <= 2 ? 'suave' : 'moderado') : 'moderado',
+          distance: c.distance || 0,
+          jumps: c.type === 'soga' ? Math.round(c.minutes * 0.6 * 110) : 0,
+          hrAvg: c.hrAvg || 0, hrMax: c.hrMax || 0, watchKcal: c.watchKcal || 0,
+          zones: c.zones && c.zones.some(Boolean) ? c.zones : null,
+          rpe: c.hrAvg ? clamp(Math.round(zoneOf(c.hrAvg) * 2), 1, 10) : 6,
+          mood: 3, notes: c.label || '', source: 'reloj'
+        };
+        o.kcal = sessionKcal(o);
+        S.sessions.push(o);
+        nuevas++;
+      });
+      pending = [];
+      save(); render(); renderImport();
+      toast(nuevas
+        ? `${nuevas} sesión${nuevas > 1 ? 'es' : ''} agregada${nuevas > 1 ? 's' : ''}${repetidas ? ` · ${repetidas} repetida${repetidas > 1 ? 's' : ''} omitida${repetidas > 1 ? 's' : ''}` : ''}`
+        : 'Ya las tenías todas cargadas');
+    }
+  });
+
+  ['#sesType', '#sesMin', '#sesInt', '#sesHrAvg'].forEach(sel =>
     $(sel).addEventListener('input', updateKcalPreview));
   $('#sesRpe').addEventListener('input', e => { $('#rpeOut').textContent = e.target.value; });
 
@@ -703,17 +1037,21 @@ function bind() {
     const intensity = $('#sesInt').value;
     let jumps = Number($('#sesJumps').value) || 0;
     if (type === 'soga' && !jumps) jumps = Math.round(minutes * 0.6 * 110); // ~60% del tiempo saltando
-    S.sessions.push({
+    const o = {
       id: Date.now(),
       date: $('#sesDate').value || today(),
       type, minutes, intensity,
       distance: Number($('#sesKm').value) || 0,
       jumps,
+      hrAvg: Number($('#sesHrAvg').value) || 0,
+      hrMax: Number($('#sesHrMax').value) || 0,
       rpe: Number($('#sesRpe').value),
       mood: Number($('#sesMood').value),
       notes: $('#sesNotes').value.trim(),
-      kcal: kcal(type, intensity, minutes, currentWeight())
-    });
+      source: 'manual'
+    };
+    o.kcal = sessionKcal(o);
+    S.sessions.push(o);
     save();
     e.target.reset();
     $('#sesDate').value = today();
@@ -759,8 +1097,14 @@ function bind() {
       startWeight: Number($('#pStart').value) || 91,
       goalWeight: Number($('#pGoal').value) || 83,
       startDate: $('#pDate').value || today(),
-      footballDay: Number($('#pFootball').value)
+      footballDay: Number($('#pFootball').value),
+      restDay: Number($('#pRest').value),
+      hrMax: Number($('#pHrMax').value) || 0
     });
+    if (S.profile.restDay === S.profile.footballDay) {
+      S.profile.restDay = (S.profile.footballDay + 1) % 7;
+      toast('El descanso no puede caer el día del partido: lo moví al día siguiente');
+    }
     save(); render(); toast('Perfil actualizado');
   });
 
