@@ -193,6 +193,9 @@ tools/              utilidades de build
 tests/              recorrido de extremo a extremo y generador de fixtures
 ```
 
+El ícono es una soga de saltar dorada sobre negro: una sola forma, pensada para leerse a 60 px
+entre íconos planos y saturados, donde el fondo negro es justamente lo que lo distingue.
+
 Sin dependencias, sin build step ni pedidos de red: los `.zip` se abren con `DecompressionStream` y
 los archivos del reloj se leen con `DOMParser`, todo en el navegador, los gráficos son SVG generados a mano y las
 tipografías (Chivo y Karla, subconjunto latino, SIL Open Font License 1.1) van incrustadas en el
