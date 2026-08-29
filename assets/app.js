@@ -1404,7 +1404,7 @@ function objetivosDia() {
 }
 function frecuentes(n) {
   const cuenta = {};
-  (S.foods || []).forEach(f => { cuenta[f.k] = (cuenta[f.k] || 0) + 1; });
+  (S.foods || []).forEach(f => { if (f.k) cuenta[f.k] = (cuenta[f.k] || 0) + 1; });
   return Object.entries(cuenta).sort((a,b) => b[1]-a[1]).slice(0, n)
     .map(([k]) => ALIMENTOS.find(a => a[0] === k)).filter(Boolean);
 }
@@ -1746,7 +1746,7 @@ function renderComida() {
         <h3><span>${etiqueta}</span><span>${r(sub)} kcal</span></h3>
         ${items.map(f => `<article class="plato">
           <div class="plato-body">
-            <b>${esc(f.n)}</b>
+            <b data-editcomida="${f.id}" role="button" tabindex="0">${esc(f.n)}</b>
             <span>${esc(f.porcion)} · ${r(f.kcal)} kcal · ${f.pr.toFixed(1)} g prot · ${f.gr.toFixed(1)} g grasa</span>
           </div>
           <div class="cant">
@@ -1766,17 +1766,34 @@ function renderComida() {
     `<button type="button" data-frec="${a[0]}">${esc(a[1])}</button>`).join('');
 }
 
+const nuevoId = () => 'c' + Date.now() + Math.round(Math.random() * 999);
+
+/* Cada entrada guarda sus valores por unidad. Con eso el mismo código sirve
+   para lo que sale de la base y para lo cargado a mano, y editar cualquiera
+   es cambiar la base y volver a multiplicar. */
 function agregarAlimento(a, q, tipo, fecha) {
-  const n = nutrDe(a, q);
-  S.foods.push({ id: 'c' + Date.now() + Math.round(Math.random() * 999),
-    date: fecha, tipo, k: a[0], n: a[1], porcion: a[2], q,
-    kcal: n.kcal, pr: n.pr, gr: n.gr, ch: n.ch });
+  const base = { kcal: a[3], pr: a[4], gr: a[5], ch: a[6] };
+  const f = { id: nuevoId(), date: fecha, tipo, k: a[0], n: a[1], porcion: a[2], q, base };
+  recalcular(f);
+  S.foods.push(f);
+}
+function agregarManual(datos, q, tipo, fecha) {
+  const f = { id: nuevoId(), date: fecha, tipo, k: '', n: datos.n,
+    porcion: datos.porcion || '1 porción', q, manual: true,
+    base: { kcal: datos.kcal, pr: datos.pr, gr: datos.gr, ch: datos.ch } };
+  recalcular(f);
+  S.foods.push(f);
+  return f;
 }
 function recalcular(f) {
-  const a = ALIMENTOS.find(x => x[0] === f.k);
-  if (!a) return;
-  const n = nutrDe(a, f.q);
-  f.kcal = n.kcal; f.pr = n.pr; f.gr = n.gr; f.ch = n.ch;
+  let base = f.base;
+  if (!base) {                        // entradas guardadas antes de que existiera base
+    const a = ALIMENTOS.find(x => x[0] === f.k);
+    if (!a) return;
+    base = f.base = { kcal: a[3], pr: a[4], gr: a[5], ch: a[6] };
+  }
+  f.kcal = base.kcal * f.q; f.pr = base.pr * f.q;
+  f.gr = base.gr * f.q;   f.ch = base.ch * f.q;
 }
 
 function renderHitos() {
@@ -2201,6 +2218,12 @@ function bind() {
       save(); renderWeight(); renderToday(); renderTopbar(); toast('Registro borrado');
       return;
     }
+    const ed = e.target.closest('[data-editcomida]');
+    if (ed) {
+      const f = S.foods.find(x => x.id === ed.dataset.editcomida);
+      if (f) { if (!f.base) recalcular(f); abrirManual(f); }
+      return;
+    }
     const fq = e.target.closest('[data-frec]');
     if (fq) {
       const a = ALIMENTOS.find(x => x[0] === fq.dataset.frec);
@@ -2445,6 +2468,52 @@ function bind() {
     $('#comidaTexto').value = '';
     const leidos = items.map(i => i.a[1] + (i.q !== 1 ? ' ×' + i.q : '')).join(' · ');
     toast(sinReconocer.length ? `${leidos} · no reconocí «${sinReconocer[0]}»` : leidos);
+  });
+
+  // --- carga manual y edición de un plato ---
+  const abrirManual = (f) => {
+    const form = $('#formManual');
+    $('#manId').value = f ? f.id : '';
+    $('#manNombre').value = f ? f.n : '';
+    $('#manPorcion').value = f ? f.porcion : '';
+    $('#manKcal').value = f ? Math.round(f.base.kcal * 10) / 10 : '';
+    $('#manPr').value = f && f.base.pr ? Math.round(f.base.pr * 10) / 10 : '';
+    $('#manGr').value = f && f.base.gr ? Math.round(f.base.gr * 10) / 10 : '';
+    $('#manCh').value = f && f.base.ch ? Math.round(f.base.ch * 10) / 10 : '';
+    $('#manualTitulo').textContent = f ? 'Corregir este plato' : 'Cargar a mano';
+    $('#manGuardar').textContent = f ? 'Guardar' : 'Agregar';
+    form.hidden = false;
+    form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('#manNombre').focus();
+  };
+  $('#btnManual').addEventListener('click', () => abrirManual(null));
+  $('#btnCerrarManual').addEventListener('click', () => { $('#formManual').hidden = true; });
+
+  $('#formManual').addEventListener('submit', e => {
+    e.preventDefault();
+    const n = $('#manNombre').value.trim();
+    const kcal = Number($('#manKcal').value);
+    if (!n || !isFinite(kcal) || kcal < 0) { toast('Falta el nombre o las calorías'); return; }
+    const datos = { n, porcion: $('#manPorcion').value.trim(),
+      kcal, pr: Number($('#manPr').value) || 0,
+      gr: Number($('#manGr').value) || 0, ch: Number($('#manCh').value) || 0 };
+    const id = $('#manId').value;
+    if (id) {
+      // Editar: cambia la base y se recalcula con la cantidad que ya tenía.
+      const f = S.foods.find(x => x.id === id);
+      if (f) {
+        f.n = datos.n;
+        f.porcion = datos.porcion || f.porcion;
+        f.base = { kcal: datos.kcal, pr: datos.pr, gr: datos.gr, ch: datos.ch };
+        f.manual = true;
+        recalcular(f);
+      }
+      toast('Plato corregido');
+    } else {
+      agregarManual(datos, 1, $('#comidaTipo').value, $('#comidaDate').value || today());
+      toast(`${datos.n} · ${Math.round(datos.kcal)} kcal`);
+    }
+    save(); e.target.reset(); $('#formManual').hidden = true; render();
   });
 
   // --- estudios de laboratorio ---

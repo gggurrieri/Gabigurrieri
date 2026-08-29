@@ -417,3 +417,5 @@ main{max-width:720px;margin:0 auto;padding:0 var(--sp)}
 .cant button{width:32px;height:36px;border:1px solid var(--line);background:var(--bg-soft);
   border-radius:9px;cursor:pointer;font-size:16px;line-height:1}
 .cant b{min-width:34px;text-align:center;font-size:13px;font-variant-numeric:tabular-nums}
+.plato-body b{cursor:pointer}
+.plato-body b::after{content:' ✎';opacity:.35;font-size:11px}

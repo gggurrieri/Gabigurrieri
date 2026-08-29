@@ -73,6 +73,14 @@ intérprete de texto que reconoce cantidades (`dos`, `medio`, `3`), tamaños (`c
 plurales, y que sabe extraer varios alimentos de una misma frase: *«milanesa de pollo con puré»* son
 dos platos, pero *«café con leche»* es uno solo.
 
+Lo que no esté en la base se carga a mano con **Cargar a mano**: nombre, porción y calorías, más
+proteína, grasa y carbohidratos si los tenés. Lo que se deje en blanco queda en cero — no se
+inventan macros. Tocando el nombre de cualquier plato ya registrado se abre el mismo formulario para
+corregirlo, así que si tu granola trae 240 kcal por pote y no 180, se arregla una vez.
+
+Cada entrada guarda sus valores **por unidad**, así que el mismo código sirve para lo que sale de la
+base y para lo cargado a mano, y los botones de media porción escalan las dos igual.
+
 El día se compara contra los objetivos que la app ya calculaba: las calorías del gasto estimado menos
 550, y la proteína en 1,6 g/kg — que pasa a «sin objetivo» si los estudios levantaron la bandera
 renal. Los alimentos más repetidos quedan a un toque.
@@ -237,6 +245,7 @@ node tests/labs.js                 # 27 comprobaciones sobre los estudios
 node tests/hitos.js                # 18 comprobaciones sobre los hitos de peso
 node tests/comida.js               # 20 comprobaciones sobre nutrición
 node tests/pasos.js tmp            # 11 comprobaciones sobre pasos y pulso en reposo
+node tests/manual.js               # 18 comprobaciones sobre carga manual y corrección
 ```
 
 `tests/e2e.js` recorre la app como un usuario, en viewport de iPhone y con eventos táctiles reales.
