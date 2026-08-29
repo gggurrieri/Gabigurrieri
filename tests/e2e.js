@@ -219,6 +219,33 @@ const db = p => p.evaluate(() => JSON.parse(localStorage.getItem('desafio90_v1')
   const sinBoton = await p.$('#btnAddImported');
   check('sin resultados no ofrece agregar', !sinBoton);
 
+  // ─────────── M · los campos quedan parejos y adentro del módulo ───────────
+  console.log('\nM · Campos de formulario');
+  await p.goto(APP);
+  await p.evaluate(() => localStorage.clear());
+  await p.reload(); await p.waitForTimeout(400);
+  for (const v of ['log','peso','progreso','ajustes']) {
+    await ir(v);
+    if (v==='peso') { await p.tap('#btnNuevoLab'); await p.waitForTimeout(300); }
+    const r = await p.evaluate(() => {
+      const campos = [...document.querySelectorAll('.view:not([hidden]) input, .view:not([hidden]) select')]
+        .filter(el => !el.hidden && el.type!=='file' && el.type!=='range' && el.getBoundingClientRect().width);
+      const alturas = [...new Set(campos.map(el => Math.round(el.getBoundingClientRect().height)))];
+      const fuera = campos.filter(el => {
+        const c = el.closest('.card'); if (!c) return false;
+        const cs = getComputedStyle(c), b = el.getBoundingClientRect(), k = c.getBoundingClientRect();
+        return b.right > k.right - parseFloat(cs.paddingRight) + 1 || b.left < k.left + parseFloat(cs.paddingLeft) - 1;
+      }).map(el => el.id || el.type);
+      const fechas = campos.filter(el => el.type==='date')
+        .map(el => getComputedStyle(el).textAlign);
+      return { alturas, fuera, fechas, n: campos.length };
+    });
+    check(`${v}: todos los campos con la misma altura`, r.alturas.length===1, `alturas ${r.alturas.join(', ')}px`);
+    check(`${v}: ningún campo se sale del módulo`, r.fuera.length===0, r.fuera.join(', '));
+    if (r.fechas.length)
+      check(`${v}: las fechas alinean como el resto`, r.fechas.every(a=>a==='left'||a==='start'), r.fechas.join(', '));
+  }
+
   console.log('\n' + '─'.repeat(50));
   console.log(`${ok} pasaron · ${fail} fallaron`);
   if (fallos.length) { console.log('\nFALLOS:'); fallos.forEach(f=>console.log('  · '+f)); }
