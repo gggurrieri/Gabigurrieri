@@ -13,6 +13,6 @@
 <rect width="192" height="192" rx="44" fill="url(#borde)"/>
 <rect x="0.75" y="0.75" width="190.5" height="190.5" rx="43.5" fill="none"
       stroke="#ffffff" stroke-opacity="0.10" stroke-width="1.5"/>
-<circle cx="96" cy="96" r="54" fill="none" stroke="url(#oro)" stroke-width="9"/>
-<circle cx="96" cy="96" r="8" fill="url(#oro)"/>
+<circle cx="96" cy="96" r="51" fill="none" stroke="url(#oro)" stroke-width="15"/>
+<circle cx="96" cy="96" r="13" fill="url(#oro)"/>
 </svg>
