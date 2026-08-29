@@ -140,8 +140,13 @@ habituales de adulto —diferenciados por sexo donde corresponde— y traduce lo
 implicancias de entrenamiento. Los rangos varían entre laboratorios: manda el del informe. Y ante
 cualquier valor marcado, manda el médico.
 
-Se cubren 33 marcadores agrupados en hemograma, hierro, metabólico, lípidos, hígado, riñón,
-tiroides, vitaminas e inflamación, iones y orina.
+Se cubren 36 marcadores agrupados en hemograma, hierro, metabólico, lípidos, hígado, riñón,
+tiroides, vitaminas e inflamación, iones y orina. Las unidades siguen la convención de los
+laboratorios locales — los glóbulos blancos en mil/mm³, por ejemplo — porque un desajuste de
+unidades genera falsas alarmas, que son peores que no tener la función.
+
+Con **Pegar valores** se carga un estudio en JSON sin tipear campo por campo; se suma a los
+existentes, nunca los reemplaza.
 
 ### Cómo afecta al plan
 
@@ -168,7 +173,7 @@ cuota; como todo lo demás, no salen del dispositivo.
 ```
 python3 tests/fixtures.py tmp      # genera los archivos de ejemplo
 node tests/e2e.js tmp              # 43 comprobaciones, sale con 1 si algo falla
-node tests/labs.js                 # 20 comprobaciones sobre los estudios
+node tests/labs.js                 # 27 comprobaciones sobre los estudios
 ```
 
 `tests/e2e.js` recorre la app como un usuario, en viewport de iPhone y con eventos táctiles reales.

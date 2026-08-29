@@ -234,6 +234,7 @@
         informe. Y ante cualquier valor marcado, manda tu médico, no esta app.</p>
         <div class="btn-row">
           <button class="btn primary" id="btnNuevoLab" type="button">Cargar un estudio</button>
+          <button class="btn" id="btnPegarLab" type="button">Pegar valores</button>
         </div>
       </div>
 
@@ -307,7 +308,10 @@
         <h2>Tu perfil</h2>
         <div class="grid-2">
           <label>Nombre<input type="text" id="pName" placeholder="Gabi"></label>
-          <label>Edad<input type="number" id="pAge" min="14" max="99"></label>
+          <label>Fecha de nacimiento
+            <input type="date" id="pBirth">
+            <small class="muted" id="pAgeShown"></small>
+          </label>
           <label>Altura (cm)<input type="number" id="pHeight" min="120" max="230"></label>
           <label>Sexo
             <select id="pSex"><option value="m">Masculino</option><option value="f">Femenino</option></select>

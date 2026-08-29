@@ -51,7 +51,7 @@ const clonar = o => (typeof structuredClone === 'function'
 
 const DEFAULTS = {
   profile: {
-    name: '', age: 32, sex: 'm', height: 176,
+    name: '', age: 32, birth: '', sex: 'm', height: 176,
     startWeight: 91, goalWeight: 83,
     startDate: today(), footballDay: 5, restDay: 6, hrMax: 0
   },
@@ -263,7 +263,7 @@ function bmiLabel(v) {
 }
 function bmr(kg) {
   const p = S.profile;
-  return Math.round(10 * kg + 6.25 * p.height - 5 * p.age + (p.sex === 'm' ? 5 : -161));
+  return Math.round(10 * kg + 6.25 * p.height - 5 * edad() + (p.sex === 'm' ? 5 : -161));
 }
 /* Gasto base (sin entrenar) + promedio real de lo que estás entrenando.
    Se separa así para no contar dos veces las calorías de las sesiones. */
@@ -278,7 +278,20 @@ function tdee(kg) { return baseExpenditure(kg) + avgTrainingKcal(14); }
 /* ---- frecuencia cardíaca ----
    Sin FC máxima medida se estima con Tanaka (208 - 0,7 x edad), más fiable
    que el viejo 220 - edad para mayores de 30. */
-function hrMax() { return S.profile.hrMax || Math.round(208 - 0.7 * S.profile.age); }
+/* La edad sale de la fecha de nacimiento si está cargada, así no se
+   desactualiza sola. Los perfiles viejos siguen usando el número suelto. */
+function edad() {
+  const b = S.profile.birth;
+  if (b && /^\d{4}-\d{2}-\d{2}$/.test(b)) {
+    const d = fromISO(b), h = new Date();
+    let a = h.getFullYear() - d.getFullYear();
+    const m = h.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && h.getDate() < d.getDate())) a--;
+    if (a > 0 && a < 120) return a;
+  }
+  return Number(S.profile.age) || 32;
+}
+function hrMax() { return S.profile.hrMax || Math.round(208 - 0.7 * edad()); }
 
 const ZONES = [
   { n: 1, name: 'Recuperación', lo: 0.50, hi: 0.60, color: 'var(--movilidad)',
@@ -303,7 +316,7 @@ function zoneOf(hr) {
 /* Calorías a partir del pulso medio (Keytel et al., 2005). Bastante más
    ajustado que los METs cuando el reloj te dio la FC real de la sesión. */
 function kcalFromHr(hrAvg, minutes, kg) {
-  const a = S.profile.age;
+  const a = edad();
   const perMin = S.profile.sex === 'm'
     ? (-55.0969 + 0.6309 * hrAvg + 0.1988 * kg + 0.2017 * a) / 4.184
     : (-20.4022 + 0.4472 * hrAvg - 0.1263 * kg + 0.0740 * a) / 4.184;
@@ -829,10 +842,10 @@ const MARCADORES = [
   { g:'Hemograma', k:'hto', n:'Hematocrito', u:'%', ref:{m:[41,53], f:[36,46]},
     bajo:{ plan:'sinIntervalos', nota:'Acompaña a la hemoglobina baja: esperá más fatiga de la habitual al empezar.' },
     alto:{ nota:'Suele ir junto con deshidratación. Revisá cuánto tomás en el día.' } },
-  { g:'Hemograma', k:'gb', n:'Glóbulos blancos', u:'/mm³', ref:{m:[4000,10000], f:[4000,10000]},
+  { g:'Hemograma', k:'gb', n:'Glóbulos blancos', u:'mil/mm³', ref:{m:[3.8,11.0], f:[3.8,11.0]},
     alto:{ plan:'sinIntervalos', nota:'Puede indicar una infección en curso. No se entrena fuerte con una infección activa.' },
     bajo:{ nota:'Consultalo antes de seguir con el plan.' },
-    critico:{ alto:20000, bajo:2000 } },
+    critico:{ alto:20, bajo:2 } },
 
   // ---- hierro ----
   { g:'Hierro', k:'ferritina', n:'Ferritina', u:'ng/mL', ref:{m:[30,400], f:[15,150]},
@@ -851,6 +864,8 @@ const MARCADORES = [
     critico:{ alto:9 } },
   { g:'Metabólico', k:'insulina', n:'Insulina', u:'µU/mL', ref:{m:[2,25], f:[2,25]},
     alto:{ nota:'Suele acompañar a la resistencia a la insulina. Mejora con pérdida de peso y volumen aeróbico.' } },
+  { g:'Metabólico', k:'homa', n:'HOMA', u:'', ref:{m:[0,1.0], f:[0,1.0]},
+    alto:{ nota:'Entre 1 y 3,5 es zona dudosa; por encima de 3,5 se considera resistencia a la insulina. Es de los marcadores que mejor responden a bajar de peso y sumar volumen aeróbico.' } },
 
   // ---- lípidos ----
   { g:'Lípidos', k:'colesterol', n:'Colesterol total', u:'mg/dL', ref:{m:[0,200], f:[0,200]},
@@ -900,6 +915,8 @@ const MARCADORES = [
     bajo:{ nota:'Déficit muy frecuente. Se asocia a menos fuerza y peor recuperación. Andar en bici de día ayuda; si está muy baja, se corrige con suplementación indicada por tu médico.' } },
   { g:'Vitaminas e inflamación', k:'b12', n:'Vitamina B12', u:'pg/mL', ref:{m:[200,900], f:[200,900]},
     bajo:{ nota:'Puede dar fatiga y hormigueos. Consultalo.' } },
+  { g:'Vitaminas e inflamación', k:'folato', n:'Ácido fólico', u:'ng/mL', ref:{m:[5.3,30], f:[5.3,30]},
+    bajo:{ nota:'Puede dar fatiga. Consultalo.' } },
   { g:'Vitaminas e inflamación', k:'pcr', n:'PCR ultrasensible', u:'mg/L', ref:{m:[0,3], f:[0,3]},
     alto:{ plan:'sinIntervalos', nota:'Inflamación. Si es por una infección en curso, no es momento de entrenar fuerte. Si es persistente, el ejercicio y bajar de peso tienden a bajarla.' },
     critico:{ alto:10 } },
@@ -908,10 +925,12 @@ const MARCADORES = [
   { g:'Iones', k:'sodio', n:'Sodio', u:'mEq/L', ref:{m:[135,145], f:[135,145]},
     bajo:{ plan:'sinIntervalos', nota:'Importa para las salidas largas: tomar solo agua en sesiones de más de una hora puede bajarlo más. Consultalo.' },
     critico:{ bajo:130, alto:150 } },
+  { g:'Iones', k:'magnesio', n:'Magnesio', u:'mg/dL', ref:{m:[1.6,2.6], f:[1.6,2.6]},
+    bajo:{ nota:'Bajo se asocia a calambres, justo lo que aparece en las salidas largas y en la soga.' } },
   { g:'Iones', k:'potasio', n:'Potasio', u:'mEq/L', ref:{m:[3.5,5.1], f:[3.5,5.1]},
     bajo:{ plan:'sinIntervalos', nota:'Fuera de rango afecta al ritmo cardíaco. Consultá antes de hacer esfuerzos intensos.' },
-    alto:{ plan:'sinIntervalos', nota:'Fuera de rango afecta al ritmo cardíaco. Consultá antes de hacer esfuerzos intensos.' },
-    critico:{ bajo:3.0, alto:6.0 } },
+    alto:{ plan:'sinIntervalos', nota:'Fuera de rango afecta al ritmo cardíaco, y el ejercicio intenso lo sube de forma transitoria. La causa más frecuente de un potasio algo alto es un artefacto de la extracción — hemólisis, torniquete apretado, abrir y cerrar la mano — así que lo primero es repetirlo. Hasta confirmarlo, consultá antes de hacer esfuerzos máximos.' },
+    critico:{ bajo:3.0, alto:5.5 } },
 
   // ---- orina ----
   { g:'Orina', k:'densidad', n:'Densidad', u:'', ref:{m:[1.005,1.030], f:[1.005,1.030]},
@@ -1508,7 +1527,8 @@ function renderLabs() {
 function renderProfile() {
   const p = S.profile;
   $('#pName').value = p.name || '';
-  $('#pAge').value = p.age;
+  $('#pBirth').value = p.birth || '';
+  $('#pAgeShown').textContent = edad() + ' años';
   $('#pHeight').value = p.height;
   $('#pSex').value = p.sex;
   $('#pStart').value = p.startWeight;
@@ -1779,6 +1799,40 @@ function bind() {
   });
   $('#btnCerrarLab').addEventListener('click', () => { $('#formLab').hidden = true; });
 
+  /* Pegar un estudio ya tipeado: suma, nunca reemplaza lo que ya tenés.
+     Sirve para no cargar veinte valores a mano en el teléfono. */
+  $('#btnPegarLab').addEventListener('click', () => {
+    openModal('Pegar valores de un estudio', '',
+      'Pegá acá el estudio en formato JSON: {"date":"2026-06-06","lugar":"...","values":{"hb":16.3, ...}}. '
+      + 'Se agrega a los que ya tengas, no borra nada. Acepta también una lista de estudios.',
+      txt => {
+        let datos;
+        try { datos = JSON.parse(txt); }
+        catch (e) { toast('Eso no es un JSON válido'); return; }
+        const lista = Array.isArray(datos) ? datos : [datos];
+        const validos = lista.filter(x => x && typeof x === 'object' && x.values && typeof x.values === 'object');
+        if (!validos.length) { toast('No encontré ningún estudio con valores'); return; }
+        let n = 0;
+        validos.forEach((x, i) => {
+          const values = {};
+          Object.entries(x.values).forEach(([k, v]) => { if (marcador(k) && v !== '' && v != null) values[k] = v; });
+          if (!Object.keys(values).length) return;
+          S.labs.push({
+            id: 'lab' + Date.now() + i,
+            date: /^\d{4}-\d{2}-\d{2}$/.test(x.date || '') ? x.date : today(),
+            lugar: String(x.lugar || '').slice(0, 60),
+            notas: String(x.notas || '').slice(0, 140),
+            values, aplicar: true, archivo: null
+          });
+          n++;
+        });
+        if (!n) { toast('Ninguno de esos valores coincide con los marcadores'); return; }
+        save(); render();
+        toast(`${n} estudio${n > 1 ? 's' : ''} agregado${n > 1 ? 's' : ''}`);
+        $('#labList').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+  });
+
   $('#formLab').addEventListener('submit', async e => {
     e.preventDefault();
     const values = {};
@@ -1819,7 +1873,7 @@ function bind() {
     e.preventDefault();
     Object.assign(S.profile, {
       name: $('#pName').value.trim(),
-      age: Number($('#pAge').value) || 32,
+      birth: $('#pBirth').value || '',
       height: Number($('#pHeight').value) || 176,
       sex: $('#pSex').value,
       startWeight: Number($('#pStart').value) || 91,

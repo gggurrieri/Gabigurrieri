@@ -49,7 +49,7 @@ const db = p => p.evaluate(() => JSON.parse(localStorage.getItem('desafio90_v1')
   // ─────────── B · perfil ───────────
   console.log('\nB · Perfil');
   await ir('ajustes');
-  await p.fill('#pName','Gabi'); await p.fill('#pAge','32');
+  await p.fill('#pName','Gabi'); await p.fill('#pBirth','1987-04-22');
   await p.selectOption('#pFootball','3');            // jueves
   await p.selectOption('#pRest','4');                // viernes
   await p.tap('#formProfile button[type=submit]'); await p.waitForTimeout(400);

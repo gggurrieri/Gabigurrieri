@@ -109,6 +109,41 @@ const check=(n,c,d='')=>{ if(c){ok++;console.log('  ✓ '+n);} else {fail++;cons
     return i && i.src.startsWith('data:image'); });
   check('lo muestra desde IndexedDB', cargada);
 
+  console.log('\nH · Unidades y umbrales con valores reales');
+  await p.evaluate(() => { const d=JSON.parse(localStorage.getItem('desafio90_v1')); d.labs=[]; localStorage.setItem('desafio90_v1',JSON.stringify(d)); });
+  await p.reload(); await p.waitForTimeout(400);
+  await irCuerpo();
+  await p.tap('#btnPegarLab'); await p.waitForTimeout(350);
+  // Valores inventados, con la forma de un informe real: la mayoría en rango,
+  // los glóbulos blancos en mil/mm³ como los informan los laboratorios de acá,
+  // y cinco marcadores fuera de rango a propósito.
+  await p.fill('#modalText', JSON.stringify({ date:'2026-06-06', lugar:'Laboratorio',
+    values:{ hb:15.2, hto:45.1, gb:6.2, ferritina:88.0, glucosa:92, homa:0.9,
+             colesterol:232, hdl:64, ldl:147, trigliceridos:118, got:24, gpt:26,
+             creatinina:1.10, filtrado:86.0, acidoUrico:5.8, tsh:1.90,
+             vitd:22, b12:410, sodio:140, potasio:5.7, magnesio:2.1 } }));
+  await p.tap('[data-ok]'); await p.waitForTimeout(700);
+  const marcados = await p.$$eval('#labList .hallazgo b', e=>e.map(x=>x.textContent.replace(/\s+/g,' ').trim()));
+  check('pegar valores agrega el estudio', marcados.length>0);
+  check('no marca los glóbulos blancos normales (mil/mm³)',
+        !marcados.some(x=>/Glóbulos/.test(x)), marcados.filter(x=>/Glóbulos/.test(x)).join());
+  check('no marca hemoglobina, ferritina ni tiroides normales',
+        !marcados.some(x=>/Hemoglobina|Ferritina|TSH/.test(x)));
+  check('marca el potasio alto como crítico',
+        await p.evaluate(() => [...document.querySelectorAll('.hallazgo.critico b')].some(e=>/Potasio/.test(e.textContent))));
+  check('marca colesterol, LDL, filtrado y vitamina D',
+        ['Colesterol total','LDL','Filtrado','Vitamina D'].every(k=>marcados.some(x=>x.includes(k))),
+        marcados.join(' · '));
+  check('son exactamente cinco hallazgos', marcados.length===5, `n=${marcados.length}`);
+
+  console.log('\nI · Edad desde la fecha de nacimiento');
+  await p.tap('#btnSettings'); await p.waitForTimeout(250);
+  await p.fill('#pBirth','1987-04-22');
+  await p.tap('#formProfile button[type=submit]'); await p.waitForTimeout(350);
+  await p.tap('#btnSettings'); await p.waitForTimeout(250);
+  const edad = await p.textContent('#pAgeShown');
+  check('calcula la edad sola', /3[5-9] años/.test(edad), edad);
+
   console.log('\n' + '─'.repeat(46));
   console.log(`${ok} pasaron · ${fail} fallaron`);
   console.log(errs.length ? 'ERRORES JS:\n  '+[...new Set(errs)].join('\n  ') : 'sin errores JS');
