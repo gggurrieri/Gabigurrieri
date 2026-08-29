@@ -3,7 +3,7 @@
 
 Uso: python3 tests/fixtures.py <directorio>
 """
-import sys, pathlib, zipfile, datetime, math
+import sys, pathlib, zipfile, datetime, json
 
 def salida():
     if len(sys.argv) < 2:
@@ -89,7 +89,26 @@ def main():
         '<MaximumHeartRateBpm><Value>158</Value></MaximumHeartRateBpm>'
         f'<Track>{tp}</Track></Lap>\n </Activity></Activities>\n</TrainingCenterDatabase>\n',
         encoding='utf-8')
-    print(f'archivos de prueba en {d} · {pesos} pesos, 33 entrenamientos')
+    # dos fuentes contando los mismos pasos: el caso que hay que desduplicar
+    pasos, esperado = [], {}
+    for i in range(20):
+        f = inicio + datetime.timedelta(days=i)
+        reales, parcial = 6000 + i * 180, int((6000 + i * 180) * 0.62)
+        for n in range(12):
+            pasos.append(f'<Record type="HKQuantityTypeIdentifierStepCount" sourceName="Amazfit" unit="count" '
+                         f'creationDate="{ts(f, 9, n)}" startDate="{ts(f, 9, n)}" endDate="{ts(f, 9, n)}" value="{reales // 12}"/>\n')
+            pasos.append(f'<Record type="HKQuantityTypeIdentifierStepCount" sourceName="iPhone" unit="count" '
+                         f'creationDate="{ts(f, 10, n)}" startDate="{ts(f, 10, n)}" endDate="{ts(f, 10, n)}" value="{parcial // 12}"/>\n')
+        esperado[f.isoformat()] = (reales // 12) * 12
+        fc = 62 - i // 4
+        for fuente, v in (('Amazfit', fc), ('iPhone', fc + 1)):
+            pasos.append(f'<Record type="HKQuantityTypeIdentifierRestingHeartRate" sourceName="{fuente}" '
+                         f'unit="count/min" creationDate="{ts(f, 7)}" startDate="{ts(f, 7)}" endDate="{ts(f, 7)}" value="{v}"/>\n')
+    pasos.append(workout(inicio, 'Cycling', 45, 14.0, 430, None))
+    zipear(d / 'pasos.zip', 'exportación.xml', envolver(''.join(pasos)))
+    (d / 'pasos-esperado.json').write_text(json.dumps(esperado), encoding='utf-8')
+
+    print(f'archivos de prueba en {d} · {pesos} pesos, 33 entrenamientos, 20 días de pasos')
 
 if __name__ == '__main__':
     main()

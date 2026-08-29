@@ -60,6 +60,7 @@ const DEFAULTS = {
   tests: [],      // {date,bike,jumps,plank}
   labs: [],       // {id,date,lugar,notas,values:{},aplicar,archivo}
   foods: [],      // {id,date,tipo,k,n,q,kcal,pr,gr,ch}
+  daily: {},      // {"2026-08-29": {pasos, fcRep}} — importado de Salud
   done: {}        // {"w1-0": true}
 };
 
@@ -82,6 +83,7 @@ function load() {
       tests: parsed.tests || [],
       labs: parsed.labs || [],
       foods: parsed.foods || [],
+      daily: parsed.daily || {},
       done: parsed.done || {}
     };
   } catch (e) {
@@ -604,27 +606,80 @@ function parseWorkout(block, fileName) {
 }
 
 const BODY_MASS = 'HKQuantityTypeIdentifierBodyMass';
-function scanWeights(text, out) {
+const STEP_COUNT = 'HKQuantityTypeIdentifierStepCount';
+const RESTING_HR = 'HKQuantityTypeIdentifierRestingHeartRate';
+
+/* Los pasos son el tipo de registro más numeroso del archivo —cientos por
+   día— así que se leen sin expresiones regulares: buscar la etiqueta y
+   recortar los dos atributos que hacen falta es bastante más rápido. */
+function atributo(tag, nombre) {
+  const k = nombre + '="';
+  const i = tag.indexOf(k);
+  if (i === -1) return '';
+  const j = tag.indexOf('"', i + k.length);
+  return j === -1 ? '' : tag.slice(i + k.length, j);
+}
+function porTipo(text, tipo, fn) {
   let i = 0;
-  while ((i = text.indexOf(BODY_MASS, i)) !== -1) {
+  while ((i = text.indexOf(tipo, i)) !== -1) {
     const open = text.lastIndexOf('<Record', i);
     const close = text.indexOf('>', i);
-    if (open === -1 || close === -1) { i += BODY_MASS.length; continue; }
-    const a = tagAttrs(text.slice(open, close + 1));
-    const date = hkDate(a.startDate);
-    let kg = parseFloat(a.value);
-    if (date && isFinite(kg)) {
-      if (/lb/i.test(a.unit || '')) kg *= 0.45359237;
-      out.push({ date, kg: Math.round(kg * 10) / 10 });
-    }
+    if (open === -1 || close === -1) { i += tipo.length; continue; }
+    fn(text.slice(open, close + 1));
     i = close + 1;
   }
+}
+
+function scanRegistros(text, acc) {
+  porTipo(text, BODY_MASS, tag => {
+    const a = tagAttrs(tag);
+    const date = hkDate(a.startDate);
+    let kg = parseFloat(a.value);
+    if (!date || !isFinite(kg)) return;
+    if (/lb/i.test(a.unit || '')) kg *= 0.45359237;
+    acc.pesos.push({ date, kg: Math.round(kg * 10) / 10 });
+  });
+
+  /* El iPhone y el reloj cuentan los mismos pasos en paralelo. Se acumula
+     por día y por fuente, y al cerrar se toma la fuente con más pasos de
+     ese día: sumarlas daría el doble. */
+  porTipo(text, STEP_COUNT, tag => {
+    const date = hkDate(atributo(tag, 'startDate'));
+    const v = parseFloat(atributo(tag, 'value'));
+    if (!date || !isFinite(v)) return;
+    const fuente = atributo(tag, 'sourceName') || '?';
+    const dia = acc.pasos[date] || (acc.pasos[date] = {});
+    dia[fuente] = (dia[fuente] || 0) + v;
+  });
+
+  porTipo(text, RESTING_HR, tag => {
+    const date = hkDate(atributo(tag, 'startDate'));
+    const v = parseFloat(atributo(tag, 'value'));
+    if (!date || !isFinite(v) || v < 25 || v > 140) return;
+    (acc.fcRep[date] || (acc.fcRep[date] = [])).push(v);
+  });
+}
+
+/* Cierra los acumuladores en un registro por día. */
+function consolidarDiarios(acc) {
+  const out = {};
+  Object.entries(acc.pasos).forEach(([date, fuentes]) => {
+    const vals = Object.values(fuentes);
+    const mejor = Math.max.apply(null, vals);
+    if (mejor > 0) out[date] = { pasos: Math.round(mejor) };
+  });
+  Object.entries(acc.fcRep).forEach(([date, vals]) => {
+    vals.sort((a, b) => a - b);
+    const mediana = vals[Math.floor(vals.length / 2)];
+    (out[date] || (out[date] = {})).fcRep = Math.round(mediana);
+  });
+  return out;
 }
 
 /* Recorre un trozo de texto y devuelve lo que quedó a medias para el
    siguiente. TAIL protege los registros cortados por el borde del trozo. */
 const TAIL = 600;
-function consumeChunk(buf, workouts, weights, fileName, final) {
+function consumeChunk(buf, workouts, acc, fileName, final) {
   let p = 0;
   for (;;) {
     const wi = buf.indexOf('<Workout ', p);
@@ -640,14 +695,14 @@ function consumeChunk(buf, workouts, weights, fileName, final) {
       if (close === -1) break;
       end = close + 10;
     }
-    scanWeights(buf.slice(p, wi), weights);
+    scanRegistros(buf.slice(p, wi), acc);
     const w = parseWorkout(buf.slice(wi, end), fileName);
     if (w) workouts.push(w);
     p = end;
   }
   const wi = buf.indexOf('<Workout ', p);
   const safe = final ? buf.length : Math.max(p, (wi === -1 ? buf.length - TAIL : wi));
-  scanWeights(buf.slice(p, Math.max(p, safe)), weights);
+  scanRegistros(buf.slice(p, Math.max(p, safe)), acc);
   return final ? '' : buf.slice(Math.max(p, safe > p ? safe : p));
 }
 
@@ -720,19 +775,20 @@ async function readHealthExport(file, onProgress) {
   const stream = isZip ? await zipEntryStream(file) : file.stream();
   const reader = stream.getReader();
   const dec = new TextDecoder('utf-8');
-  const workouts = [], weights = [];
+  const workouts = [];
+  const acc = { pesos: [], pasos: {}, fcRep: {} };
   let buf = '', bytes = 0, last = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     bytes += value.byteLength;
     buf += dec.decode(value, { stream: true });
-    buf = consumeChunk(buf, workouts, weights, file.name, false);
+    buf = consumeChunk(buf, workouts, acc, file.name, false);
     if (onProgress && bytes - last > 4e6) { last = bytes; onProgress(bytes); await new Promise(r => setTimeout(r)); }
   }
   buf += dec.decode();
-  consumeChunk(buf, workouts, weights, file.name, true);
-  return { workouts, weights, bytes };
+  consumeChunk(buf, workouts, acc, file.name, true);
+  return { workouts, weights: acc.pesos, diarios: consolidarDiarios(acc), bytes };
 }
 
 function isDuplicate(c) {
@@ -1490,6 +1546,7 @@ let pending = [];
 let pendingWeights = [];
 let importNote = '';
 let lastScan = null;          // última exploración de un archivo de Salud
+let pendingDiarios = {};      // días con pasos y pulso en reposo por importar
 let importRango = 'inicio';
 const MAX_ROWS = 40;
 
@@ -1519,6 +1576,8 @@ function aplicarRango(r) {
   const orden = (a, b) => a.date < b.date ? -1 : 1;
   pending = lastScan.workouts.filter(w => w.date >= desde).sort(orden);
   pendingWeights = lastScan.weights.filter(w => w.date >= desde).sort(orden);
+  pendingDiarios = {};
+  Object.entries(lastScan.diarios || {}).forEach(([f, d]) => { if (f >= desde) pendingDiarios[f] = d; });
 
   const total = lastScan.workouts.length;
   const cabeza = `Leí ${lastScan.mb} MB de ${lastScan.nombre}: ${total} entrenamiento${total === 1 ? '' : 's'} en total. `;
@@ -1531,8 +1590,10 @@ function aplicarRango(r) {
     importNote = cabeza + `Ninguno es posterior al ${fmtDate(desde)}. Ampliá el rango acá abajo para traerlos.`;
   } else {
     const fuera = total - pending.length;
+    const nDias = Object.keys(pendingDiarios).length;
     importNote = cabeza + `Listos para agregar: ${pending.length}`
       + (pendingWeights.length ? ` y ${pendingWeights.length} registro${pendingWeights.length === 1 ? '' : 's'} de peso` : '')
+      + (nDias ? `, más ${nDias} día${nDias === 1 ? '' : 's'} de pasos y pulso en reposo` : '')
       + '.'
       + (fuera ? ` Quedan ${fuera} fuera del rango: ampliá abajo si los querés.` : '');
   }
@@ -1593,7 +1654,7 @@ function renderImport() {
   const nuevosPesos = pendingWeights.filter(w => !S.weights.some(x => x.date === w.date));
   const nota = importNote ? `<p class="import-note">${esc(importNote)}</p>` : '';
 
-  if (!pending.length && !nuevosPesos.length) {
+  if (!pending.length && !nuevosPesos.length && !Object.keys(pendingDiarios).length) {
     // Estado explícito: sin esto la tarjeta se corta y parece que se rompió.
     body.innerHTML = nota + (lastScan
       ? `<div class="empty">No hay nada para agregar en este rango. Elegí uno más amplio en «Traer desde».</div>`
@@ -1609,6 +1670,11 @@ function renderImport() {
         ? `<article class="entry"><div class="entry-ico">⚖️</div><div class="entry-body">
              <div class="entry-title">${nuevosPesos.length} registro${nuevosPesos.length > 1 ? 's' : ''} de peso</div>
              <div class="entry-sub">de ${fmtDate(nuevosPesos[0].date)} a ${fmtDate(nuevosPesos[nuevosPesos.length - 1].date)}</div>
+           </div></article>` : '')
+    + (Object.keys(pendingDiarios).length
+        ? `<article class="entry"><div class="entry-ico">👣</div><div class="entry-body">
+             <div class="entry-title">${Object.keys(pendingDiarios).length} días de actividad diaria</div>
+             <div class="entry-sub">pasos y pulso en reposo</div>
            </div></article>` : '')
     + `<div class="btn-row">
       <button class="btn primary" id="btnAddImported" type="button">Agregar${pending.length ? ' ' + pending.length + (pending.length === 1 ? ' sesión' : ' sesiones') : ''}${nuevosPesos.length ? (pending.length ? ' y ' : ' ') + nuevosPesos.length + ' peso' + (nuevosPesos.length > 1 ? 's' : '') : ''}</button>
@@ -1845,6 +1911,7 @@ function renderProgress() {
   $('#weekChart').innerHTML = barChart(bars);
 
   renderZones();
+  renderDiarios();
 
   $('#badges').innerHTML = BADGES.map(b =>
     `<div class="badge ${b.f(st) ? 'on' : ''}"><b>${b.i}</b><span>${esc(b.t)}</span></div>`).join('');
@@ -1860,6 +1927,50 @@ function renderProgress() {
       <div class="entry-sub">${fmtDate(t.date)}</div></div>
       <button class="entry-del" data-delt="${t.date}" aria-label="Borrar">×</button></article>`;
   }).join('') : '';
+}
+
+function renderDiarios() {
+  const card = $('#diarioCard');
+  if (!card) return;
+  const dias = Object.entries(S.daily || {}).sort((a, b) => a[0] < b[0] ? -1 : 1);
+  if (!dias.length) { card.hidden = true; return; }
+  card.hidden = false;
+
+  const conPasos = dias.filter(([, d]) => d.pasos);
+  const conFc = dias.filter(([, d]) => d.fcRep);
+  const ult30 = conPasos.slice(-30);
+  const prom = ult30.length ? Math.round(ult30.reduce((a, [, d]) => a + d.pasos, 0) / ult30.length) : 0;
+  const fcAhora = conFc.length ? conFc[conFc.length - 1][1].fcRep : null;
+  const fcPrimera = conFc.length ? conFc[0][1].fcRep : null;
+  const delta = (fcAhora != null && fcPrimera != null) ? fcAhora - fcPrimera : null;
+
+  $('#diarioFuente').textContent = `${dias.length} días`;
+  $('#diarioResumen').innerHTML =
+    `<div class="card mini"><b>${prom ? prom.toLocaleString('es-AR') : '—'}</b><span>pasos por día</span></div>
+     <div class="card mini"><b>${fcAhora != null ? fcAhora + ' ppm' : '—'}</b><span>pulso en reposo${
+       delta != null && delta !== 0 ? ` · ${delta < 0 ? '↓' : '↑'}${Math.abs(delta)}` : ''}</span></div>`;
+
+  // El pulso en reposo bajando es la mejor señal de que el plan está funcionando.
+  const p0 = S.profile.startDate;
+  const ptsFc = conFc.map(([f, d]) => ({ x: daysBetween(p0, f), y: d.fcRep }));
+  $('#diarioFc').innerHTML = ptsFc.length > 1
+    ? `<p class="muted small" style="margin:12px 0 4px">Pulso en reposo · baja cuando mejora tu estado físico</p>`
+      + lineChart([{ points: ptsFc, color: '#f472b6', width: 1.6, dots: ptsFc.length <= 40 },
+                   { points: movingAvg(ptsFc, 14), color: '#ff6a2b', width: 2.4 }], {})
+    : '';
+
+  // Pasos por semana, alineados con el ritmo del resto de la app.
+  const semanas = [];
+  for (let k = 11; k >= 0; k--) {
+    const lun = addDays(mondayOf(today()), -7 * k), dom = addDays(lun, 6);
+    const d = conPasos.filter(([f]) => f >= lun && f <= dom);
+    semanas.push({ label: fromISO(lun).getDate() + '/' + (fromISO(lun).getMonth() + 1),
+                   value: d.length ? Math.round(d.reduce((a, [, x]) => a + x.pasos, 0) / d.length) : 0,
+                   current: k === 0 });
+  }
+  $('#diarioPasos').innerHTML = semanas.some(x => x.value)
+    ? `<p class="muted small" style="margin:14px 0 4px">Promedio de pasos por semana</p>` + barChart(semanas)
+    : '';
 }
 
 function renderZones() {
@@ -2153,13 +2264,14 @@ function bind() {
         const el = $('#impProg');
         if (el) el.textContent = `Leyendo ${esc(f.name)} · ${mb(b)} MB`;
       });
-      lastScan = { workouts: res.workouts, weights: res.weights, mb: mb(res.bytes), nombre: f.name };
+      lastScan = { workouts: res.workouts, weights: res.weights, diarios: res.diarios,
+                   mb: mb(res.bytes), nombre: f.name };
       // Si nada entra en el rango por defecto, se abre al que sí trae algo.
       let r = 'inicio';
       if (!cuentaEn(r)) r = ['90', '365', 'todo'].find(x => cuentaEn(x)) || 'inicio';
       aplicarRango(r);
     } catch (err) {
-      pending = []; pendingWeights = []; lastScan = null; headFor = null;
+      pending = []; pendingWeights = []; pendingDiarios = {}; lastScan = null; headFor = null;
       importNote = 'No pude leer el archivo: ' + err.message;
       renderImport();
     }
@@ -2179,7 +2291,7 @@ function bind() {
       if (parsed) pending.push(parsed); else malos++;
     }
     pending.sort((a, b) => a.date < b.date ? -1 : 1);
-    importNote = ''; lastScan = null; headFor = null;
+    importNote = ''; lastScan = null; headFor = null; pendingDiarios = {};
     renderImport();
     if (malos) toast(`${malos} archivo${malos > 1 ? 's' : ''} sin datos legibles (¿es .fit?)`);
     else if (pending.length) toast(`${pending.length} actividad${pending.length > 1 ? 'es' : ''} lista${pending.length > 1 ? 's' : ''}`);
@@ -2205,7 +2317,7 @@ function bind() {
   document.addEventListener('click', e => {
     const drop = e.target.closest('[data-drop]');
     if (drop) { pending.splice(Number(drop.dataset.drop), 1); renderImport(); return; }
-    if (e.target.closest('#btnClearImport')) { pending = []; pendingWeights = []; importNote = ''; lastScan = null; headFor = null; renderImport(); return; }
+    if (e.target.closest('#btnClearImport')) { pending = []; pendingWeights = []; pendingDiarios = {}; importNote = ''; lastScan = null; headFor = null; renderImport(); return; }
     if (e.target.closest('#btnAddImported')) {
       let nuevas = 0, repetidas = 0;
       pending.forEach(c => {
@@ -2225,17 +2337,25 @@ function bind() {
         S.sessions.push(o);
         nuevas++;
       });
+      let dias = 0;
+      Object.entries(pendingDiarios).forEach(([f, d]) => {
+        S.daily[f] = Object.assign({}, S.daily[f], d); dias++;
+      });
       let pesos = 0;
       pendingWeights.forEach(w => {
         if (S.weights.some(x => x.date === w.date)) return;
         S.weights.push(w); pesos++;
       });
-      pending = []; pendingWeights = []; importNote = ''; lastScan = null; headFor = null;
+      pending = []; pendingWeights = []; pendingDiarios = {};
+      importNote = ''; lastScan = null; headFor = null;
       save(); render(); renderImport();
       // Para que se vea dónde quedaron, en vez de dejar la pantalla igual.
       const lista = $('#logList');
       if (lista && nuevas) lista.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      if (pesos) toast(`${pesos} registro${pesos > 1 ? 's' : ''} de peso agregado${pesos > 1 ? 's' : ''}`);
+      if (pesos || dias) toast([
+        pesos ? `${pesos} peso${pesos > 1 ? 's' : ''}` : '',
+        dias ? `${dias} día${dias > 1 ? 's' : ''} de actividad` : ''
+      ].filter(Boolean).join(' y ') + ' más');
       toast(nuevas
         ? `${nuevas} sesión${nuevas > 1 ? 'es' : ''} agregada${nuevas > 1 ? 's' : ''}${repetidas ? ` · ${repetidas} repetida${repetidas > 1 ? 's' : ''} omitida${repetidas > 1 ? 's' : ''}` : ''}`
         : 'Ya las tenías todas cargadas');
@@ -2454,7 +2574,7 @@ function bind() {
           profile: Object.assign({}, DEFAULTS.profile, data.profile),
           sessions: data.sessions || [], weights: data.weights || [],
           tests: data.tests || [], labs: data.labs || [],
-          foods: data.foods || [], done: data.done || {}
+          foods: data.foods || [], daily: data.daily || {}, done: data.done || {}
         };
         save(); render(); toast('Datos importados');
       } catch (err) { toast('El texto no es una copia válida'); }

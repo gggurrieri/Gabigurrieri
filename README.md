@@ -147,6 +147,24 @@ actividades repetidas se detectan comparando fecha, tipo y duración.
 
 Los saltos de soga no vienen en ningún formato: se estiman a partir del tiempo.
 
+### Actividad diaria
+
+La exportación de Salud también trae pasos y pulso en reposo, y se importan junto con lo demás.
+Aparecen en **Progreso**: promedio de pasos por día, pulso en reposo actual con su variación desde el
+primer registro, la curva del pulso en el tiempo y el promedio de pasos por semana.
+
+El pulso en reposo es el mejor marcador gratuito de progreso aeróbico que hay — baja a medida que
+mejora el estado físico — y no depende de la balanza, que las primeras semanas engaña.
+
+**El detalle que importa: el teléfono y el reloj cuentan los mismos pasos en paralelo.** Sumar las
+fuentes duplica el total. Se acumula por día y por fuente, y se toma la que más registró ese día, que
+es la que estuvo encima durante más tiempo. El pulso en reposo se resuelve por mediana cuando hay
+varias fuentes.
+
+Los registros de pasos son los más numerosos del archivo —cientos por día—, así que se leen sin
+expresiones regulares: ubicar la etiqueta y recortar los dos atributos necesarios. Un export de
+184 MB sigue procesándose en dos segundos.
+
 ### Zonas de frecuencia cardíaca
 
 Con el pulso importado, la app calcula el tiempo en cada zona y lo acumula por semana. La FC máxima
@@ -218,6 +236,7 @@ node tests/e2e.js tmp              # 43 comprobaciones, sale con 1 si algo falla
 node tests/labs.js                 # 27 comprobaciones sobre los estudios
 node tests/hitos.js                # 18 comprobaciones sobre los hitos de peso
 node tests/comida.js               # 20 comprobaciones sobre nutrición
+node tests/pasos.js tmp            # 11 comprobaciones sobre pasos y pulso en reposo
 ```
 
 `tests/e2e.js` recorre la app como un usuario, en viewport de iPhone y con eventos táctiles reales.
