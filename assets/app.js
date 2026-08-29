@@ -1983,11 +1983,46 @@ function openModal(title, value, note, onConfirm) {
   if (!onConfirm) $('#modalText').select();
 }
 
+
+/* --------- ícono de "Agregar a inicio" ----------
+   iOS lo toma de un <link rel="apple-touch-icon"> que esté en el <head>, y
+   solo acepta PNG. Publicada como artifact, la página se sirve sin nuestro
+   <head>, así que iOS caía en el favicon y mostraba un emoji. Se inserta en
+   tiempo de ejecución: la marca se rasteriza a PNG en un canvas, que es la
+   única forma de tener el ícono real sin un <head> propio. */
+const MARCA_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"> <defs> <linearGradient id="oro" x1="0.1" y1="1" x2="0.9" y2="0.05"> <stop offset="0" stop-color="#A9741A"/><stop offset="0.35" stop-color="#F4D27E"/> <stop offset="0.7" stop-color="#DDA945"/><stop offset="1" stop-color="#B5822A"/> </linearGradient> <radialGradient id="borde" cx="0.5" cy="0.06" r="0.95"> <stop offset="0" stop-color="#ffffff" stop-opacity="0.10"/> <stop offset="0.55" stop-color="#ffffff" stop-opacity="0"/> </radialGradient> </defs> <rect width="192" height="192" rx="44" fill="#0A0A0B"/> <rect width="192" height="192" rx="44" fill="url(#borde)"/> <rect x="0.75" y="0.75" width="190.5" height="190.5" rx="43.5" fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="1.5"/> <circle cx="96" cy="96" r="51" fill="none" stroke="url(#oro)" stroke-width="15"/> <circle cx="96" cy="96" r="13" fill="url(#oro)"/> </svg>';
+
+function ponerIconoDeInicio() {
+  if (document.querySelector('link[rel="apple-touch-icon"]')) return;
+  try {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = c.height = 180;
+        const g = c.getContext('2d');
+        // iOS recorta el ícono con su propia máscara y compone lo transparente
+        // sobre blanco: se entrega un cuadrado lleno, sin esquinas caladas.
+        g.fillStyle = '#0A0A0B'; g.fillRect(0, 0, 180, 180);
+        g.drawImage(img, 0, 0, 180, 180);
+        const png = c.toDataURL('image/png');
+        [['apple-touch-icon', '180x180'], ['icon', '180x180']].forEach(([rel, sizes]) => {
+          const l = document.createElement('link');
+          l.rel = rel; l.setAttribute('sizes', sizes); l.type = 'image/png'; l.href = png;
+          document.head.appendChild(l);
+        });
+      } catch (e) { /* sin canvas se queda como estaba */ }
+    };
+    img.src = 'data:image/svg+xml;base64,' + btoa(MARCA_SVG);
+  } catch (e) { /* idem */ }
+}
+
 /* ------------------------------- init ------------------------------ */
 function init() {
   /* Sin esto el estado vive solo en memoria hasta la primera acción, y la
      fecha de inicio del desafío se recalcula a "hoy" en cada apertura. */
   if (!localStorage.getItem(KEY)) save();
+  ponerIconoDeInicio();
   $('#sesDate').value = today();
   $('#wDate').value = today();
   $('#tDate').value = today();

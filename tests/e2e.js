@@ -246,6 +246,28 @@ const db = p => p.evaluate(() => JSON.parse(localStorage.getItem('desafio90_v1')
       check(`${v}: las fechas alinean como el resto`, r.fechas.every(a=>a==='left'||a==='start'), r.fechas.join(', '));
   }
 
+  // ─────────── N · ícono de "Agregar a inicio" ───────────
+  console.log('\nN · Ícono de pantalla de inicio');
+  const artifact = 'file://' + path.resolve(__dirname, '..', 'dist', 'artifact.html');
+  const fs2 = require('fs');
+  if (fs2.existsSync(path.resolve(__dirname, '..', 'dist', 'artifact.html'))) {
+    await p.goto(artifact); await p.waitForTimeout(900);
+    const ico = await p.evaluate(() => {
+      const l = document.head.querySelector('link[rel="apple-touch-icon"]');
+      return l ? { padre: l.parentElement.tagName, png: l.href.startsWith('data:image/png'),
+                   sizes: l.getAttribute('sizes'), kb: Math.round(l.href.length/1024) } : null;
+    });
+    check('el build sin <head> propio inserta el ícono', !!ico, 'no se insertó');
+    if (ico) {
+      check('queda dentro del <head>', ico.padre==='HEAD', ico.padre);
+      check('es un PNG, que es lo único que acepta iOS', ico.png);
+      check('declara 180x180', ico.sizes==='180x180', ico.sizes);
+    }
+  }
+  await p.goto(APP); await p.waitForTimeout(600);
+  const unico = await p.evaluate(() => document.head.querySelectorAll('link[rel="apple-touch-icon"]').length);
+  check('con <head> propio no lo duplica', unico===1, `hay ${unico}`);
+
   console.log('\n' + '─'.repeat(50));
   console.log(`${ok} pasaron · ${fail} fallaron`);
   if (fallos.length) { console.log('\nFALLOS:'); fallos.forEach(f=>console.log('  · '+f)); }

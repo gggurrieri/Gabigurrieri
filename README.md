@@ -13,6 +13,12 @@ no hay cuenta, no hay datos que salgan del dispositivo.
 GitHub Pages, activándolo en *Settings → Pages → Deploy from a branch* — entrá desde el celular y
 usá "Agregar a pantalla de inicio". Queda como una app nativa y funciona sin señal.
 
+iOS toma el ícono de esa opción de un `<link rel="apple-touch-icon">` que esté en el `<head>`, y
+solo acepta PNG. Cuando la página se sirve sin un `<head>` propio —como al publicarla embebida— iOS
+cae en el favicon y muestra cualquier cosa, así que la app se lo inserta en tiempo de ejecución:
+rasteriza su marca a PNG en un canvas y agrega el enlace al `<head>`. Servida desde tu propio
+hosting el enlace ya viene en el HTML y esa inserción no hace nada.
+
 > Los datos viven en el `localStorage` del navegador donde la abriste. Si limpiás el navegador o
 > cambiás de teléfono, se pierden: usá **Ajustes → Exportar copia** cada tanto.
 
