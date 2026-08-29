@@ -220,9 +220,42 @@
       </div>
 
       <div class="card" id="weightLogCard">
-        <h2>Historial</h2>
+        <h2>Historial de peso</h2>
         <div id="weightList" class="stack tight"></div>
       </div>
+
+      <h2 class="section-title">Estudios de laboratorio</h2>
+      <div id="labAlert"></div>
+
+      <div class="card">
+        <p class="muted small"><b>Esto no interpreta ni diagnostica nada.</b> Guarda tus valores, los
+        compara con rangos de referencia habituales de adulto y traduce lo que queda afuera a
+        implicancias de entrenamiento. Los rangos cambian según el laboratorio: mandá siempre el del
+        informe. Y ante cualquier valor marcado, manda tu médico, no esta app.</p>
+        <div class="btn-row">
+          <button class="btn primary" id="btnNuevoLab" type="button">Cargar un estudio</button>
+        </div>
+      </div>
+
+      <form class="card form" id="formLab" hidden>
+        <div class="card-head"><h2>Nuevo estudio</h2>
+          <button class="btn" id="btnCerrarLab" type="button">Cerrar</button></div>
+        <div class="grid-2">
+          <label>Fecha del estudio<input type="date" id="labDate" required></label>
+          <label>Laboratorio<input type="text" id="labLugar" maxlength="60" placeholder="opcional"></label>
+        </div>
+        <label>Adjuntar el informe
+          <input type="file" id="labFile" accept="image/*,application/pdf">
+        </label>
+        <p class="muted small">Se guarda solo en este teléfono, igual que el resto. Cargá únicamente
+        los valores que tengas: lo que dejes vacío se ignora.</p>
+        <div id="labCampos"></div>
+        <label>Notas<input type="text" id="labNotas" maxlength="140" placeholder="Lo que te haya dicho el médico, por ejemplo"></label>
+        <div class="form-actions"><span></span>
+          <button class="btn primary" type="submit">Guardar estudio</button></div>
+      </form>
+
+      <div id="labList" class="stack"></div>
     </section>
 
     <!-- ============ PROGRESO ============ -->
@@ -324,7 +357,7 @@
     <button class="tab active" data-view="hoy"><span>🏠</span>Hoy</button>
     <button class="tab" data-view="plan"><span>📋</span>Plan</button>
     <button class="tab" data-view="log"><span>➕</span>Registro</button>
-    <button class="tab" data-view="peso"><span>⚖️</span>Peso</button>
+    <button class="tab" data-view="peso"><span>🩺</span>Cuerpo</button>
     <button class="tab" data-view="progreso"><span>📈</span>Progreso</button>
   </nav>
 

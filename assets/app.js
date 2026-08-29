@@ -58,6 +58,7 @@ const DEFAULTS = {
   sessions: [],   // {id,date,type,minutes,intensity,distance,jumps,rpe,mood,notes,kcal}
   weights: [],    // {date,kg}
   tests: [],      // {date,bike,jumps,plank}
+  labs: [],       // {id,date,lugar,notas,values:{},aplicar,archivo}
   done: {}        // {"w1-0": true}
 };
 
@@ -78,6 +79,7 @@ function load() {
       sessions: parsed.sessions || [],
       weights: parsed.weights || [],
       tests: parsed.tests || [],
+      labs: parsed.labs || [],
       done: parsed.done || {}
     };
   } catch (e) {
@@ -163,7 +165,7 @@ function buildWeek(wn) {
     detail: 'Ritmo cómodo y continuo (RPE 3-4): podés hablar de corrido todo el rato. Cadencia alta y ligera, no fuerces el plato.' };
 
   const minA = p.ropeA ? ropeMinutes(p.ropeA) + 12 : 0;
-  const sogaA = p.ropeA
+  let sogaA = p.ropeA
     ? { type: 'soga', title: `Soga · ${p.ropeA.r} series + fuerza`, minutes: minA,
         met: blendMet(p.ropeA.r * p.ropeA.on, minA),
         detail: `5 min de entrada en calor (movilidad de tobillo y saltos sin soga). Después ${ropeText(p.ropeA)}. Cerrá con: ${CORE}` }
@@ -185,7 +187,7 @@ function buildWeek(wn) {
   }
 
   const minB = p.ropeB ? ropeMinutes(p.ropeB) + 10 : 0;
-  const ligero = p.ropeB
+  let ligero = p.ropeB
     ? { type: 'soga', title: `Soga · ${p.ropeB.r} series + core`, minutes: minB,
         met: blendMet(p.ropeB.r * p.ropeB.on, minB), eve: true,
         detail: `${ropeText(p.ropeB)}. Después 2 vueltas del circuito de fuerza. Es la víspera del partido: si llegás cargado, cambiala por una caminata.` }
@@ -197,6 +199,19 @@ function buildWeek(wn) {
 
   const descanso = { type: 'descanso', title: 'Descanso total', minutes: 0, rest: true,
     detail: 'Día libre después del partido. El descanso no es lo que interrumpe el progreso: es donde pasa. Comé bien, hidratate y dormí.' };
+
+  /* Ajustes por estudios: solo pueden suavizar el plan. */
+  const fl = banderasPlan();
+  if (fl.has('sinIntervalos') && !p.finalTest) {
+    intervalos = { type: 'bici', title: `Bici suave · ${p.z2} min`, minutes: p.z2, ajuste: true,
+      detail: 'Cambiado por tus estudios: en vez de intervalos, rodaje tranquilo a ritmo conversado. Volvé a los intervalos cuando el valor que lo motivó esté corregido.' };
+  }
+  if (fl.has('sinImpacto')) {
+    const suave = (base, min) => ({ type: 'movilidad', title: 'Caminata o bici suave', minutes: min, ajuste: true,
+      detail: 'Cambiado por tus estudios: sin impacto por ahora. Caminata a paso vivo o bici floja, lo que te resulte más cómodo.' });
+    if (sogaA.type === 'soga') sogaA = suave(sogaA, Math.min(35, sogaA.minutes));
+    if (ligero.type === 'soga') ligero = Object.assign(suave(ligero, Math.min(30, ligero.minutes)), { eve: true, optional: true });
+  }
 
   const fd = clamp(Number(S.profile.footballDay), 0, 6);
   let rd = clamp(Number(S.profile.restDay), 0, 6);
@@ -795,6 +810,180 @@ const BADGES = [
   { i: '🏆', t: 'Desafío completo', f: s => s.perfectWeeks >= 10 }
 ];
 
+
+/* ==================== estudios de laboratorio ======================
+   Esto NO interpreta ni diagnostica: guarda los valores, los compara con
+   rangos de referencia habituales de adulto y traduce lo que está fuera de
+   rango a implicancias de entrenamiento. Los rangos varían entre
+   laboratorios; manda siempre el del informe. Y manda el médico.
+
+   Los ajustes que puede hacer al plan solo lo vuelven más suave o menos
+   riesgoso: nunca suben la carga. */
+
+const MARCADORES = [
+  // ---- hemograma ----
+  { g:'Hemograma', k:'hb', n:'Hemoglobina', u:'g/dL', ref:{m:[13.5,17.5], f:[12.0,15.5]},
+    bajo:{ plan:'sinIntervalos', nota:'Menos oxígeno transportado a los músculos. La bici suave te va a costar más de lo esperado y los intervalos, mucho más. Hasta corregirlo conviene quedarse en ritmo conversado y no perseguir los tiempos del plan.' },
+    alto:{ nota:'Puede deberse a deshidratación al momento del análisis, entre otras causas. Consultalo.' },
+    critico:{ bajo:10 } },
+  { g:'Hemograma', k:'hto', n:'Hematocrito', u:'%', ref:{m:[41,53], f:[36,46]},
+    bajo:{ plan:'sinIntervalos', nota:'Acompaña a la hemoglobina baja: esperá más fatiga de la habitual al empezar.' },
+    alto:{ nota:'Suele ir junto con deshidratación. Revisá cuánto tomás en el día.' } },
+  { g:'Hemograma', k:'gb', n:'Glóbulos blancos', u:'/mm³', ref:{m:[4000,10000], f:[4000,10000]},
+    alto:{ plan:'sinIntervalos', nota:'Puede indicar una infección en curso. No se entrena fuerte con una infección activa.' },
+    bajo:{ nota:'Consultalo antes de seguir con el plan.' },
+    critico:{ alto:20000, bajo:2000 } },
+
+  // ---- hierro ----
+  { g:'Hierro', k:'ferritina', n:'Ferritina', u:'ng/mL', ref:{m:[30,400], f:[15,150]},
+    bajo:{ plan:'sinIntervalos', nota:'Reservas de hierro bajas: es de las causas más frecuentes de fatiga al retomar la actividad, incluso con hemoglobina normal. No suplementes por tu cuenta, el hierro de más es tóxico.' },
+    alto:{ nota:'Puede reflejar inflamación además de sobrecarga de hierro. Consultalo.' } },
+  { g:'Hierro', k:'hierro', n:'Hierro sérico', u:'µg/dL', ref:{m:[65,175], f:[50,170]},
+    bajo:{ nota:'Miralo junto con la ferritina, que refleja mejor las reservas.' } },
+
+  // ---- metabólico ----
+  { g:'Metabólico', k:'glucosa', n:'Glucosa en ayunas', u:'mg/dL', ref:{m:[70,99], f:[70,99]},
+    alto:{ nota:'El ejercicio aeróbico es de lo más efectivo que existe para esto: la salida larga es tu mejor herramienta. Si tomás medicación para la glucosa, consultá antes por el riesgo de hipoglucemia durante el ejercicio y llevá algo dulce encima.' },
+    bajo:{ nota:'No entrenes en ayunas hasta revisarlo.' },
+    critico:{ alto:250, bajo:60 } },
+  { g:'Metabólico', k:'hba1c', n:'Hemoglobina glicosilada', u:'%', ref:{m:[4.0,5.6], f:[4.0,5.6]},
+    alto:{ nota:'Refleja los últimos tres meses de glucemia. Entre 5,7 y 6,4 se considera prediabetes; 6,5 o más, diabetes. Es exactamente lo que este plan puede mejorar, pero consultalo.' },
+    critico:{ alto:9 } },
+  { g:'Metabólico', k:'insulina', n:'Insulina', u:'µU/mL', ref:{m:[2,25], f:[2,25]},
+    alto:{ nota:'Suele acompañar a la resistencia a la insulina. Mejora con pérdida de peso y volumen aeróbico.' } },
+
+  // ---- lípidos ----
+  { g:'Lípidos', k:'colesterol', n:'Colesterol total', u:'mg/dL', ref:{m:[0,200], f:[0,200]},
+    alto:{ nota:'Mirá el desglose: lo que importa es la relación entre HDL y LDL, no el total solo.' } },
+  { g:'Lípidos', k:'hdl', n:'Colesterol HDL', u:'mg/dL', ref:{m:[40,100], f:[50,100]},
+    bajo:{ nota:'Es el que sube con el ejercicio aeróbico sostenido. Buen marcador para repetir en la semana 12.' } },
+  { g:'Lípidos', k:'ldl', n:'Colesterol LDL', u:'mg/dL', ref:{m:[0,130], f:[0,130]},
+    alto:{ nota:'Responde más a la alimentación que al entrenamiento, pero la pérdida de peso ayuda.' } },
+  { g:'Lípidos', k:'trigliceridos', n:'Triglicéridos', u:'mg/dL', ref:{m:[0,150], f:[0,150]},
+    alto:{ nota:'De todos los lípidos, es el que más responde al volumen aeróbico y a bajar de peso. Es muy probable que baje bastante en estas 12 semanas: repetilo al final, es de los cambios más motivantes de ver.' },
+    critico:{ alto:500 } },
+
+  // ---- hígado ----
+  { g:'Hígado', k:'got', n:'GOT / AST', u:'U/L', ref:{m:[10,40], f:[10,35]},
+    alto:{ nota:'Puede subir simplemente por haber entrenado los días previos: también sale del músculo, no solo del hígado.' } },
+  { g:'Hígado', k:'gpt', n:'GPT / ALT', u:'U/L', ref:{m:[7,56], f:[7,45]},
+    alto:{ nota:'Más específica del hígado. Con sobrepeso suele asociarse a hígado graso, que mejora justamente con pérdida de peso y ejercicio aeróbico. Evitá el alcohol y consultalo.' },
+    critico:{ alto:200 } },
+  { g:'Hígado', k:'ggt', n:'GGT', u:'U/L', ref:{m:[8,61], f:[5,36]},
+    alto:{ nota:'Sensible al alcohol y al hígado graso.' } },
+  { g:'Hígado', k:'ck', n:'CPK / CK', u:'U/L', ref:{m:[39,308], f:[26,192]},
+    alto:{ plan:'sinImpacto', nota:'Refleja daño muscular; sube mucho tras entrenar fuerte o hacer algo desacostumbrado. Si además tenés dolor muscular intenso y orina oscura, no entrenes y consultá hoy mismo.' },
+    critico:{ alto:1000 } },
+
+  // ---- riñón ----
+  { g:'Riñón', k:'creatinina', n:'Creatinina', u:'mg/dL', ref:{m:[0.7,1.3], f:[0.6,1.1]},
+    alto:{ plan:'proteinaConCuidado', nota:'Antes de subir la proteína como sugiere la app, consultalo: con la función renal comprometida la recomendación cambia. En gente muy musculosa puede estar algo alta sin significar nada.' },
+    critico:{ alto:2 } },
+  { g:'Riñón', k:'urea', n:'Urea', u:'mg/dL', ref:{m:[15,45], f:[15,45]},
+    alto:{ nota:'Puede reflejar deshidratación o mucha proteína en la dieta, además de función renal.' } },
+  { g:'Riñón', k:'filtrado', n:'Filtrado glomerular', u:'mL/min', ref:{m:[90,200], f:[90,200]},
+    bajo:{ plan:'proteinaConCuidado', nota:'Por debajo de 60 hay que revisar tanto la proteína como la hidratación en las salidas largas. Consultalo.' },
+    critico:{ bajo:45 } },
+  { g:'Riñón', k:'acidoUrico', n:'Ácido úrico', u:'mg/dL', ref:{m:[3.4,7.0], f:[2.4,6.0]},
+    alto:{ plan:'sinImpacto', nota:'Riesgo de crisis de gota, y la deshidratación en las salidas largas puede desencadenarla. Tomá agua de sobra. Mientras esté alto conviene bajar el impacto de la soga.' } },
+
+  // ---- tiroides ----
+  { g:'Tiroides', k:'tsh', n:'TSH', u:'µUI/mL', ref:{m:[0.4,4.0], f:[0.4,4.0]},
+    alto:{ plan:'sinIntervalos', nota:'Un hipotiroidismo puede explicar fatiga, frío y dificultad para bajar de peso pese a hacer todo bien. Es tratable y cambia mucho las cosas: consultalo.' },
+    bajo:{ plan:'sinIntervalos', nota:'Un hipertiroidismo altera la frecuencia cardíaca y la tolerancia al ejercicio. Consultá antes de hacer trabajo intenso.' },
+    critico:{ alto:10, bajo:0.1 } },
+  { g:'Tiroides', k:'t4l', n:'T4 libre', u:'ng/dL', ref:{m:[0.8,1.8], f:[0.8,1.8]},
+    bajo:{ nota:'Miralo junto con la TSH.' }, alto:{ nota:'Miralo junto con la TSH.' } },
+
+  // ---- vitaminas e inflamación ----
+  { g:'Vitaminas e inflamación', k:'vitd', n:'Vitamina D (25-OH)', u:'ng/mL', ref:{m:[30,100], f:[30,100]},
+    bajo:{ nota:'Déficit muy frecuente. Se asocia a menos fuerza y peor recuperación. Andar en bici de día ayuda; si está muy baja, se corrige con suplementación indicada por tu médico.' } },
+  { g:'Vitaminas e inflamación', k:'b12', n:'Vitamina B12', u:'pg/mL', ref:{m:[200,900], f:[200,900]},
+    bajo:{ nota:'Puede dar fatiga y hormigueos. Consultalo.' } },
+  { g:'Vitaminas e inflamación', k:'pcr', n:'PCR ultrasensible', u:'mg/L', ref:{m:[0,3], f:[0,3]},
+    alto:{ plan:'sinIntervalos', nota:'Inflamación. Si es por una infección en curso, no es momento de entrenar fuerte. Si es persistente, el ejercicio y bajar de peso tienden a bajarla.' },
+    critico:{ alto:10 } },
+
+  // ---- iones ----
+  { g:'Iones', k:'sodio', n:'Sodio', u:'mEq/L', ref:{m:[135,145], f:[135,145]},
+    bajo:{ plan:'sinIntervalos', nota:'Importa para las salidas largas: tomar solo agua en sesiones de más de una hora puede bajarlo más. Consultalo.' },
+    critico:{ bajo:130, alto:150 } },
+  { g:'Iones', k:'potasio', n:'Potasio', u:'mEq/L', ref:{m:[3.5,5.1], f:[3.5,5.1]},
+    bajo:{ plan:'sinIntervalos', nota:'Fuera de rango afecta al ritmo cardíaco. Consultá antes de hacer esfuerzos intensos.' },
+    alto:{ plan:'sinIntervalos', nota:'Fuera de rango afecta al ritmo cardíaco. Consultá antes de hacer esfuerzos intensos.' },
+    critico:{ bajo:3.0, alto:6.0 } },
+
+  // ---- orina ----
+  { g:'Orina', k:'densidad', n:'Densidad', u:'', ref:{m:[1.005,1.030], f:[1.005,1.030]},
+    alto:{ nota:'Orina concentrada: estabas deshidratado al hacer el estudio. Es la variable más fácil de corregir de toda esta lista y la que más te va a cambiar cómo te sentís arriba de la bici.' } },
+  { g:'Orina', k:'phU', n:'pH', u:'', ref:{m:[4.5,8.0], f:[4.5,8.0]} },
+  { g:'Orina', k:'proteinasU', n:'Proteínas', u:'', cualitativo:true,
+    alto:{ nota:'Puede aparecer transitoriamente después de ejercicio intenso, pero también marcar algo renal. Consultalo antes de seguir subiendo la carga.' } },
+  { g:'Orina', k:'glucosaU', n:'Glucosa', u:'', cualitativo:true,
+    alto:{ nota:'Glucosa en orina suele acompañar glucemias altas. Consultalo.' } },
+  { g:'Orina', k:'cetonasU', n:'Cetonas', u:'', cualitativo:true,
+    alto:{ nota:'Aparecen con ayuno prolongado o dietas muy bajas en carbohidratos. Si estás haciendo déficit, revisá que no sea demasiado agresivo.' } },
+  { g:'Orina', k:'hematiesU', n:'Hematíes / sangre', u:'', cualitativo:true,
+    alto:{ plan:'sinImpacto', nota:'Puede aparecer tras ejercicio intenso, pero hay que descartar otras causas. Consultalo antes de seguir.' } },
+  { g:'Orina', k:'leucocitosU', n:'Leucocitos', u:'', cualitativo:true,
+    alto:{ nota:'Puede indicar infección urinaria. Consultalo.' } }
+];
+
+const GRUPOS = [...new Set(MARCADORES.map(m => m.g))];
+const marcador = k => MARCADORES.find(m => m.k === k);
+const refDe = m => (m.ref ? (m.ref[S.profile.sex] || m.ref.m) : null);
+
+/* Devuelve cómo cae un valor: dentro de rango, bajo, alto, y si cruza un
+   umbral en el que corresponde parar y consultar antes de entrenar. */
+function evaluarValor(m, v) {
+  if (v === '' || v == null) return null;
+  if (m.cualitativo) {
+    const positivo = String(v) !== 'neg';
+    return { estado: positivo ? 'alto' : 'ok', critico: false };
+  }
+  const n = Number(v);
+  if (!isFinite(n)) return null;
+  const r = refDe(m);
+  const c = m.critico || {};
+  const critico = (c.bajo != null && n < c.bajo) || (c.alto != null && n > c.alto);
+  let estado = 'ok';
+  if (r && n < r[0]) estado = 'bajo';
+  else if (r && n > r[1]) estado = 'alto';
+  return { estado, critico };
+}
+
+function hallazgos(est) {
+  const out = [];
+  MARCADORES.forEach(m => {
+    const v = est.values[m.k];
+    const e = evaluarValor(m, v);
+    if (!e || e.estado === 'ok') return;
+    const info = m[e.estado] || {};
+    out.push({ m, valor: v, estado: e.estado, critico: e.critico,
+               nota: info.nota || '', plan: info.plan || '' });
+  });
+  return out.sort((a, b) => (b.critico ? 1 : 0) - (a.critico ? 1 : 0));
+}
+
+function ultimoEstudio() {
+  if (!S.labs || !S.labs.length) return null;
+  return S.labs.slice().sort((a, b) => a.date < b.date ? 1 : -1)[0];
+}
+
+/* Banderas que el plan respeta, solo del estudio más reciente y solo si
+   está marcado para aplicarse. */
+function banderasPlan() {
+  const est = ultimoEstudio();
+  const set = new Set();
+  if (!est || est.aplicar === false) return set;
+  hallazgos(est).forEach(h => { if (h.plan) set.add(h.plan); });
+  return set;
+}
+function hayAlerta() {
+  const est = ultimoEstudio();
+  return est ? hallazgos(est).some(h => h.critico) : false;
+}
+
 /* ------------------------------ render ----------------------------- */
 function render() {
   renderTopbar();
@@ -803,6 +992,7 @@ function render() {
   renderLog();
   renderWeight();
   renderProgress();
+  renderLabs();
   renderProfile();
 }
 
@@ -827,6 +1017,7 @@ function sessionCard(s, opts) {
   const meta = s.rest ? '' : `<div class="sess-meta">
         <span class="pill">≈ ${fmtMin(s.minutes)}</span>
         <span class="pill">≈ ${planKcal(s)} kcal</span>
+        ${s.ajuste ? '<span class="pill ajuste">ajustado por tus estudios</span>' : ''}
         ${s.eve ? '<span class="pill eve">víspera de partido</span>' : ''}
         ${s.optional ? '<span class="pill opt">opcional</span>' : ''}
       </div>`;
@@ -1093,7 +1284,11 @@ function renderWeight() {
   $('#tdee').textContent = gasto.toLocaleString('es-AR') + ' kcal'
     + (entren ? ` (${baseExpenditure(w).toLocaleString('es-AR')} base + ${entren} de entrenamiento)` : '');
   $('#target').textContent = (gasto - 550).toLocaleString('es-AR') + ' kcal/día';
-  $('#protein').textContent = Math.round(w * 1.6) + ' g/día';
+  const riñon = banderasPlan().has('proteinaConCuidado');
+  $('#protein').textContent = riñon
+    ? 'consultá antes de subirla'
+    : Math.round(w * 1.6) + ' g/día';
+  $('#protein').style.color = riñon ? 'var(--soga)' : '';
 
   $('#weightList').innerHTML = sorted.length
     ? sorted.slice().reverse().map((x, i, arr) => {
@@ -1187,6 +1382,129 @@ function renderZones() {
      </div>`).join('');
 }
 
+
+/* --------- archivos adjuntos de los estudios (IndexedDB) ----------
+   localStorage no aguanta una foto de un informe: los archivos van a
+   IndexedDB, y se guardan como data URL para poder mostrarlos sin depender
+   de blob:, que algunos contextos embebidos bloquean. */
+const DB_ARCHIVOS = 'desafio12-archivos';
+function conArchivos(fn) {
+  return new Promise((res, rej) => {
+    if (typeof indexedDB === 'undefined') return rej(new Error('sin IndexedDB'));
+    const req = indexedDB.open(DB_ARCHIVOS, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('files');
+    req.onerror = () => rej(req.error);
+    req.onsuccess = () => {
+      try {
+        const tx = req.result.transaction('files', 'readwrite');
+        const r = fn(tx.objectStore('files'));
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      } catch (e) { rej(e); }
+    };
+  });
+}
+const guardarArchivo = (id, dataUrl) => conArchivos(st => st.put(dataUrl, id));
+const leerArchivo = id => conArchivos(st => st.get(id));
+const borrarArchivo = id => conArchivos(st => st.delete(id));
+const aDataUrl = f => new Promise((res, rej) => {
+  const r = new FileReader();
+  r.onload = () => res(r.result); r.onerror = () => rej(r.error);
+  r.readAsDataURL(f);
+});
+
+/* ------------------------- estudios: pantalla --------------------- */
+const CUALI = [['neg','Negativo'],['+','+'],['++','++'],['+++','+++']];
+
+function renderLabCampos() {
+  const cont = $('#labCampos');
+  if (!cont) return;
+  cont.innerHTML = GRUPOS.map(g => `<div class="lab-grupo"><h3>${esc(g)}</h3>${
+    MARCADORES.filter(m => m.g === g).map(m => {
+      const r = refDe(m);
+      const ayuda = m.cualitativo ? 'negativo es lo esperable'
+        : (r ? `${r[0]}–${r[1]}${m.u ? ' ' + m.u : ''}` : '');
+      const campo = m.cualitativo
+        ? `<select id="lab_${m.k}">${CUALI.map(c => `<option value="${c[0]}">${c[1]}</option>`).join('')}</select>`
+        : `<input type="number" step="any" inputmode="decimal" id="lab_${m.k}" placeholder="—">`;
+      return `<div class="lab-fila"><label for="lab_${m.k}">${esc(m.n)}<small>${esc(ayuda)}</small></label>${campo}</div>`;
+    }).join('')}</div>`).join('');
+}
+
+function flechaPrevio(est, m) {
+  const previos = S.labs.filter(x => x.date < est.date && x.values[m.k] != null && x.values[m.k] !== '')
+    .sort((a, b) => a.date < b.date ? 1 : -1);
+  if (!previos.length || m.cualitativo) return '';
+  const antes = Number(previos[0].values[m.k]), ahora = Number(est.values[m.k]);
+  if (!isFinite(antes) || !isFinite(ahora) || antes === ahora) return '';
+  return ` <span class="muted small">(antes ${antes}${ahora < antes ? ' ↓' : ' ↑'})</span>`;
+}
+
+function renderLabs() {
+  const cont = $('#labList');
+  if (!cont) return;
+
+  const alerta = $('#labAlert');
+  if (alerta) {
+    alerta.innerHTML = hayAlerta()
+      ? `<div class="lab-alerta"><i>⚠️</i><div>
+           <b>Hay un valor que conviene revisar antes de entrenar</b>
+           <span>Alguno de tus resultados está bastante fuera de rango. No es un diagnóstico
+           — puede tener explicaciones inocentes — pero es motivo para hablar con tu médico antes
+           de seguir sumando carga. Mientras tanto el plan queda suavizado.</span>
+         </div></div>` : '';
+  }
+
+  const orden = S.labs.slice().sort((a, b) => a.date < b.date ? 1 : -1);
+  if (!orden.length) {
+    cont.innerHTML = `<div class="empty">Todavía no cargaste ningún estudio. Si tenés uno reciente,
+      cargalo: cambia bastante cómo leer el cansancio de las primeras semanas.</div>`;
+    return;
+  }
+
+  cont.innerHTML = orden.map(est => {
+    const hs = hallazgos(est);
+    const conPlan = hs.filter(h => h.plan).length;
+    const cuerpo = hs.length
+      ? hs.map(h => `<div class="hallazgo ${h.critico ? 'critico' : ''}">
+          <i></i><div class="hallazgo-txt">
+            <b>${esc(h.m.n)}: ${esc(String(h.valor))}${h.m.u ? ' ' + esc(h.m.u) : ''}
+              <em>${h.estado === 'bajo' ? 'bajo' : (h.m.cualitativo ? 'positivo' : 'alto')}</em>
+              ${flechaPrevio(est, h.m)}</b>
+            <p>${esc(h.nota)}</p>
+          </div></div>`).join('')
+      : `<div class="lab-ok">Todos los valores que cargaste están dentro de rango.</div>`;
+
+    const ajuste = conPlan ? `<label class="lab-adj">
+        <input type="checkbox" data-aplicar="${est.id}"${est.aplicar === false ? '' : ' checked'}>
+        Suavizar el plan mientras tanto (menos intensidad o menos impacto, nunca más carga)
+      </label>` : '';
+
+    const archivo = est.archivo
+      ? (/^image\//.test(est.archivo.tipo)
+          ? `<img class="lab-foto" data-foto="${est.archivo.id}" alt="Informe adjunto">`
+          : `<div class="lab-archivo">📎 ${esc(est.archivo.nombre)} · ${Math.round(est.archivo.tam / 1024)} KB</div>`)
+      : '';
+
+    return `<article class="lab-card" data-lab="${est.id}">
+      <div class="lab-head">
+        <div><b>${fmtDate(est.date)}</b><br><span>${esc(est.lugar || 'Estudio de laboratorio')}${
+          hs.length ? ` · ${hs.length} valor${hs.length > 1 ? 'es' : ''} fuera de rango` : ''}</span></div>
+        <button class="entry-del" data-dellab="${est.id}" aria-label="Borrar">×</button>
+      </div>
+      ${cuerpo}
+      ${est.notas ? `<p class="muted small" style="margin-top:11px">${esc(est.notas)}</p>` : ''}
+      ${archivo}
+      ${ajuste}
+    </article>`;
+  }).join('');
+
+  // las fotos se traen de IndexedDB después de pintar
+  $$('#labList img[data-foto]').forEach(img => {
+    leerArchivo(img.dataset.foto).then(d => { if (d) img.src = d; }).catch(() => {});
+  });
+}
+
 function renderProfile() {
   const p = S.profile;
   $('#pName').value = p.name || '';
@@ -1264,6 +1582,14 @@ function bind() {
       save(); renderWeight(); renderToday(); renderTopbar(); toast('Registro borrado');
       return;
     }
+    const dl = e.target.closest('[data-dellab]');
+    if (dl) {
+      const id = dl.dataset.dellab;
+      S.labs = S.labs.filter(x => x.id !== id);
+      borrarArchivo(id).catch(() => {});
+      save(); render(); toast('Estudio borrado');
+      return;
+    }
     const dt = e.target.closest('[data-delt]');
     if (dt) {
       S.tests = S.tests.filter(x => x.date !== dt.dataset.delt);
@@ -1325,6 +1651,12 @@ function bind() {
   });
 
   const alCambiar = e => {
+    const ap = e.target.closest('[data-aplicar]');
+    if (ap) {
+      const est = S.labs.find(x => x.id === ap.dataset.aplicar);
+      if (est) { est.aplicar = ap.checked; save(); renderToday(); renderPlan(); renderWeight(); }
+      return;
+    }
     const rango = e.target.closest('#impRango');
     if (rango) { if (rango.value !== importRango) aplicarRango(rango.value); return; }
     const sel = e.target.closest('.imp-type');
@@ -1437,6 +1769,52 @@ function bind() {
     renderProgress(); toast('Test guardado');
   });
 
+  // --- estudios de laboratorio ---
+  renderLabCampos();
+  $('#btnNuevoLab').addEventListener('click', () => {
+    const f = $('#formLab');
+    f.hidden = false;
+    $('#labDate').value = today();
+    f.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  $('#btnCerrarLab').addEventListener('click', () => { $('#formLab').hidden = true; });
+
+  $('#formLab').addEventListener('submit', async e => {
+    e.preventDefault();
+    const values = {};
+    MARCADORES.forEach(m => {
+      const el = $('#lab_' + m.k);
+      if (!el) return;
+      const v = el.value;
+      if (v === '' || (m.cualitativo && v === 'neg')) return;
+      values[m.k] = m.cualitativo ? v : Number(v);
+    });
+    const est = {
+      id: 'lab' + Date.now(),
+      date: $('#labDate').value || today(),
+      lugar: $('#labLugar').value.trim(),
+      notas: $('#labNotas').value.trim(),
+      values, aplicar: true, archivo: null
+    };
+    const f = $('#labFile').files[0];
+    if (f) {
+      try {
+        const url = await aDataUrl(f);
+        await guardarArchivo(est.id, url);
+        est.archivo = { id: est.id, nombre: f.name, tipo: f.type, tam: f.size };
+      } catch (err) {
+        toast('No pude guardar el archivo, pero sí los valores');
+      }
+    }
+    S.labs.push(est);
+    save();
+    e.target.reset(); $('#formLab').hidden = true; renderLabCampos();
+    render();
+    const n = hallazgos(est).length;
+    toast(n ? `Estudio guardado · ${n} valor${n > 1 ? 'es' : ''} fuera de rango` : 'Estudio guardado · todo en rango');
+    $('#labList').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
   $('#formProfile').addEventListener('submit', e => {
     e.preventDefault();
     Object.assign(S.profile, {
@@ -1483,7 +1861,7 @@ function bind() {
         S = {
           profile: Object.assign({}, DEFAULTS.profile, data.profile),
           sessions: data.sessions || [], weights: data.weights || [],
-          tests: data.tests || [], done: data.done || {}
+          tests: data.tests || [], labs: data.labs || [], done: data.done || {}
         };
         save(); render(); toast('Datos importados');
       } catch (err) { toast('El texto no es una copia válida'); }

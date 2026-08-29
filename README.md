@@ -23,7 +23,7 @@ usá "Agregar a pantalla de inicio". Queda como una app nativa y funciona sin se
 | **Hoy** | Progreso del desafío, peso, racha, y las sesiones de la semana ordenadas desde hoy. Botones para marcar hecho o registrar. |
 | **Plan** | Las 12 semanas completas, con el detalle de cada sesión, volumen y calorías estimadas. |
 | **Registro** | Importación de la exportación de Salud (.zip/.xml) y de actividades sueltas (GPX/TCX), más carga manual de sesiones (tipo, duración, distancia, saltos, pulso, RPE, sensación, notas) con cálculo automático de calorías, más la bitácora filtrable. |
-| **Peso** | Registro de peso con gráfico de evolución, tendencia de 7 días, línea de meta, IMC, metabolismo basal y objetivo calórico. |
+| **Cuerpo** | Registro de peso con gráfico de evolución, tendencia de 7 días, línea de meta, IMC, metabolismo basal y objetivo calórico, más los estudios de laboratorio. |
 | **Progreso** | Totales acumulados, mapa de constancia de 13 semanas, minutos por semana, tiempo en zonas de pulso, 18 logros desbloqueables y tests de control. |
 | **Ajustes** | Perfil, día de fútbol y de descanso, FC máxima, exportar/importar/borrar datos y las advertencias de seguridad. |
 
@@ -130,11 +130,45 @@ gasto diario suma el gasto base (×1,35) más el promedio real de entrenamiento 
 
 Son estimaciones orientativas. Ninguna fórmula reemplaza un control médico ni a un nutricionista.
 
+## Estudios de laboratorio
+
+En **Cuerpo** se pueden cargar los valores de un análisis de sangre y orina, adjuntar el informe y
+seguir su evolución entre estudios.
+
+**Esto no interpreta ni diagnostica nada.** Guarda los valores, los compara con rangos de referencia
+habituales de adulto —diferenciados por sexo donde corresponde— y traduce lo que queda afuera a
+implicancias de entrenamiento. Los rangos varían entre laboratorios: manda el del informe. Y ante
+cualquier valor marcado, manda el médico.
+
+Se cubren 33 marcadores agrupados en hemograma, hierro, metabólico, lípidos, hígado, riñón,
+tiroides, vitaminas e inflamación, iones y orina.
+
+### Cómo afecta al plan
+
+Un hallazgo puede activar una bandera que **suaviza** el plan. Por construcción, los ajustes solo
+pueden bajar la carga, nunca subirla:
+
+| Bandera | Qué la activa | Qué hace |
+|---|---|---|
+| `sinIntervalos` | Hemoglobina, hematocrito o ferritina bajos · TSH fuera de rango · PCR o glóbulos blancos altos · sodio o potasio fuera de rango | Reemplaza la sesión de intervalos por rodaje suave |
+| `sinImpacto` | CPK o ácido úrico altos · hematíes en orina | Reemplaza las sesiones de soga por caminata o bici floja |
+| `proteinaConCuidado` | Creatinina alta o filtrado glomerular bajo | La sugerencia de proteína pasa a "consultá antes de subirla" |
+
+Las sesiones modificadas quedan marcadas en el plan, y el ajuste se puede desactivar desde la ficha
+del estudio.
+
+Valores muy fuera de rango (por ejemplo hemoglobina bajo 10, glucosa sobre 250, potasio fuera de
+3,0–6,0) levantan una alerta destacada que recomienda consultar antes de seguir sumando carga.
+
+Los informes adjuntos se guardan en IndexedDB, no en `localStorage`, porque una foto no entra en la
+cuota; como todo lo demás, no salen del dispositivo.
+
 ## Pruebas
 
 ```
 python3 tests/fixtures.py tmp      # genera los archivos de ejemplo
 node tests/e2e.js tmp              # 43 comprobaciones, sale con 1 si algo falla
+node tests/labs.js                 # 20 comprobaciones sobre los estudios
 ```
 
 `tests/e2e.js` recorre la app como un usuario, en viewport de iPhone y con eventos táctiles reales.
