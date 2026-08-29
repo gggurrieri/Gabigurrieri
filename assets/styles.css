@@ -33,6 +33,8 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+button,select,input,.tab,.chip,.check{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 body{
   background:var(--bg);
   color:var(--txt);
@@ -79,8 +81,8 @@ main{max-width:720px;margin:0 auto;padding:0 var(--sp)}
 .topbar h1{font-size:16px}
 .topbar p{font-size:12px;color:var(--muted)}
 .icon-btn{
-  background:var(--card);border:1px solid var(--line);border-radius:10px;
-  width:36px;height:36px;font-size:16px;cursor:pointer;flex:none;
+  background:var(--card);border:1px solid var(--line);border-radius:11px;
+  width:44px;height:44px;font-size:17px;cursor:pointer;flex:none;
 }
 .icon-btn:active{background:var(--card-2)}
 
@@ -143,8 +145,8 @@ main{max-width:720px;margin:0 auto;padding:0 var(--sp)}
 .pill.opt{color:var(--soga);border-color:#5a4415}
 .sess-actions{display:flex;flex-direction:column;gap:6px;flex:none}
 .check{
-  width:32px;height:32px;border-radius:9px;border:1px solid var(--line);
-  background:var(--bg-soft);cursor:pointer;font-size:14px;
+  width:44px;height:44px;border-radius:11px;border:1px solid var(--line);
+  background:var(--bg-soft);cursor:pointer;font-size:16px;
 }
 .check.on{background:var(--good);border-color:var(--good);color:var(--good-ink)}
 
@@ -168,15 +170,17 @@ main{max-width:720px;margin:0 auto;padding:0 var(--sp)}
 .form label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted)}
 .form input,.form select{
   background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;
-  padding:10px 11px;color:var(--txt);width:100%;
+  padding:11px;color:var(--txt);width:100%;
+  /* 16px es el mínimo que evita que iOS haga zoom al enfocar el campo. */
+  font-size:16px;min-height:44px;
 }
 .form input:focus,.form select:focus{outline:none;border-color:var(--accent)}
-.form input[type=range]{padding:0;accent-color:var(--accent);background:none;border:0}
+.form input[type=range]{padding:0;accent-color:var(--accent);background:none;border:0;min-height:44px}
 .form label output{font-size:13px;color:var(--txt);font-weight:600}
 .form-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px}
 .btn{
   background:var(--card-2);border:1px solid var(--line);border-radius:11px;
-  padding:10px 16px;cursor:pointer;font-weight:600;font-size:14px;
+  padding:12px 18px;min-height:44px;cursor:pointer;font-weight:600;font-size:14.5px;
 }
 .btn:active{transform:translateY(1px)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
@@ -193,7 +197,7 @@ main{max-width:720px;margin:0 auto;padding:0 var(--sp)}
 /* ---------- filtros + bitácora ---------- */
 .filters{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px}
 .chip{flex:none;background:var(--card);border:1px solid var(--line);border-radius:999px;
-  padding:6px 13px;font-size:12.5px;cursor:pointer;color:var(--muted)}
+  padding:0 16px;min-height:44px;font-size:13px;cursor:pointer;color:var(--muted)}
 .chip.active{background:var(--card-2);color:var(--txt);border-color:var(--accent)}
 .entry{display:flex;gap:12px;align-items:center;background:var(--card);
   border:1px solid var(--line);border-radius:13px;padding:11px 13px}
@@ -201,7 +205,8 @@ main{max-width:720px;margin:0 auto;padding:0 var(--sp)}
 .entry-body{flex:1;min-width:0}
 .entry-title{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
 .entry-sub{font-size:12px;color:var(--muted)}
-.entry-del{background:none;border:0;color:var(--muted);font-size:17px;cursor:pointer;padding:4px 6px;flex:none}
+.entry-del{background:none;border:0;color:var(--muted);font-size:19px;cursor:pointer;
+  width:44px;height:44px;flex:none;display:grid;place-items:center}
 .entry-del:active{color:var(--danger)}
 .empty{text-align:center;color:var(--muted);font-size:13px;padding:26px 10px;
   border:1px dashed var(--line);border-radius:14px}
@@ -250,8 +255,8 @@ main{max-width:720px;margin:0 auto;padding:0 var(--sp)}
   border-top:1px solid var(--line);
   padding:7px 4px calc(7px + env(safe-area-inset-bottom));
 }
-.tab{background:none;border:0;cursor:pointer;color:var(--muted);
-  display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10.5px;padding:3px 0}
+.tab{background:none;border:0;cursor:pointer;color:var(--muted);min-height:44px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10.5px;padding:3px 0}
 .tab span{font-size:18px;line-height:1}
 .tab.active{color:var(--accent)}
 
@@ -272,8 +277,8 @@ main{max-width:720px;margin:0 auto;padding:0 var(--sp)}
 .entry.imported{align-items:flex-start}
 .entry.imported .entry-body{display:flex;flex-direction:column;gap:5px}
 .entry.is-dup{opacity:.5}
-.imp-type{background:var(--bg-soft);border:1px solid var(--line);border-radius:8px;
-  padding:5px 8px;color:var(--txt);font-size:12.5px;align-self:flex-start}
+.imp-type{background:var(--bg-soft);border:1px solid var(--line);border-radius:9px;
+  padding:8px 10px;color:var(--txt);font-size:16px;min-height:44px;align-self:flex-start}
 
 /* ---------- zonas de pulso ---------- */
 .zone-bar{display:flex;height:13px;border-radius:7px;overflow:hidden;background:var(--bg-soft);gap:1px}

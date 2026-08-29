@@ -1,6 +1,7 @@
 /* Service worker mínimo: deja la app disponible sin conexión. */
-const CACHE = 'desafio12-v1';
-const ASSETS = ['./', './index.html', './assets/styles.css', './assets/app.js', './assets/icon.svg', './manifest.json'];
+const CACHE = 'desafio12-v2';
+const ASSETS = ['./', './index.html', './assets/styles.css', './assets/app.js',
+  './assets/icon.svg', './assets/icon-180.png', './assets/icon-512.png', './manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

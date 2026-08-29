@@ -44,6 +44,11 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
 /* ------------------------------ estado ----------------------------- */
 const KEY = 'desafio90_v1';
 
+/* structuredClone recién existe desde Safari 15.4; sin este respaldo la app
+   no arranca en un iPhone con iOS más viejo. */
+const clonar = o => (typeof structuredClone === 'function'
+  ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
+
 const DEFAULTS = {
   profile: {
     name: '', age: 32, sex: 'm', height: 176,
@@ -61,7 +66,7 @@ let S = load();
 function load() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return structuredClone(DEFAULTS);
+    if (!raw) return clonar(DEFAULTS);
     const parsed = JSON.parse(raw);
     const prof = Object.assign({}, DEFAULTS.profile, parsed.profile);
     if (parsed.profile && parsed.profile.restDay == null) {
@@ -77,7 +82,7 @@ function load() {
     };
   } catch (e) {
     console.warn('No se pudo leer el almacenamiento local', e);
-    return structuredClone(DEFAULTS);
+    return clonar(DEFAULTS);
   }
 }
 function save() {
@@ -1412,7 +1417,7 @@ function bind() {
 
   $('#btnReset').addEventListener('click', () => {
     if (!confirm('Esto borra todas tus sesiones, pesos y tests. ¿Seguro?')) return;
-    S = structuredClone(DEFAULTS);
+    S = clonar(DEFAULTS);
     S.profile.startDate = today();
     save(); planWeek = null; render(); toast('Todo borrado');
   });
@@ -1425,7 +1430,7 @@ function openModal(title, value, note, onConfirm) {
   back.innerHTML = `<div style="background:#1b1e25;border:1px solid #2c303a;border-radius:16px;padding:16px;width:100%;max-width:520px">
     <h2 style="font-size:15px;margin:0 0 6px">${esc(title)}</h2>
     <p style="font-size:12.5px;color:#93949e;margin:0 0 10px">${esc(note || '')}</p>
-    <textarea id="modalText" style="width:100%;height:190px;background:#131519;color:#ece8e1;border:1px solid #2c303a;border-radius:10px;padding:10px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;resize:vertical">${esc(value)}</textarea>
+    <textarea id="modalText" style="width:100%;height:190px;background:#131519;color:#ece8e1;border:1px solid #2c303a;border-radius:10px;padding:10px;font:16px/1.45 ui-monospace,Menlo,Consolas,monospace;resize:vertical">${esc(value)}</textarea>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
       <button class="btn" data-close>Cerrar</button>
       ${onConfirm ? '<button class="btn primary" data-ok>Importar</button>' : ''}
