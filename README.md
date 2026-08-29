@@ -29,6 +29,7 @@ hosting el enlace ya viene en el HTML y esa inserción no hace nada.
 | **Hoy** | Progreso del desafío, peso, racha, y las sesiones de la semana ordenadas desde hoy. Botones para marcar hecho o registrar. |
 | **Plan** | Las 12 semanas completas, con el detalle de cada sesión, volumen y calorías estimadas. |
 | **Registro** | Importación de la exportación de Salud (.zip/.xml) y de actividades sueltas (GPX/TCX), más carga manual de sesiones (tipo, duración, distancia, saltos, pulso, RPE, sensación, notas) con cálculo automático de calorías, más la bitácora filtrable. |
+| **Comida** | Registro de comidas en lenguaje natural, con totales del día contra los objetivos de calorías y proteína. |
 | **Cuerpo** | Registro de peso con gráfico de evolución, tendencia de 7 días, línea de meta, IMC, metabolismo basal y objetivo calórico, más los estudios de laboratorio. |
 | **Progreso** | Totales acumulados, mapa de constancia de 13 semanas, minutos por semana, tiempo en zonas de pulso, 18 logros desbloqueables y tests de control. |
 | **Ajustes** | Perfil, día de fútbol y de descanso, FC máxima, exportar/importar/borrar datos y las advertencias de seguridad. |
@@ -60,6 +61,24 @@ El día del partido y el de descanso se eligen en Ajustes, y la semana se rearma
 los dos: los cinco días restantes se llenan siempre en el mismo orden (suave → soga → larga →
 intervalos → ligero) empezando el día después del descanso, de manera que nunca queden dos
 sesiones duras pegadas y la víspera del partido caiga siempre suave.
+
+## Nutrición
+
+En **Comida** se registra lo que comés escribiéndolo como lo dirías —*«un pote chico de granola sin
+azúcar y mate»*— y la app lo traduce a calorías, proteína, grasa y carbohidratos.
+
+No hay ninguna IA detrás: es una base de 113 alimentos de consumo habitual en Argentina, medidos en
+**porciones reales** (un mate, una milanesa, un pote de yogur) porque nadie pesa lo que come, más un
+intérprete de texto que reconoce cantidades (`dos`, `medio`, `3`), tamaños (`chico`, `grande`) y
+plurales, y que sabe extraer varios alimentos de una misma frase: *«milanesa de pollo con puré»* son
+dos platos, pero *«café con leche»* es uno solo.
+
+El día se compara contra los objetivos que la app ya calculaba: las calorías del gasto estimado menos
+550, y la proteína en 1,6 g/kg — que pasa a «sin objetivo» si los estudios levantaron la bandera
+renal. Los alimentos más repetidos quedan a un toque.
+
+Los valores son aproximados por definición: una milanesa casera y una de rotisería no se parecen.
+Sirven para ver tendencias y órdenes de magnitud, no para contar gramos.
 
 ## Hitos de peso
 
@@ -198,6 +217,7 @@ python3 tests/fixtures.py tmp      # genera los archivos de ejemplo
 node tests/e2e.js tmp              # 43 comprobaciones, sale con 1 si algo falla
 node tests/labs.js                 # 27 comprobaciones sobre los estudios
 node tests/hitos.js                # 18 comprobaciones sobre los hitos de peso
+node tests/comida.js               # 20 comprobaciones sobre nutrición
 ```
 
 `tests/e2e.js` recorre la app como un usuario, en viewport de iPhone y con eventos táctiles reales.

@@ -246,7 +246,7 @@ main{max-width:720px;margin:0 auto;padding:0 var(--sp)}
 /* ---------- tabbar ---------- */
 .tabbar{
   position:fixed;left:0;right:0;bottom:0;z-index:30;
-  display:grid;grid-template-columns:repeat(5,1fr);
+  display:grid;grid-template-columns:repeat(6,1fr);
   background:rgba(25,28,34,.95);backdrop-filter:blur(14px);
   border-top:1px solid var(--line);
   padding:7px 4px calc(7px + env(safe-area-inset-bottom));
@@ -389,3 +389,31 @@ main{max-width:720px;margin:0 auto;padding:0 var(--sp)}
 .hito-mini div{min-width:0}
 .hito-mini b{display:block;font-size:13.5px}
 .hito-mini span{font-size:12px;color:var(--muted)}
+
+/* ---------- nutrición ---------- */
+.macro{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:5px}
+.macro b{font-family:var(--display);font-size:15px;font-variant-numeric:tabular-nums}
+.macro span{font-size:12px;color:var(--muted)}
+.barra{height:8px;border-radius:5px;background:var(--bg-soft);overflow:hidden;margin-bottom:14px}
+.barra i{display:block;height:100%;border-radius:5px;background:var(--accent);transition:width .35s ease}
+.barra.ok i{background:var(--good)}
+.barra.pasado i{background:var(--soga)}
+.macro-min{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:2px}
+.macro-min div{background:var(--bg-soft);border-radius:10px;padding:10px;text-align:center}
+.macro-min b{display:block;font-family:var(--display);font-size:16px;font-variant-numeric:tabular-nums}
+.macro-min span{font-size:11px;color:var(--muted)}
+.chips-frec{display:flex;flex-wrap:wrap;gap:7px}
+.chips-frec button{background:var(--bg-soft);border:1px solid var(--line);border-radius:999px;
+  padding:0 14px;min-height:40px;font-size:13px;cursor:pointer;color:var(--txt)}
+.grupo-comida{margin-bottom:4px}
+.grupo-comida h3{font-family:var(--display);font-size:11.5px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.11em;color:var(--muted);margin:14px 2px 8px;display:flex;justify-content:space-between}
+.plato{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);
+  border-radius:13px;padding:10px 12px}
+.plato-body{flex:1;min-width:0}
+.plato-body b{display:block;font-size:14px;font-weight:600}
+.plato-body span{font-size:12px;color:var(--muted)}
+.cant{display:flex;align-items:center;gap:2px;flex:none}
+.cant button{width:32px;height:36px;border:1px solid var(--line);background:var(--bg-soft);
+  border-radius:9px;cursor:pointer;font-size:16px;line-height:1}
+.cant b{min-width:34px;text-align:center;font-size:13px;font-variant-numeric:tabular-nums}

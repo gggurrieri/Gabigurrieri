@@ -59,6 +59,7 @@ const DEFAULTS = {
   weights: [],    // {date,kg}
   tests: [],      // {date,bike,jumps,plank}
   labs: [],       // {id,date,lugar,notas,values:{},aplicar,archivo}
+  foods: [],      // {id,date,tipo,k,n,q,kcal,pr,gr,ch}
   done: {}        // {"w1-0": true}
 };
 
@@ -80,6 +81,7 @@ function load() {
       weights: parsed.weights || [],
       tests: parsed.tests || [],
       labs: parsed.labs || [],
+      foods: parsed.foods || [],
       done: parsed.done || {}
     };
   } catch (e) {
@@ -1094,6 +1096,271 @@ function consejoHito(h) {
   return 'Vas justo donde tenés que ir. Sostener esto once semanas más es todo el desafío.';
 }
 
+
+/* ====================== nutrición ==========================
+   Base de alimentos de consumo habitual en Argentina, medidos en porciones
+   reales —un mate, una milanesa, un pote de yogur— porque nadie pesa lo que
+   come. Los valores son aproximados por definición: una milanesa casera y
+   una de rotisería no se parecen. Sirven para ver tendencias y órdenes de
+   magnitud, no para contar gramos.
+   Formato: [clave, nombre, porción, kcal, proteína, grasa, carbohidratos, sinónimos] */
+const ALIMENTOS = [
+  // --- infusiones y bebidas ---
+  ['mate','Mate amargo','1 mate cebado',3,0.3,0,0.5,'yerba amargo'],
+  ['mate_dulce','Mate dulce','1 mate cebado',28,0.3,0,7,'yerba azucarado'],
+  ['mate_cocido','Mate cocido','1 taza',5,0.3,0,1,''],
+  ['cafe','Café solo','1 pocillo',2,0.2,0,0,'expreso negro'],
+  ['cafe_leche','Café con leche','1 taza',100,5,5,8,'cortado grande'],
+  ['cortado','Cortado','1 taza chica',70,3.4,3.5,5,''],
+  ['te','Té','1 taza',2,0,0,0,'infusion'],
+  ['leche','Leche entera','1 vaso',124,6.4,6.6,9.6,''],
+  ['leche_desc','Leche descremada','1 vaso',74,6.8,1,9.8,'leche light'],
+  ['agua','Agua','1 vaso',0,0,0,0,'soda'],
+  ['gaseosa','Gaseosa','1 vaso',105,0,0,26,'coca sprite refresco'],
+  ['gaseosa_light','Gaseosa light','1 vaso',1,0,0,0,'coca zero sin azucar'],
+  ['jugo','Jugo de naranja','1 vaso',90,1.4,0.4,21,'exprimido'],
+  ['cerveza','Cerveza','1 porrón',140,1.6,0,11,'birra chop'],
+  ['vino','Vino','1 copa',125,0.1,0,4,'tinto blanco malbec'],
+  ['fernet','Fernet con coca','1 vaso',220,0,0,26,'gancia aperitivo'],
+  ['licuado','Licuado de banana','1 vaso',220,8,6,34,'batido'],
+  // --- desayuno y merienda ---
+  ['granola_sa','Granola sin azúcar','1 pote chico',180,5,8,22,'cereal avena'],
+  ['granola','Granola','1 pote chico',195,4.5,7,28,'cereal'],
+  ['avena','Avena','3 cucharadas',113,4,2,20,'porridge'],
+  ['yogur','Yogur natural','1 pote',110,9,3,12,''],
+  ['yogur_desc','Yogur descremado','1 pote',85,9,1,12,'light'],
+  ['yogur_cereal','Yogur con cereal','1 pote',180,8,4,28,''],
+  ['pan','Pan francés','1 unidad',160,5,1,33,'flauta mignon felipe'],
+  ['pan_lactal','Pan lactal','1 rebanada',75,2.5,1,13,'molde'],
+  ['tostada','Tostada','1 unidad',70,2.4,1,12,'tostadas'],
+  ['gall_agua','Galletitas de agua','4 unidades',120,2.5,4,18,'crackers'],
+  ['gall_dulces','Galletitas dulces','4 unidades',180,2,7,28,'obleas'],
+  ['medialuna','Medialuna','1 unidad',180,3.5,9,22,'croissant'],
+  ['factura','Factura','1 unidad',200,4,10,24,'bola fraile vigilante'],
+  ['queso_untable','Queso untable','1 cucharada',45,1.5,4,1,'crema philadelphia'],
+  ['ddl','Dulce de leche','1 cucharada',65,1,1.5,12,''],
+  ['mermelada','Mermelada','1 cucharada',50,0,0,13,'jalea'],
+  ['manteca','Manteca','1 cucharadita',60,0,6.7,0,'mantequilla'],
+  ['miel','Miel','1 cucharada',64,0,0,17,''],
+  ['azucar','Azúcar','1 cucharadita',20,0,0,5,''],
+  // --- huevos y quesos ---
+  ['huevo','Huevo duro','1 unidad',78,6.3,5.3,0.6,'hervido'],
+  ['huevo_frito','Huevo frito','1 unidad',92,6.3,7,0.6,'revuelto'],
+  ['queso_cremoso','Queso cremoso','1 feta',90,6,7,1,'port salut'],
+  ['queso_rallado','Queso rallado','1 cucharada',25,2,1.8,0.2,'parmesano'],
+  ['ricota','Ricota','2 cucharadas',87,6,6,1.5,''],
+  ['muzzarella','Muzzarella','1 porción',140,12,10,1.5,'mozzarella'],
+  // --- carnes ---
+  ['mila_carne','Milanesa de carne al horno','1 unidad',330,28,18,14,'milanga'],
+  ['mila_frita','Milanesa frita','1 unidad',450,28,28,18,'milanga'],
+  ['mila_pollo','Milanesa de pollo al horno','1 unidad',300,30,12,14,'milanga'],
+  ['bife','Bife a la plancha','1 unidad',280,40,13,0,'carne nalga cuadril'],
+  ['bife_chorizo','Bife de chorizo','1 unidad',460,44,30,0,'ojo'],
+  ['asado','Asado de tira','1 porción',500,38,38,0,'costilla parrilla'],
+  ['vacio','Vacío','1 porción',420,40,28,0,'parrilla'],
+  ['chorizo','Chorizo','1 unidad',300,13,27,2,'parrilla'],
+  ['morcilla','Morcilla','1 unidad',250,10,22,3,''],
+  ['pechuga','Pechuga de pollo','1 porción',250,46,6,0,'pollo suprema'],
+  ['pollo_muslo','Pata muslo de pollo','1 unidad',280,26,19,0,'pollo'],
+  ['hamburguesa','Hamburguesa casera','1 medallón',250,20,18,2,'burger'],
+  ['hamburguesa_full','Hamburguesa completa','1 unidad',550,28,30,40,'burger doble'],
+  ['pancho','Pancho','1 unidad',300,10,17,26,'hot dog salchicha'],
+  ['merluza','Merluza','1 filete',140,28,3,0,'pescado'],
+  ['salmon','Salmón','1 porción',310,34,18,0,'pescado'],
+  ['atun','Atún al natural','1 lata',130,29,1,0,'pescado'],
+  ['bondiola','Bondiola de cerdo','1 porción',340,32,23,0,'cerdo'],
+  ['jamon','Jamón cocido','2 fetas',60,9,2.5,1,'fiambre'],
+  ['salame','Salame','5 fetas',150,8,13,0.5,'fiambre'],
+  // --- guarniciones ---
+  ['fideos','Fideos','1 plato',260,9,1.5,52,'pasta tallarines'],
+  ['fideos_salsa','Fideos con salsa','1 plato',350,11,6,60,'pasta tuco'],
+  ['noquis','Ñoquis','1 plato',380,10,6,70,'pasta'],
+  ['ravioles','Ravioles con salsa','1 plato',450,18,14,62,'pasta sorrentinos'],
+  ['arroz','Arroz','1 plato',260,5,0.6,57,''],
+  ['papa','Papa hervida','1 mediana',130,3,0.2,30,''],
+  ['pure','Puré de papas','1 plato',220,4,7,35,''],
+  ['papas_fritas','Papas fritas','1 porción',450,5,22,58,''],
+  ['batata','Batata','1 mediana',130,2,0.2,31,'boniato'],
+  ['polenta','Polenta','1 plato',200,4,1,44,''],
+  ['lentejas','Lentejas','1 plato',320,18,6,50,'guiso legumbres'],
+  ['porotos','Porotos','1 plato',300,17,2,52,'legumbres'],
+  ['garbanzos','Garbanzos','1 plato',330,17,5,55,'legumbres'],
+  ['choclo','Choclo','1 unidad',130,4,1.5,28,'maiz'],
+  // --- verduras ---
+  ['ensalada','Ensalada mixta','1 plato',45,2,0.3,9,'verduras'],
+  ['tomate','Tomate','1 unidad',22,1,0.2,5,''],
+  ['zanahoria','Zanahoria','1 unidad',30,0.7,0.2,7,''],
+  ['brocoli','Brócoli','1 porción',35,3,0.4,7,'verdura'],
+  ['zapallo','Zapallo','1 porción',45,1,0.1,11,'calabaza'],
+  ['palta','Palta','media unidad',160,2,15,9,'aguacate'],
+  ['aceite','Aceite de oliva','1 cucharada',120,0,13.5,0,''],
+  ['mayonesa','Mayonesa','1 cucharada',95,0.2,10,0.5,''],
+  ['ketchup','Ketchup','1 cucharada',20,0.2,0,5,'salsa'],
+  // --- platos ---
+  ['empanada','Empanada de carne','1 unidad',280,12,16,22,''],
+  ['empanada_jq','Empanada de jamón y queso','1 unidad',270,11,15,22,''],
+  ['empanada_humita','Empanada de humita','1 unidad',260,8,13,27,''],
+  ['pizza','Porción de pizza','1 porción',280,12,11,33,'muzzarella'],
+  ['tarta','Tarta de verdura','1 porción',300,11,17,25,''],
+  ['sandwich_miga','Sándwich de miga','2 triples',240,9,10,28,''],
+  ['tostado','Tostado de jamón y queso','1 unidad',350,18,16,32,'carlitos'],
+  ['choripan','Choripán','1 unidad',480,17,30,35,''],
+  // --- frutas ---
+  ['banana','Banana','1 unidad',105,1.3,0.4,27,'fruta'],
+  ['manzana','Manzana','1 unidad',95,0.5,0.3,25,'fruta'],
+  ['naranja','Naranja','1 unidad',62,1.2,0.2,15,'fruta'],
+  ['mandarina','Mandarina','1 unidad',47,0.7,0.3,12,'fruta'],
+  ['pera','Pera','1 unidad',100,0.6,0.2,27,'fruta'],
+  ['uvas','Uvas','1 taza',104,1,0.2,27,'fruta'],
+  ['frutillas','Frutillas','1 taza',50,1,0.5,12,'fruta'],
+  ['kiwi','Kiwi','1 unidad',42,0.8,0.4,10,'fruta'],
+  ['durazno','Durazno','1 unidad',59,1.4,0.4,14,'fruta'],
+  // --- snacks y dulces ---
+  ['alfajor','Alfajor simple','1 unidad',220,3,9,32,''],
+  ['alfajor_triple','Alfajor triple','1 unidad',350,5,16,48,''],
+  ['chocolate','Chocolate','1 barra',220,3,13,24,''],
+  ['barrita','Barrita de cereal','1 unidad',110,1.5,3,20,''],
+  ['mani','Maní','1 puñado',170,7,14,6,'frutos secos'],
+  ['almendras','Almendras','1 puñado',175,6,15,6,'frutos secos'],
+  ['nueces','Nueces','1 puñado',200,5,20,4,'frutos secos'],
+  ['papitas','Papas fritas de paquete','1 paquete chico',270,3,17,26,'snack'],
+  ['helado','Helado','1 bocha',130,2.5,7,15,''],
+  ['flan','Flan con dulce de leche','1 porción',300,8,10,45,'postre'],
+  ['torta','Torta','1 porción',350,5,15,50,'postre budin']
+];
+
+const COMIDAS = [['desayuno','Desayuno'],['almuerzo','Almuerzo'],
+                 ['merienda','Merienda'],['cena','Cena'],['snack','Snack']];
+
+const normalizar = t => String(t || '').toLowerCase()
+  .normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .replace(/[^a-z0-9\/ ]/g, ' ').replace(/\s+/g, ' ').trim();
+
+const VACIAS = new Set(['de','del','con','sin','y','e','un','una','unos','unas','el','la','los','las',
+  'mi','me','al','a','en','por','para','o','u','poco','poquito','mucho','algo','tomo','comi','desayuno',
+  'almuerzo','merienda','cena','tome','comer','plato','vaso','taza','pote','unidad','porcion']);
+
+const CANTIDADES = { 'medio':0.5, 'media':0.5, '1/2':0.5, 'un':1, 'una':1, 'dos':2, 'tres':3,
+  'cuatro':4, 'cinco':5, 'seis':6, 'doble':2 };
+const TAMANOS = { 'chico':0.7, 'chica':0.7, 'chiquito':0.7, 'pequeno':0.7, 'mini':0.6,
+  'grande':1.4, 'grandote':1.5, 'enorme':1.6 };
+
+/* Los plurales se comparan en singular: "dos medialunas" tiene que
+   encontrar "Medialuna". */
+const singular = w => (w.length > 4 && w.endsWith('es')) ? w.slice(0, -2)
+                    : (w.length > 3 && w.endsWith('s')) ? w.slice(0, -1) : w;
+
+const significativas = t => normalizar(t).split(' ').filter(w => w && !VACIAS.has(w)
+  && !(w in CANTIDADES) && !(w in TAMANOS) && !/^\d+$/.test(w));
+
+/* Puntúa cuántas palabras del fragmento aparecen en el alimento, y descuenta
+   por cada palabra del alimento que el fragmento no menciona: sin ese castigo
+   "banana" caía en "Licuado de banana", que la contiene. */
+function puntuar(pal, a) {
+  const tokens = significativas(a[1] + ' ' + a[7]).map(singular);
+  const campo = normalizar(a[1] + ' ' + a[7]);
+  const usados = new Set();
+  let punto = 0;
+  pal.forEach(w0 => {
+    const w = singular(w0);
+    const i = tokens.indexOf(w);
+    if (i >= 0) { punto += 2 + Math.min(w.length, 8) / 8; usados.add(w); return; }
+    if (w.length >= 4 && campo.includes(w0)) { punto += 1.2; return; }
+    const pref = tokens.find(t => t.length >= 5 && w.length >= 5
+      && (t.startsWith(w.slice(0, 5)) || w.startsWith(t.slice(0, 5))));
+    if (pref) { punto += 1.4; usados.add(pref); }
+  });
+  const propias = significativas(a[1]).map(singular);
+  const sobran = propias.filter(t => !usados.has(t)).length;
+  return { punto: punto - sobran * 0.35, usados };
+}
+
+function buscarAlimento(fragmento) {
+  const pal = significativas(fragmento);
+  if (!pal.length) return null;
+  let mejor = null, mejorPunto = 0;
+  ALIMENTOS.forEach(a => {
+    const r = puntuar(pal, a);
+    if (r.punto > mejorPunto) { mejorPunto = r.punto; mejor = a; }
+  });
+  return mejorPunto >= 1.5 ? mejor : null;
+}
+
+/* Un mismo fragmento puede traer más de un alimento: "milanesa de pollo con
+   puré" son dos. Se extrae el mejor, se sacan las palabras que consumió y se
+   vuelve a buscar en lo que queda. "Café con leche" sobrevive entero porque
+   la primera pasada se lleva las dos palabras. */
+function extraerAlimentos(fragmento) {
+  let pal = significativas(fragmento);
+  const salida = [];
+  for (let vuelta = 0; vuelta < 4 && pal.length; vuelta++) {
+    let mejor = null, mejorPunto = 0, mejorUsados = null;
+    ALIMENTOS.forEach(a => {
+      const r = puntuar(pal, a);
+      if (r.punto > mejorPunto) { mejorPunto = r.punto; mejor = a; mejorUsados = r.usados; }
+    });
+    if (!mejor || mejorPunto < 1.5) break;
+    salida.push(mejor);
+    const antes = pal.length;
+    pal = pal.filter(w => !mejorUsados.has(singular(w)));
+    if (pal.length === antes) break;
+  }
+  return salida;
+}
+
+/* Divide el texto en fragmentos y traduce cada uno a alimentos con su cantidad. */
+function interpretarComida(texto) {
+  const partes = String(texto || '').split(/,| y | mas | \+ |\+/i).map(x => x.trim()).filter(Boolean);
+  const items = [], sinReconocer = [];
+  partes.forEach(fr => {
+    const encontrados = extraerAlimentos(fr);
+    if (!encontrados.length) { if (significativas(fr).length) sinReconocer.push(fr); return; }
+    let q = 1, esc = 1;
+    normalizar(fr).split(' ').forEach(w => {
+      if (w in CANTIDADES) q = CANTIDADES[w];
+      else if (/^\d+$/.test(w)) q = Math.min(20, Number(w));
+      if (w in TAMANOS) esc = TAMANOS[w];
+    });
+    // La cantidad se aplica al primero: "dos milanesas con puré" son dos
+    // milanesas y un puré, no dos de cada cosa.
+    encontrados.forEach((a, i) => items.push({ a, q: i === 0 ? Math.round(q * esc * 100) / 100 : 1 }));
+  });
+  return { items, sinReconocer };
+}
+
+const nutrDe = (a, q) => ({ kcal: a[3]*q, pr: a[4]*q, gr: a[5]*q, ch: a[6]*q });
+
+function comidasDe(fecha) {
+  return (S.foods || []).filter(f => f.date === fecha);
+}
+function totalesDe(fecha) {
+  const t = { kcal:0, pr:0, gr:0, ch:0 };
+  comidasDe(fecha).forEach(f => { t.kcal += f.kcal; t.pr += f.pr; t.gr += f.gr; t.ch += f.ch; });
+  return t;
+}
+/* Objetivos del día: las calorías ya las calcula la app, la proteína respeta
+   la bandera renal de los estudios, y la grasa se toma como el 28% del total. */
+function objetivosDia() {
+  const w = currentWeight();
+  const kcal = Math.max(1200, tdee(w) - 550);
+  const riñon = banderasPlan().has('proteinaConCuidado');
+  return { kcal, pr: riñon ? null : Math.round(w * 1.6), gr: Math.round(kcal * 0.28 / 9) };
+}
+function frecuentes(n) {
+  const cuenta = {};
+  (S.foods || []).forEach(f => { cuenta[f.k] = (cuenta[f.k] || 0) + 1; });
+  return Object.entries(cuenta).sort((a,b) => b[1]-a[1]).slice(0, n)
+    .map(([k]) => ALIMENTOS.find(a => a[0] === k)).filter(Boolean);
+}
+const momentoDelDia = () => {
+  const h = new Date().getHours();
+  if (h < 11) return 'desayuno';
+  if (h < 15) return 'almuerzo';
+  if (h < 19) return 'merienda';
+  if (h < 23) return 'cena';
+  return 'snack';
+};
+
 /* ------------------------------ render ----------------------------- */
 function render() {
   renderTopbar();
@@ -1103,6 +1370,7 @@ function render() {
   renderWeight();
   renderProgress();
   renderHitos();
+  renderComida();
   renderLabs();
   renderProfile();
 }
@@ -1369,6 +1637,80 @@ function renderLog() {
       <button class="entry-del" data-del="${s.id}" aria-label="Borrar">×</button>
     </article>`;
   }).join('') : `<div class="empty">Todavía no registraste nada. Empezá por la primera salida en bici.</div>`;
+}
+
+function renderComida() {
+  const cont = $('#comidaLista');
+  if (!cont) return;
+  const fecha = $('#comidaDate').value || today();
+  $('#comidaFecha').textContent = fecha === today() ? 'hoy' : fmtDate(fecha);
+
+  const t = totalesDe(fecha), obj = objetivosDia();
+  const r = Math.round;
+  const barra = (val, meta, invertido) => {
+    const pct = meta ? Math.min(100, val / meta * 100) : 0;
+    const cls = !meta ? '' : (val > meta * 1.05 ? (invertido ? ' ok' : ' pasado')
+                : (val >= meta * 0.9 ? ' ok' : ''));
+    return `<div class="barra${cls}"><i style="width:${pct.toFixed(0)}%"></i></div>`;
+  };
+
+  const resto = obj.kcal - t.kcal;
+  $('#comidaResto').textContent = resto >= 0
+    ? `te quedan ${r(resto)} kcal` : `${r(-resto)} kcal por encima`;
+
+  $('#comidaTotales').innerHTML =
+    `<div class="macro"><b>${r(t.kcal)} kcal</b><span>de ${r(obj.kcal)}</span></div>
+     ${barra(t.kcal, obj.kcal)}
+     <div class="macro"><b>${r(t.pr)} g de proteína</b><span>${obj.pr ? 'de ' + obj.pr : 'sin objetivo: revisá el riñón'}</span></div>
+     ${barra(t.pr, obj.pr, true)}
+     <div class="macro-min">
+       <div><b>${r(t.gr)} g</b><span>grasa · sugerido ${obj.gr}</span></div>
+       <div><b>${r(t.ch)} g</b><span>carbohidratos</span></div>
+     </div>`;
+
+  const delDia = comidasDe(fecha);
+  if (!delDia.length) {
+    cont.innerHTML = `<div class="empty">Todavía no cargaste nada de ${fecha === today() ? 'hoy' : 'ese día'}.</div>`;
+  } else {
+    cont.innerHTML = COMIDAS.map(([k, etiqueta]) => {
+      const items = delDia.filter(f => f.tipo === k);
+      if (!items.length) return '';
+      const sub = items.reduce((a, b) => a + b.kcal, 0);
+      return `<div class="grupo-comida">
+        <h3><span>${etiqueta}</span><span>${r(sub)} kcal</span></h3>
+        ${items.map(f => `<article class="plato">
+          <div class="plato-body">
+            <b>${esc(f.n)}</b>
+            <span>${esc(f.porcion)} · ${r(f.kcal)} kcal · ${f.pr.toFixed(1)} g prot · ${f.gr.toFixed(1)} g grasa</span>
+          </div>
+          <div class="cant">
+            <button type="button" data-qmenos="${f.id}" aria-label="Menos">−</button>
+            <b>${f.q}</b>
+            <button type="button" data-qmas="${f.id}" aria-label="Más">+</button>
+          </div>
+          <button class="entry-del" data-delcomida="${f.id}" aria-label="Borrar">×</button>
+        </article>`).join('')}
+      </div>`;
+    }).join('');
+  }
+
+  const frec = frecuentes(8);
+  $('#frecuentesCard').hidden = !frec.length;
+  $('#frecuentes').innerHTML = frec.map(a =>
+    `<button type="button" data-frec="${a[0]}">${esc(a[1])}</button>`).join('');
+}
+
+function agregarAlimento(a, q, tipo, fecha) {
+  const n = nutrDe(a, q);
+  S.foods.push({ id: 'c' + Date.now() + Math.round(Math.random() * 999),
+    date: fecha, tipo, k: a[0], n: a[1], porcion: a[2], q,
+    kcal: n.kcal, pr: n.pr, gr: n.gr, ch: n.ch });
+}
+function recalcular(f) {
+  const a = ALIMENTOS.find(x => x[0] === f.k);
+  if (!a) return;
+  const n = nutrDe(a, f.q);
+  f.kcal = n.kcal; f.pr = n.pr; f.gr = n.gr; f.ch = n.ch;
 }
 
 function renderHitos() {
@@ -1748,6 +2090,33 @@ function bind() {
       save(); renderWeight(); renderToday(); renderTopbar(); toast('Registro borrado');
       return;
     }
+    const fq = e.target.closest('[data-frec]');
+    if (fq) {
+      const a = ALIMENTOS.find(x => x[0] === fq.dataset.frec);
+      if (a) {
+        agregarAlimento(a, 1, $('#comidaTipo').value, $('#comidaDate').value || today());
+        save(); render(); toast(a[1]);
+      }
+      return;
+    }
+    const qm = e.target.closest('[data-qmas]'), qn = e.target.closest('[data-qmenos]');
+    if (qm || qn) {
+      const id = (qm || qn).dataset[qm ? 'qmas' : 'qmenos'];
+      const f = S.foods.find(x => x.id === id);
+      if (f) {
+        f.q = Math.round((f.q + (qm ? 0.5 : -0.5)) * 100) / 100;
+        if (f.q <= 0) S.foods = S.foods.filter(x => x.id !== id);
+        else recalcular(f);
+        save(); render();
+      }
+      return;
+    }
+    const dc = e.target.closest('[data-delcomida]');
+    if (dc) {
+      S.foods = S.foods.filter(x => x.id !== dc.dataset.delcomida);
+      save(); render(); toast('Borrado');
+      return;
+    }
     const dl = e.target.closest('[data-dellab]');
     if (dl) {
       const id = dl.dataset.dellab;
@@ -1935,6 +2304,29 @@ function bind() {
     renderProgress(); toast('Test guardado');
   });
 
+  // --- comida ---
+  $('#comidaTipo').innerHTML = COMIDAS.map(([k, t]) => `<option value="${k}">${t}</option>`).join('');
+  $('#comidaTipo').value = momentoDelDia();
+  $('#comidaDate').value = today();
+  $('#comidaDate').addEventListener('change', renderComida);
+
+  $('#formComida').addEventListener('submit', e => {
+    e.preventDefault();
+    const texto = $('#comidaTexto').value.trim();
+    if (!texto) return;
+    const { items, sinReconocer } = interpretarComida(texto);
+    if (!items.length) {
+      toast('No reconocí ningún alimento en eso');
+      return;
+    }
+    const tipo = $('#comidaTipo').value, fecha = $('#comidaDate').value || today();
+    items.forEach(i => agregarAlimento(i.a, i.q, tipo, fecha));
+    save(); render();
+    $('#comidaTexto').value = '';
+    const leidos = items.map(i => i.a[1] + (i.q !== 1 ? ' ×' + i.q : '')).join(' · ');
+    toast(sinReconocer.length ? `${leidos} · no reconocí «${sinReconocer[0]}»` : leidos);
+  });
+
   // --- estudios de laboratorio ---
   renderLabCampos();
   $('#btnNuevoLab').addEventListener('click', () => {
@@ -2061,7 +2453,8 @@ function bind() {
         S = {
           profile: Object.assign({}, DEFAULTS.profile, data.profile),
           sessions: data.sessions || [], weights: data.weights || [],
-          tests: data.tests || [], labs: data.labs || [], done: data.done || {}
+          tests: data.tests || [], labs: data.labs || [],
+          foods: data.foods || [], done: data.done || {}
         };
         save(); render(); toast('Datos importados');
       } catch (err) { toast('El texto no es una copia válida'); }

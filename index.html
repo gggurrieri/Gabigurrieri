@@ -183,6 +183,43 @@
       <div id="logList" class="stack"></div>
     </section>
 
+    <!-- ============ COMIDA ============ -->
+    <section class="view" id="view-comida" hidden>
+      <form class="card form" id="formComida">
+        <div class="card-head"><h2>Qué comiste</h2><span class="muted small" id="comidaFecha"></span></div>
+        <label>Escribilo como lo dirías
+          <input type="text" id="comidaTexto" maxlength="180" autocomplete="off"
+                 placeholder="un pote chico de granola sin azúcar y mate">
+        </label>
+        <div class="grid-2">
+          <label>Momento<select id="comidaTipo"></select></label>
+          <label>Fecha<input type="date" id="comidaDate"></label>
+        </div>
+        <div class="form-actions">
+          <span class="muted small">Separá con comas o con «y».</span>
+          <button class="btn primary" type="submit">Agregar</button>
+        </div>
+      </form>
+
+      <div class="card" id="frecuentesCard" hidden>
+        <h2>Lo que más repetís</h2>
+        <div class="chips-frec" id="frecuentes"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>El día</h2><span class="muted small" id="comidaResto"></span></div>
+        <div id="comidaTotales"></div>
+      </div>
+
+      <div id="comidaLista" class="stack"></div>
+
+      <div class="card">
+        <p class="muted small">Los valores son aproximados por definición: una milanesa casera y una
+        de rotisería no se parecen en nada. Sirven para ver tendencias y órdenes de magnitud, no para
+        contar gramos. Si algo no lo reconoce, buscá el alimento más parecido de la lista.</p>
+      </div>
+    </section>
+
     <!-- ============ PESO ============ -->
     <section class="view" id="view-peso" hidden>
       <form class="card form" id="formWeight">
@@ -370,6 +407,7 @@
     <button class="tab active" data-view="hoy"><span>🏠</span>Hoy</button>
     <button class="tab" data-view="plan"><span>📋</span>Plan</button>
     <button class="tab" data-view="log"><span>➕</span>Registro</button>
+    <button class="tab" data-view="comida"><span>🍽️</span>Comida</button>
     <button class="tab" data-view="peso"><span>🩺</span>Cuerpo</button>
     <button class="tab" data-view="progreso"><span>📈</span>Progreso</button>
   </nav>
