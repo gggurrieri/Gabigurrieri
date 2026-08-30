@@ -61,6 +61,7 @@ const DEFAULTS = {
   labs: [],       // {id,date,lugar,notas,values:{},aplicar,archivo}
   foods: [],      // {id,date,tipo,k,n,q,kcal,pr,gr,ch}
   daily: {},      // {"2026-08-29": {pasos, fcRep}} — importado de Salud
+  meta: {},       // {ultimaCopia: "2026-08-29"}
   done: {}        // {"w1-0": true}
 };
 
@@ -84,6 +85,7 @@ function load() {
       labs: parsed.labs || [],
       foods: parsed.foods || [],
       daily: parsed.daily || {},
+      meta: parsed.meta || {},
       done: parsed.done || {}
     };
   } catch (e) {
@@ -1394,6 +1396,19 @@ function totalesDe(fecha) {
   comidasDe(fecha).forEach(f => { t.kcal += f.kcal; t.pr += f.pr; t.gr += f.gr; t.ch += f.ch; });
   return t;
 }
+/* Lo que importa para bajar de peso es el promedio de la semana, no un día
+   suelto: un asado del sábado dentro de una semana ordenada no mueve nada. */
+function promedioSemana(hasta) {
+  const fin = hasta || today();
+  const dias = [];
+  for (let i = 0; i < 7; i++) {
+    const f = addDays(fin, -i);
+    const t = totalesDe(f);
+    if (t.kcal > 0) dias.push(t.kcal);
+  }
+  return dias.length ? { kcal: Math.round(dias.reduce((a, b) => a + b, 0) / dias.length), dias: dias.length } : null;
+}
+
 /* Objetivos del día: las calorías ya las calcula la app, la proteína respeta
    la bandera renal de los estudios, y la grasa se toma como el 28% del total. */
 function objetivosDia() {
@@ -1417,6 +1432,41 @@ const momentoDelDia = () => {
   return 'snack';
 };
 
+
+/* ==================== copias de seguridad ====================
+   Todo vive en el almacenamiento del navegador. Safari en iOS borra el
+   almacenamiento de un sitio tras siete días sin visitarlo —las apps
+   agregadas a la pantalla de inicio quedan exentas—, y además está el
+   borrado manual, el cambio de teléfono y la navegación privada. Nada de
+   eso avisa antes, así que la app lleva la cuenta. */
+const DIAS_COPIA = 7;
+
+function hayAlgoQuePerder() {
+  return (S.sessions.length + S.weights.length + S.foods.length
+        + S.labs.length + Object.keys(S.daily || {}).length) > 0;
+}
+function diasSinCopia() {
+  const u = S.meta && S.meta.ultimaCopia;
+  if (!u) return null;                     // nunca hizo una
+  return Math.max(0, daysBetween(u, today()));
+}
+function copiaVencida() {
+  if (!hayAlgoQuePerder()) return false;
+  const d = diasSinCopia();
+  return d === null || d >= DIAS_COPIA;
+}
+function marcarCopia() {
+  S.meta = Object.assign({}, S.meta, { ultimaCopia: today() });
+  save();
+}
+function textoCopia() {
+  const d = diasSinCopia();
+  if (d === null) return 'Nunca hiciste una copia';
+  if (d === 0) return 'Copia hecha hoy';
+  if (d === 1) return 'Última copia: ayer';
+  return `Última copia: hace ${d} días`;
+}
+
 /* ------------------------------ render ----------------------------- */
 function render() {
   renderTopbar();
@@ -1427,6 +1477,7 @@ function render() {
   renderProgress();
   renderHitos();
   renderComida();
+  renderCopia();
   renderLabs();
   renderProfile();
 }
@@ -1724,6 +1775,22 @@ function renderComida() {
   $('#comidaResto').textContent = resto >= 0
     ? `te quedan ${r(resto)} kcal` : `${r(-resto)} kcal por encima`;
 
+  // Aviso al pasarse, con el promedio semanal para no leer un día como una tragedia.
+  const aviso = $('#avisoCalorias');
+  if (aviso) {
+    if (resto >= 0) { aviso.hidden = true; }
+    else {
+      aviso.hidden = false;
+      const prom = promedioSemana(fecha);
+      const extra = prom && prom.dias >= 3
+        ? ` Tu promedio de los últimos ${prom.dias} días con registro es de ${prom.kcal} kcal, contra un objetivo de ${r(obj.kcal)}.`
+        : ' Lo que mueve la aguja es el promedio de la semana, no un día suelto.';
+      aviso.innerHTML = `<i></i><div>
+        <b>Te pasaste por ${r(-resto)} kcal</b>
+        <span>${esc(extra.trim())}</span></div>`;
+    }
+  }
+
   $('#comidaTotales').innerHTML =
     `<div class="macro"><b>${r(t.kcal)} kcal</b><span>de ${r(obj.kcal)}</span></div>
      ${barra(t.kcal, obj.kcal)}
@@ -1732,7 +1799,14 @@ function renderComida() {
      <div class="macro-min">
        <div><b>${r(t.gr)} g</b><span>grasa · sugerido ${obj.gr}</span></div>
        <div><b>${r(t.ch)} g</b><span>carbohidratos</span></div>
-     </div>`;
+     </div>${(() => {
+       const pr = promedioSemana(fecha);
+       if (!pr || pr.dias < 2) return '';
+       const dif = pr.kcal - obj.kcal;
+       return `<p class="muted small" style="margin-top:12px">Promedio de los últimos ${pr.dias} días con registro:
+         <b style="color:${dif > 100 ? 'var(--soga)' : 'var(--good)'}">${pr.kcal} kcal</b>
+         · ${dif > 0 ? `${dif} por encima del objetivo` : `${-dif} por debajo`}</p>`;
+     })()}`;
 
   const delDia = comidasDe(fecha);
   if (!delDia.length) {
@@ -1745,6 +1819,7 @@ function renderComida() {
       return `<div class="grupo-comida">
         <h3><span>${etiqueta}</span><span>${r(sub)} kcal</span></h3>
         ${items.map(f => `<article class="plato">
+          ${f.foto ? `<img class="plato-foto" data-fotocomida="${f.id}" alt="">` : ''}
           <div class="plato-body">
             <b data-editcomida="${f.id}" role="button" tabindex="0">${esc(f.n)}</b>
             <span>${esc(f.porcion)} · ${r(f.kcal)} kcal · ${f.pr.toFixed(1)} g prot · ${f.gr.toFixed(1)} g grasa</span>
@@ -1759,6 +1834,10 @@ function renderComida() {
       </div>`;
     }).join('');
   }
+
+  $$('#comidaLista img[data-fotocomida]').forEach(img => {
+    leerArchivo('foto-' + img.dataset.fotocomida).then(d => { if (d) img.src = d; }).catch(() => {});
+  });
 
   const frec = frecuentes(8);
   $('#frecuentesCard').hidden = !frec.length;
@@ -2042,6 +2121,30 @@ function conArchivos(fn) {
 const guardarArchivo = (id, dataUrl) => conArchivos(st => st.put(dataUrl, id));
 const leerArchivo = id => conArchivos(st => st.get(id));
 const borrarArchivo = id => conArchivos(st => st.delete(id));
+/* Una foto del celular pesa varios MB. Se reduce a 900 px y JPEG antes de
+   guardarla: alcanza de sobra para reconocer el plato y no llena la cuota. */
+function reducirImagen(file, max) {
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onerror = () => rej(fr.error);
+    fr.onload = () => {
+      const img = new Image();
+      img.onerror = () => rej(new Error('imagen ilegible'));
+      img.onload = () => {
+        try {
+          const e = Math.min(1, max / Math.max(img.width, img.height));
+          const c = document.createElement('canvas');
+          c.width = Math.round(img.width * e); c.height = Math.round(img.height * e);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          res(c.toDataURL('image/jpeg', 0.72));
+        } catch (err) { rej(err); }
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+
 const aDataUrl = f => new Promise((res, rej) => {
   const r = new FileReader();
   r.onload = () => res(r.result); r.onerror = () => rej(r.error);
@@ -2140,6 +2243,23 @@ function renderLabs() {
   });
 }
 
+function renderCopia() {
+  const est = $('#copiaEstado');
+  if (est) {
+    est.textContent = textoCopia();
+    est.style.color = copiaVencida() ? 'var(--soga)' : 'var(--muted)';
+  }
+  const aviso = $('#avisoCopia');
+  if (!aviso) return;
+  if (!copiaVencida()) { aviso.hidden = true; return; }
+  aviso.hidden = false;
+  const d = diasSinCopia();
+  aviso.innerHTML = `<i></i><div>
+      <b>${d === null ? 'No tenés ninguna copia' : `Hace ${d} días que no hacés una copia`}</b>
+      <span>Todo lo que registrás vive solo en este teléfono. Tocá acá para copiarlo y pegarlo en una nota.</span>
+    </div>`;
+}
+
 function renderProfile() {
   const p = S.profile;
   $('#pName').value = p.name || '';
@@ -2183,6 +2303,7 @@ function updateKcalPreview() {
 function bind() {
   $$('.tab').forEach(t => t.addEventListener('click', () => showView(t.dataset.view)));
   $('#btnSettings').addEventListener('click', () => showView('ajustes'));
+  $('#avisoCopia').addEventListener('click', () => { showView('ajustes'); $('#btnExport').click(); });
 
   // marcar hecha / registrar rápido (delegación global)
   document.addEventListener('click', e => {
@@ -2247,6 +2368,7 @@ function bind() {
     }
     const dc = e.target.closest('[data-delcomida]');
     if (dc) {
+      borrarArchivo('foto-' + dc.dataset.delcomida).catch(() => {});
       S.foods = S.foods.filter(x => x.id !== dc.dataset.delcomida);
       save(); render(); toast('Borrado');
       return;
@@ -2467,12 +2589,38 @@ function bind() {
     save(); render();
     $('#comidaTexto').value = '';
     const leidos = items.map(i => i.a[1] + (i.q !== 1 ? ' ×' + i.q : '')).join(' · ');
-    toast(sinReconocer.length ? `${leidos} · no reconocí «${sinReconocer[0]}»` : leidos);
+    const sobra = totalesDe(fecha).kcal - objetivosDia().kcal;
+    toast(sinReconocer.length ? `${leidos} · no reconocí «${sinReconocer[0]}»`
+          : (sobra > 0 ? `${leidos} · ${Math.round(sobra)} kcal por encima del objetivo` : leidos));
   });
 
   // --- carga manual y edición de un plato ---
+  let fotoPendiente = null;      // dataURL elegida en esta edición
+  let fotoBorrar = false;
+  const mostrarFoto = (url) => {
+    const img = $('#manFotoPrev'), quitar = $('#btnQuitarFoto');
+    if (url) { img.src = url; img.hidden = false; quitar.hidden = false; }
+    else { img.removeAttribute('src'); img.hidden = true; quitar.hidden = true; }
+  };
+  $('#btnFoto').addEventListener('click', () => $('#manFoto').click());
+  $('#manFoto').addEventListener('change', async e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    try {
+      fotoPendiente = await reducirImagen(f, 900);
+      fotoBorrar = false;
+      mostrarFoto(fotoPendiente);
+    } catch (err) { toast('No pude leer esa imagen'); }
+  });
+  $('#btnQuitarFoto').addEventListener('click', () => {
+    fotoPendiente = null; fotoBorrar = true; mostrarFoto(null);
+  });
+
   const abrirManual = (f) => {
     const form = $('#formManual');
+    fotoPendiente = null; fotoBorrar = false;
+    mostrarFoto(null);
+    if (f && f.foto) leerArchivo('foto-' + f.id).then(d => { if (d) mostrarFoto(d); }).catch(() => {});
     $('#manId').value = f ? f.id : '';
     $('#manNombre').value = f ? f.n : '';
     $('#manPorcion').value = f ? f.porcion : '';
@@ -2497,6 +2645,13 @@ function bind() {
     const datos = { n, porcion: $('#manPorcion').value.trim(),
       kcal, pr: Number($('#manPr').value) || 0,
       gr: Number($('#manGr').value) || 0, ch: Number($('#manCh').value) || 0 };
+    const guardarFoto = async (entrada) => {
+      try {
+        if (fotoPendiente) { await guardarArchivo('foto-' + entrada.id, fotoPendiente); entrada.foto = true; }
+        else if (fotoBorrar && entrada.foto) { await borrarArchivo('foto-' + entrada.id); entrada.foto = false; }
+      } catch (err) { toast('Guardé la comida, pero no la foto'); }
+      save(); render();
+    };
     const id = $('#manId').value;
     if (id) {
       // Editar: cambia la base y se recalcula con la cantidad que ya tenía.
@@ -2507,13 +2662,15 @@ function bind() {
         f.base = { kcal: datos.kcal, pr: datos.pr, gr: datos.gr, ch: datos.ch };
         f.manual = true;
         recalcular(f);
+        guardarFoto(f);
       }
       toast('Plato corregido');
     } else {
-      agregarManual(datos, 1, $('#comidaTipo').value, $('#comidaDate').value || today());
+      const nuevo = agregarManual(datos, 1, $('#comidaTipo').value, $('#comidaDate').value || today());
+      guardarFoto(nuevo);
       toast(`${datos.n} · ${Math.round(datos.kcal)} kcal`);
     }
-    save(); e.target.reset(); $('#formManual').hidden = true; render();
+    save(); e.target.reset(); mostrarFoto(null); $('#formManual').hidden = true; render();
   });
 
   // --- estudios de laboratorio ---
@@ -2627,6 +2784,8 @@ function bind() {
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) { /* algunos navegadores bloquean la descarga */ }
+    marcarCopia();
+    renderCopia();
     openModal('Copia de seguridad', json,
       'Ya está copiada en el portapapeles: pegala en una nota, un mail o donde la tengas a mano. ' +
       'Si abriste la app desde tu propia carpeta, además se descargó como archivo .json.');
@@ -2643,7 +2802,8 @@ function bind() {
           profile: Object.assign({}, DEFAULTS.profile, data.profile),
           sessions: data.sessions || [], weights: data.weights || [],
           tests: data.tests || [], labs: data.labs || [],
-          foods: data.foods || [], daily: data.daily || {}, done: data.done || {}
+          foods: data.foods || [], daily: data.daily || {},
+          meta: data.meta || {}, done: data.done || {}
         };
         save(); render(); toast('Datos importados');
       } catch (err) { toast('El texto no es una copia válida'); }

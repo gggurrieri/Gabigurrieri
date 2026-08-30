@@ -81,6 +81,15 @@ corregirlo, así que si tu granola trae 240 kcal por pote y no 180, se arregla u
 Cada entrada guarda sus valores **por unidad**, así que el mismo código sirve para lo que sale de la
 base y para lo cargado a mano, y los botones de media porción escalan las dos igual.
 
+Cada plato acepta una **foto**, que se reduce a 900 px y se guarda como JPEG en IndexedDB. La foto
+**no calcula nada** — para leer calorías de una imagen hace falta un modelo de visión, o sea un
+servidor — pero fotografiar lo que uno come es una de las intervenciones con mejor evidencia para
+comer mejor, sin contar nada.
+
+Al pasarse del objetivo del día aparece un aviso que dice por cuánto y lo encuadra con el **promedio
+de los últimos días con registro**, que es el número que mueve la aguja: un día suelto no decide
+nada, y leerlo como fracaso es lo que rompe el hábito.
+
 El día se compara contra los objetivos que la app ya calculaba: las calorías del gasto estimado menos
 550, y la proteína en 1,6 g/kg — que pasa a «sin objetivo» si los estudios levantaron la bandera
 renal. Los alimentos más repetidos quedan a un toque.
@@ -236,6 +245,17 @@ Valores muy fuera de rango (por ejemplo hemoglobina bajo 10, glucosa sobre 250, 
 Los informes adjuntos se guardan en IndexedDB, no en `localStorage`, porque una foto no entra en la
 cuota; como todo lo demás, no salen del dispositivo.
 
+## Copias de seguridad
+
+Todo vive en el almacenamiento del navegador. **Safari en iOS borra el almacenamiento de un sitio
+tras siete días sin visitarlo**; las apps agregadas a la pantalla de inicio quedan exentas, porque
+llevan su propio contador de uso. A eso se suman el borrado manual de datos del navegador, la
+navegación privada y el cambio de teléfono.
+
+Nada de eso avisa antes, así que la app lleva la cuenta: si hay datos y pasó una semana sin
+exportar, aparece un aviso en **Hoy** que abre la copia de un toque. En Ajustes se ve siempre cuándo
+fue la última.
+
 ## Pruebas
 
 ```
@@ -246,6 +266,7 @@ node tests/hitos.js                # 18 comprobaciones sobre los hitos de peso
 node tests/comida.js               # 20 comprobaciones sobre nutrición
 node tests/pasos.js tmp            # 11 comprobaciones sobre pasos y pulso en reposo
 node tests/manual.js               # 18 comprobaciones sobre carga manual y corrección
+node tests/avisos.js               # 20 comprobaciones sobre avisos y foto de la comida
 ```
 
 `tests/e2e.js` recorre la app como un usuario, en viewport de iPhone y con eventos táctiles reales.

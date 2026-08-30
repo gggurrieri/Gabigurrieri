@@ -108,7 +108,12 @@ const db = p => p.evaluate(() => JSON.parse(localStorage.getItem('desafio90_v1')
   check('la marca sobrevive a recargar', marcadas===1, `n=${marcadas}`);
 
   // ─────────── F · importar Salud con el perfil recién creado ───────────
-  console.log('\nF · Importar Salud sin tocar la fecha de inicio (caso del primer uso)');
+  console.log('\nF · Importar Salud con parte del historial fuera de rango');
+  // Fecha fija a propósito: los fixtures tienen fechas fijas, y anclar esto a
+  // "hoy" hacía que el caso dejara de reproducirse con solo cambiar de día.
+  await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('desafio90_v1'));
+    d.profile.startDate = '2026-08-20'; localStorage.setItem('desafio90_v1', JSON.stringify(d)); });
+  await p.reload(); await p.waitForTimeout(400);
   await ir('log');
   await p.setInputFiles('#fileHealth', SP+'exportacion-es.zip');
   await p.waitForSelector('.import-note',{timeout:40000}); await p.waitForTimeout(300);

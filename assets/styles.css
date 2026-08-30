@@ -419,3 +419,18 @@ main{max-width:720px;margin:0 auto;padding:0 var(--sp)}
 .cant b{min-width:34px;text-align:center;font-size:13px;font-variant-numeric:tabular-nums}
 .plato-body b{cursor:pointer}
 .plato-body b::after{content:' ✎';opacity:.35;font-size:11px}
+
+/* ---------- aviso de copia ---------- */
+.aviso-copia{width:100%;text-align:left;border-color:#5a4415;background:#241d10;cursor:pointer}
+.aviso-copia i{background:var(--soga)}
+.aviso-copia b{color:var(--soga)}
+.aviso-exceso{border-color:#5a4415;background:#241d10}
+.aviso-exceso i{background:var(--soga)}
+.aviso-exceso b{color:var(--soga)}
+
+/* ---------- foto de la comida ---------- */
+.foto-fila{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:4px}
+.foto-fila img{width:62px;height:62px;object-fit:cover;border-radius:11px;display:block;
+  border:1px solid var(--line)}
+.plato-foto{width:46px;height:46px;object-fit:cover;border-radius:10px;flex:none;
+  border:1px solid var(--line)}

@@ -56,6 +56,7 @@
         <div class="card mini"><b id="statWeekMin">0'</b><span>minutos esta semana</span></div>
       </div>
       <div class="card hito-mini" id="hitoHoy" hidden></div>
+      <button class="card hito-mini aviso-copia" id="avisoCopia" type="button" hidden></button>
 
       <h2 class="section-title">Semana <span id="todayWeekNum">1</span> · <span id="todayBlock">—</span></h2>
       <p class="tip" id="todayTip"></p>
@@ -209,9 +210,16 @@
           <label>Carbohidratos (g)<input type="number" id="manCh" min="0" max="600" step="0.1"
                  inputmode="decimal" placeholder="opcional"></label>
         </div>
+        <div class="foto-fila">
+          <button class="btn" id="btnFoto" type="button">📷 Sacar o elegir foto</button>
+          <input type="file" id="manFoto" accept="image/*" capture="environment" hidden>
+          <img id="manFotoPrev" alt="" hidden>
+          <button class="btn" id="btnQuitarFoto" type="button" hidden>Quitar</button>
+        </div>
         <p class="muted small">Las calorías alcanzan. Si dejás los demás en blanco quedan en cero y la
         barra de proteína va a marcar menos de lo que comiste — cargala cuando la tengas a mano, que
-        suele estar en la etiqueta.</p>
+        suele estar en la etiqueta. <b>La foto no calcula nada</b>: queda como registro de lo que
+        comiste, que por sí solo ya ayuda a comer mejor.</p>
         <input type="hidden" id="manId">
         <div class="form-actions"><span></span>
           <button class="btn primary" type="submit" id="manGuardar">Agregar</button></div>
@@ -221,6 +229,8 @@
         <h2>Lo que más repetís</h2>
         <div class="chips-frec" id="frecuentes"></div>
       </div>
+
+      <div class="card hito-mini aviso-exceso" id="avisoCalorias" hidden></div>
 
       <div class="card">
         <div class="card-head"><h2>El día</h2><span class="muted small" id="comidaResto"></span></div>
@@ -406,6 +416,7 @@
 
       <div class="card">
         <h2>Tus datos</h2>
+        <p class="small" id="copiaEstado"></p>
         <p class="muted small">Todo se guarda solo en este navegador. Exportá de vez en cuando para no perder nada si cambiás de teléfono o limpiás el navegador.</p>
         <div class="btn-row">
           <button class="btn" id="btnExport">Exportar copia</button>
