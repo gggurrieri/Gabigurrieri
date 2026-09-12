@@ -174,6 +174,9 @@ const NOTAS = [
   { n:'Cedro de Virginia', f:'amaderada', d:'Cedro rojo americano: más seco y lapicero que el del Atlas.' },
   { n:'Ámbar', f:'ambar', d:'Genérica: el acorde cálido de resinas, vainilla y labdanum. Si la ficha aclara cuál, conviene precisarla.' },
   { n:'Flores', f:'floral', d:'Genérica: la ficha no aclara cuáles. Conviene reemplazarla por las que reconozcas.' },
+  { n:'Mango', f:'gourmand', d:'Fruta tropical, dulce y carnosa, con un fondo casi lácteo.' },
+  { n:'Abrótano', f:'aromatica', d:'Hierba de la familia del ajenjo, amarga y alcanforada, con aire de farmacia antigua.' },
+  { n:'Ajenjo', f:'aromatica', d:'La hierba de la absenta: amarga, anisada y medicinal. Prima directa de la artemisia.' },
   { n:'Vetiver de Haití', f:'amaderada', d:'Versión más limpia y ahumada de la raíz.' }
 ];
 
@@ -408,7 +411,10 @@ const CATALOGO = [
     estaciones:['otoño','invierno','primavera'], ocasiones:['trabajo','casual','evento'], momento:'ambos', longevidad:8, estela:3 },
   { casa:'Acqua di Parma', nombre:'Colonia', conc:'EDC', familia:'citrica',
     salida:['Bergamota','Limón','Naranja','Lavanda'], corazon:['Romero','Verbena','Rosa'], fondo:['Vetiver','Almizcle blanco','Pachulí','Sándalo'],
-    estaciones:['verano','primavera'], ocasiones:['trabajo','casual','evento'], momento:'dia', longevidad:5, estela:3 }
+    estaciones:['verano','primavera'], ocasiones:['trabajo','casual','evento'], momento:'dia', longevidad:5, estela:3 },
+  { casa:'Kenzo', nombre:'Homme Night', conc:'EDT', familia:'aromatica',
+    salida:['Cardamomo','Pomelo','Cilantro'], corazon:['Mango','Abrótano','Ajenjo','Geranio'], fondo:['Haba tonka','Vetiver','Guayaco'],
+    estaciones:['primavera','otoño'], ocasiones:['salida','casual','cita'], momento:'noche', longevidad:7, estela:3 }
 ];
 
 

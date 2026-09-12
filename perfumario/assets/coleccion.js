@@ -672,15 +672,28 @@ window.PERFUMARIO_COLECCION = {
       "casa": "Kenzo",
       "conc": "EDT",
       "familia": "ambar",
-      "salida": [],
-      "corazon": [],
-      "fondo": [],
+      "salida": [
+        "Cardamomo",
+        "Pomelo",
+        "Cilantro"
+      ],
+      "corazon": [
+        "Mango",
+        "Abrótano",
+        "Ajenjo",
+        "Geranio"
+      ],
+      "fondo": [
+        "Haba tonka",
+        "Vetiver",
+        "Guayaco"
+      ],
       "ml": 100,
       "mlRestante": 100,
       "precio": 0,
       "comprado": null,
-      "longevidad": 0,
-      "estela": 4,
+      "longevidad": 7,
+      "estela": 3,
       "estaciones": [
         "invierno",
         "otoño"
@@ -692,7 +705,7 @@ window.PERFUMARIO_COLECCION = {
       ],
       "momento": "noche",
       "rating": 0,
-      "nota": "Caja cerrada. La foto es del lateral sin los ml: falta la cara que los trae. Notas sin confirmar."
+      "nota": "Pirámide cargada de la ficha que me pasaste (toronja = pomelo, madera de gaiac = guayaco). Ojo: vos lo pusiste en ámbar especiado y la fuente lo lista como aromático y tropical. Dejé tu clasificación; cambiala si querés que mande la otra."
     },
     {
       "id": "col00k",
