@@ -48,6 +48,9 @@ inicio". Queda como una app nativa y funciona sin señal.
 
 ## Cómo decide qué recomendarte
 
+El número grande de cada tarjeta es el **puntaje**, de 0 a 100, y lleva su
+etiqueta debajo: sirve para comparar entre ellos, no como nota absoluta.
+
 Cada perfume arranca en 50 puntos y suma o resta según el contexto. La idea es que
 **ninguna sugerencia aparezca sin explicación**: debajo de cada una se listan las
 tres razones que más pesaron.
@@ -267,7 +270,7 @@ mano, que la ciudad se encuentre sin red y que falle sin romper nada) y la
 colección incluida (que entre sola, que no
 resucite después de borrarla y que no se duplique), la corrección de un uso con
 su recálculo de ml, el aprendizaje por temperatura y la descarga de la copia.
-143 comprobaciones, incluidos candados que fallan si alguna nota usada en una
+144 comprobaciones, incluidos candados que fallan si alguna nota usada en una
 ficha quedó sin explicación en el diccionario, o si el ícono de "Agregar a
 pantalla de inicio" vuelve a quedar liso (ya pasó una vez: salía negro).
 

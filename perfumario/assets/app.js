@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-09-12.6';
+const VERSION = '2026-09-12.7';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -692,7 +692,9 @@ function fichaSugerencia(s, i) {
         <div class="pf-house">${esc(p.casa)}${p.conc ? ' · ' + esc(p.conc) : ''}</div>
         <ul class="razones">${razones}</ul>
       </div>
-      <div class="pf-right"><div class="pf-score">${s.score}</div>${p.ml > 0 ? pct + ' %' : ''}</div>
+      <div class="pf-right">
+        <div class="pf-score">${s.score}</div><div class="pf-score-cap">puntaje</div>
+        ${p.ml > 0 ? `<div>${pct} %</div>` : ''}</div>
     </div>
     <div class="btn-row">
       <button class="btn btn-accent" data-usar="${p.id}">Me lo pongo</button>
@@ -991,13 +993,15 @@ function pintarValija(dias, ocasiones, cuantos, opciones) {
         </div>
         ${alertas.map(a => `<div class="alerta">${esc(a)}</div>`).join('')}
       </div>
-      <div class="pf-right"><div class="pf-score">${Math.round(e.prom)}</div></div>
+      <div class="pf-right">
+        <div class="pf-score">${Math.round(e.prom)}</div><div class="pf-score-cap">puntaje</div></div>
     </div>`;
   }).join('');
 
   $('#vSalida').innerHTML = resumen + `<div class="valija">${tarjetas ||
     '<div class="vacio">Ninguno de tu colección sirve para ese viaje.</div>'}</div>
-    <p class="hint">Se eligen por cobertura: el segundo es el que tapa lo que el primero deja afuera, no el segundo de la lista.${
+    <p class="hint">El puntaje va de 0 a 100 y es el promedio de todos los días y ocasiones del viaje: sirve para comparar entre ellos, no como nota.
+    Se eligen por cobertura: el segundo es el que tapa lo que el primero deja afuera, no el segundo de la lista.${
       elegidos.length > porCobertura ? ` Con ${porCobertura} te alcanzaba para todo el viaje; el resto va por gusto.` : ''}${
       elegidos.length < cuantos ? ` Te muestro ${elegidos.length} y no ${cuantos}: el resto de tu colección no suma nada para este viaje.` : ''}</p>`;
 }
@@ -1704,7 +1708,7 @@ function renderParecidos() {
         <div class="it-name">${esc(x.p.nombre)}</div>
         <div class="it-sub">Comparten ${x.comunes.length}: ${esc(x.comunes.slice(0, 4).join(', '))}</div>
       </div>
-      <div class="pf-score">${x.pct}%</div>
+      <div class="pf-right"><div class="pf-score">${x.pct}%</div><div class="pf-score-cap">parecido</div></div>
     </div>`).join('')
     : `<div class="vacio">No comparte notas con ningún otro de tu colección: es tu perfume más original.</div>`;
 }
@@ -1760,7 +1764,7 @@ function renderUso() {
   $('#listaAcabando').innerHTML = acabando.map(p => `<div class="item" data-ficha="${p.id}" role="button" tabindex="0">
     <div class="it-main"><div class="it-name">${esc(p.nombre)}</div>
       <div class="it-sub">${Math.round(p.mlRestante)} ml · ${porcRestante(p)} % del frasco</div></div>
-    <div class="pf-score">${porcRestante(p)}%</div></div>`).join('');
+    <div class="pf-right"><div class="pf-score">${porcRestante(p)}%</div><div class="pf-score-cap">del frasco</div></div></div>`).join('');
 
   const hist = S.usos.slice().sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 20);
   $('#historialUsos').innerHTML = hist.length ? hist.map(u => {

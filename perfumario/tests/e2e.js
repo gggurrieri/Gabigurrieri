@@ -133,6 +133,8 @@ const check = (n, c, d = '') => {
   await ir('hoy');
   check('sugiere tres', await cuantos('#sugerencias article.card') === 3);
   check('muestra un puntaje', /^\d+$/.test((await p.textContent('#sugerencias .pf-score')).trim()));
+  check('y dice que es un puntaje',
+    (await p.textContent('#sugerencias .pf-score-cap')).trim() === 'puntaje');
   check('explica por qué', await cuantos('#sugerencias .razones li') >= 3);
   check('dice en qué estación estamos', /(verano|otoño|invierno|primavera)/.test(await p.textContent('#contextoResumen')));
   check('ahora avisa de la copia', await visible('#avisoCopia'));

@@ -181,6 +181,8 @@ button.item{width:100%;text-align:left;cursor:pointer;font:inherit}
 .pf-bar i{display:block;height:100%;background:var(--accent);border-radius:99px}
 .pf-right{text-align:right;flex:none;font-size:11.5px;color:var(--muted)}
 .pf-score{font-family:var(--display);font-size:20px;color:var(--accent);line-height:1}
+/* un número sin etiqueta obliga a adivinar qué mide */
+.pf-score-cap{font-size:10px;color:var(--muted);letter-spacing:.2px;margin-top:2px}
 .stars{color:var(--accent);font-size:12px;letter-spacing:1px}
 
 .razones{margin:8px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
