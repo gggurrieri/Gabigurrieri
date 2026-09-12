@@ -436,13 +436,13 @@ window.PERFUMARIO_COLECCION = {
       "creado": "2026-09-12",
       "nombre": "Punto",
       "casa": "Blind",
-      "conc": "EDT",
+      "conc": "EDP",
       "familia": "aromatica",
       "salida": [],
       "corazon": [],
       "fondo": [],
-      "ml": 2,
-      "mlRestante": 2,
+      "ml": 10,
+      "mlRestante": 5,
       "precio": 0,
       "comprado": null,
       "longevidad": 0,
@@ -458,7 +458,7 @@ window.PERFUMARIO_COLECCION = {
       ],
       "momento": "ambos",
       "rating": 0,
-      "nota": "Muestra. Notas a completar."
+      "nota": "Vial de decant. Tamaño y nivel estimados de la foto: confirmá si el vidrio trae la medida. Notas sin confirmar."
     },
     {
       "id": "col00d",
@@ -535,13 +535,13 @@ window.PERFUMARIO_COLECCION = {
       "creado": "2026-09-12",
       "nombre": "Candombe",
       "casa": "Blind",
-      "conc": "EDT",
+      "conc": "EDP",
       "familia": "amaderada",
       "salida": [],
       "corazon": [],
       "fondo": [],
-      "ml": 2,
-      "mlRestante": 2,
+      "ml": 10,
+      "mlRestante": 6,
       "precio": 0,
       "comprado": null,
       "longevidad": 0,
@@ -557,7 +557,7 @@ window.PERFUMARIO_COLECCION = {
       ],
       "momento": "ambos",
       "rating": 0,
-      "nota": "Muestra. Notas a completar."
+      "nota": "Vial de decant. Tamaño y nivel estimados de la foto: confirmá si el vidrio trae la medida. Notas sin confirmar."
     },
     {
       "id": "col00g",
@@ -657,7 +657,7 @@ window.PERFUMARIO_COLECCION = {
       ],
       "momento": "noche",
       "rating": 0,
-      "nota": "Notas a completar: no las tengo confirmadas."
+      "nota": "Caja cerrada. La foto es del lateral sin los ml: falta la cara que los trae. Notas sin confirmar."
     },
     {
       "id": "col00j",
