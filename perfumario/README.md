@@ -191,6 +191,9 @@ perfumario/
 │   ├── coleccion.js    la colección que viene cargada de fábrica
 │   ├── styles.css      estilos
 │   └── icon*.png/svg   el ícono
+├── tools/
+│   ├── build-artifact.sh   arma la versión de un solo archivo
+│   └── generar-iconos.js   rasteriza el SVG a los PNG que pide iOS
 └── tests/e2e.js        prueba de punta a punta
 ```
 
@@ -223,8 +226,9 @@ mano, que la ciudad se encuentre sin red y que falle sin romper nada) y la
 colección incluida (que entre sola, que no
 resucite después de borrarla y que no se duplique), la corrección de un uso con
 su recálculo de ml, el aprendizaje por temperatura y la descarga de la copia.
-122 comprobaciones, incluido un candado que falla si alguna nota usada en una
-ficha quedó sin explicación en el diccionario.
+123 comprobaciones, incluidos candados que fallan si alguna nota usada en una
+ficha quedó sin explicación en el diccionario, o si el ícono de "Agregar a
+pantalla de inicio" vuelve a quedar liso (ya pasó una vez: salía negro).
 
 ```
 node perfumario/tests/e2e.js      # sale con código 1 si algo falla
