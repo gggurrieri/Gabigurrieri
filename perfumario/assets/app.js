@@ -96,7 +96,7 @@ const estacionHoy = () => estacionDe(today());
 /* temperatura en la que cada familia luce mejor; se usa para penalizar
    un gourmand a 35° o un cítrico a 4° */
 const TEMP_IDEAL = {
-  citrica: 27, acuatica: 27, verde: 22, floral: 21, aromatica: 19,
+  citrica: 27, acuatica: 27, verde: 22, floral: 21, almizclada: 20, aromatica: 19,
   amaderada: 16, chipre: 15, cuero: 11, ambar: 10, gourmand: 9
 };
 
@@ -496,6 +496,14 @@ function estrellas(n) {
   return '★★★★★'.slice(0, r) + '☆☆☆☆☆'.slice(0, 5 - r);
 }
 
+/* Un perfume sin familia o sin notas no participa del perfil olfativo, de los
+   parecidos ni de lo que se aprende de las notas: conviene que se vea. */
+function etiquetaFamilia(p, f) {
+  if (!p.familia) return '❓ completar familia';
+  if (!notasDe(p).length) return `${esc(f.nombre)} · ❓ completar notas`;
+  return esc(f.nombre);
+}
+
 function fichaLista(p) {
   const f = familia(p.familia);
   const pct = porcRestante(p);
@@ -508,7 +516,7 @@ function fichaLista(p) {
       <div class="pf-name">${esc(p.nombre)}</div>
       <div class="pf-house">${esc(p.casa)}${p.conc ? ' · ' + esc(p.conc) : ''}</div>
       <div class="pf-meta">
-        <span class="pill fam" style="border-color:${f.color}55">${p.familia ? esc(f.nombre) : '❓ completar'}</span>
+        <span class="pill fam" style="border-color:${f.color}55">${etiquetaFamilia(p, f)}</span>
         <span class="pill">${n} uso${n === 1 ? '' : 's'}</span>
         <span class="pill">${ult ? fmtHace(ult) : 'sin estrenar'}</span>
         ${cpu != null ? `<span class="pill">${S.ajustes.moneda}${Math.round(cpu).toLocaleString('es-AR')}/uso</span>` : ''}
@@ -740,11 +748,11 @@ function buscarEnCatalogo(linea) {
   if (!n) return null;
   const exacto = D.CATALOGO.find(c => normaliza(c.nombre) === n || normaliza(c.casa + ' ' + c.nombre) === n);
   if (exacto) return { c: exacto, exacto: true };
-  const parecido = D.CATALOGO.find(c => {
+  const parecidos = D.CATALOGO.filter(c => {
     const nn = normaliza(c.nombre);
     return nn.length >= 4 && (n.includes(nn) || nn.includes(n));
-  });
-  return parecido ? { c: parecido, exacto: false } : null;
+  }).sort((a, b) => normaliza(b.nombre).length - normaliza(a.nombre).length);
+  return parecidos.length ? { c: parecidos[0], exacto: false } : null;
 }
 
 function parsearLote(texto) {

@@ -22,7 +22,7 @@ inicio". Queda como una app nativa y funciona sin señal.
 |---|---|
 | **Hoy** | Elegís temperatura, momento del día y ocasión, y te propone tres perfumes con un puntaje y las razones de cada uno. Un toque para registrar que te lo pusiste. |
 | **Colección** | Alta, edición y borrado de perfumes con casa, concentración, familia, pirámide de notas, ml, precio, estaciones, ocasiones, duración, estela y puntaje. Buscador por nombre, casa o **nota**, filtro por familia y siete criterios de orden. **Carga rápida** para pegar una lista entera de una vez. |
-| **Notas** | Diccionario de 90 notas y 10 familias explicadas, tu perfil olfativo (qué tenés contra qué usás) y comparador de parecidos entre perfumes de tu colección. |
+| **Notas** | Diccionario de 96 notas y 11 familias explicadas, tu perfil olfativo (qué tenés contra qué usás) y comparador de parecidos entre perfumes de tu colección. |
 | **Uso** | Usos del mes, ml gastados, el más puesto, costo por uso, rotación de los últimos 90 días, los que juntan polvo, los que se están por acabar e historial. |
 | **Ajustes** | ml por aplicación, moneda, hemisferio, exportar/importar/borrar y seis perfumes de ejemplo para mirar la app con contenido. |
 
@@ -76,12 +76,14 @@ Tres decisiones de producto detrás de esto:
 ## Cargar muchos perfumes de una vez
 
 **Colección → ⚡ Carga rápida**: pegás un nombre por línea y busca cada uno
-contra el catálogo de 62 fragancias, ignorando acentos, puntuación y la
+contra el catálogo de 73 fragancias, ignorando acentos, puntuación y la
 concentración (`Acqua di Gio EDT` y `acqua di giò` son lo mismo). Antes de
 agregar nada muestra qué reconoció (✓ exacto, ≈ parecido), qué ya tenías y qué
 no encontró. Lo que no está en el catálogo entra igual con el nombre y queda
-marcado como **❓ completar**: no se le inventa una familia, porque un dato
-falso ensucia el perfil olfativo y las sugerencias.
+marcado como **❓ completar familia**: no se le inventa una, porque un dato
+falso ensucia el perfil olfativo y las sugerencias. Lo mismo con las notas: un
+perfume sin pirámide queda marcado **❓ completar notas**, porque sin ellas no
+entra en los parecidos ni en el perfil.
 
 Opcional, separado con barras: `Nombre | ml | precio`.
 
