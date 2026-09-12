@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-09-12.9';
+const VERSION = '2026-09-12.10';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -168,7 +168,7 @@ const MOMENTOS = { dia: 'Día', noche: 'Noche', ambos: 'Día y noche' };
    mano: el clima es una comodidad, no un requisito.                    */
 const CLIMA_API = 'https://api.open-meteo.com/v1/forecast';
 const GEO_API = 'https://geocoding-api.open-meteo.com/v1/search';
-const CLIMA_VIGENCIA = 30; // minutos que vale un dato antes de volver a pedirlo
+const CLIMA_VIGENCIA = 15; // minutos que vale un dato antes de volver a pedirlo
 
 /* códigos WMO, que es lo que devuelve la API */
 const WMO = {
@@ -224,13 +224,17 @@ function traerClima(forzar) {
   climaPidiendo = true;
   climaEstado('Consultando el clima…');
   const url = `${CLIMA_API}?latitude=${encodeURIComponent(lugar.lat)}&longitude=${encodeURIComponent(lugar.lon)}` +
-    '&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=auto';
+    '&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m&timezone=auto';
 
   return pedirJSON(url).then(d => {
     const c = d && d.current;
     if (!c || typeof c.temperature_2m !== 'number') throw new Error('respuesta sin temperatura');
     S.meta.clima = {
-      temp: c.temperature_2m, humedad: c.relative_humidity_2m,
+      temp: c.temperature_2m,
+      /* La sensación térmica es lo que la piel recibe de verdad: ya tiene
+         adentro el viento y la humedad. Es la que se usa para puntuar. */
+      sensacion: (typeof c.apparent_temperature === 'number') ? c.apparent_temperature : c.temperature_2m,
+      humedad: c.relative_humidity_2m,
       codigo: c.weather_code, viento: c.wind_speed_10m,
       lugar: lugar.nombre, ts: new Date().toISOString()
     };
@@ -249,7 +253,7 @@ function traerClima(forzar) {
 function aplicarTempDelClima() {
   const c = S.meta.clima;
   if (!S.ajustes.clima || !c || ctx.manual) return;
-  ctx.temp = c.temp;
+  ctx.temp = (typeof c.sensacion === 'number') ? c.sensacion : c.temp;
 }
 
 function climaEstado(txt) {
@@ -468,7 +472,10 @@ function contextoActual() {
   const cl = climaParaPuntaje();
   return {
     temp: ctx.temp, momento: ctx.momento, ocasion: ctx.ocasion,
-    estacion: estacionHoy(), lluvia: !!(cl && estaLloviendo(cl.codigo))
+    estacion: estacionHoy(),
+    lluvia: !!(cl && estaLloviendo(cl.codigo)),
+    humedad: cl ? cl.humedad : null,
+    viento: cl ? cl.viento : null
   };
 }
 
@@ -555,6 +562,28 @@ function puntuar(p, m, c) {
     const dur = p.longevidad || 0;
     if (dur >= 8) { score += 6; razones.push({ txt: 'Llueve y este aguanta', bien: true, clima: true }); }
     else if (dur && dur <= 5) { score -= 6; razones.push({ txt: 'Con lluvia, uno tan liviano se va enseguida', bien: false, clima: true }); }
+  }
+
+  /* Humedad y viento cambian cómo se comporta un perfume en la piel, no solo
+     cómo se siente el día: con humedad alta proyecta más de lo que uno quiere,
+     con aire seco se evapora antes, y con viento la estela liviana no llega a
+     ningún lado. Venían en la respuesta del clima y no se usaban. */
+  const estelaP = p.estela || 3;
+  const duraP = p.longevidad || 0;
+
+  if (typeof c.humedad === 'number') {
+    if (c.humedad >= 75) {
+      if (estelaP >= 4) { score -= 6; razones.push({ txt: `Con ${Math.round(c.humedad)} % de humedad va a proyectar de más`, bien: false, clima: true }); }
+      else if (estelaP <= 2) { score += 4; razones.push({ txt: 'La humedad lo va a levantar justo lo necesario', bien: true, clima: true }); }
+    } else if (c.humedad <= 30) {
+      if (duraP >= 8) { score += 5; razones.push({ txt: 'Con el aire seco, este igual aguanta', bien: true, clima: true }); }
+      else if (duraP && duraP <= 5) { score -= 4; razones.push({ txt: 'Con el aire seco se evapora enseguida', bien: false, clima: true }); }
+    }
+  }
+
+  if (typeof c.viento === 'number' && c.viento >= 25) {
+    if (estelaP >= 4) { score += 5; razones.push({ txt: `Con viento de ${Math.round(c.viento)} km/h, este se sostiene`, bien: true, clima: true }); }
+    else if (estelaP <= 2) { score -= 5; razones.push({ txt: `Con viento de ${Math.round(c.viento)} km/h no se va a sentir`, bien: false, clima: true }); }
   }
 
   // lo aprendido de tus elecciones anteriores
@@ -678,14 +707,20 @@ function renderClima() {
   if (!c) { l.textContent = 'Consultando el clima…'; return; }
   const [txt, emo] = describirClima(c.codigo);
   const mins = minutosDesde(c.ts);
+  const sens = (typeof c.sensacion === 'number') ? c.sensacion : c.temp;
+  const difSens = Math.abs(sens - c.temp) >= 2;
   l.innerHTML =
-    `${emo} <b>${Math.round(c.temp)}°</b> · ${esc(txt)} en ${esc(c.lugar)} · ` +
+    `${emo} <b>${Math.round(sens)}°</b>${difSens ? ' de sensación' : ''} · ${esc(txt)} en ${esc(c.lugar)} · ` +
     `${mins < 1 ? 'recién' : 'hace ' + mins + ' min'} ` +
     `<button class="link" id="btnRefrescarClima">Actualizar</button>` +
-    (ctx.manual ? ` <span class="hint">· estás usando ${Math.round(ctx.temp)}° a mano</span>` : '') +
-    (c.humedad >= 70 ? `<div class="hint">Humedad ${c.humedad} %: proyecta más de lo normal, con dos aplicaciones alcanza.</div>` : '') +
+    `<div class="hint">${difSens ? `Real ${Math.round(c.temp)}° · ` : ''}humedad ${c.humedad} %` +
+      (typeof c.viento === 'number' ? ` · viento ${Math.round(c.viento)} km/h` : '') +
+      `. Todo esto entra en el puntaje.</div>` +
+    (ctx.manual ? `<div class="hint">Estás usando ${Math.round(ctx.temp)}° a mano: la humedad y el viento igual cuentan.</div>` : '') +
+    (c.humedad >= 75 ? `<div class="hint">Humedad alta: los de mucha estela proyectan más de lo que querés.</div>` : '') +
+    (c.humedad <= 30 ? `<div class="hint">Aire seco: los livianos se evaporan antes.</div>` : '') +
     (estaLloviendo(c.codigo) ? `<div class="hint">Llueve: los frescos livianos se van enseguida.</div>` : '') +
-    (c.viento >= 25 ? `<div class="hint">Viento de ${Math.round(c.viento)} km/h: la estela se dispersa, podés sumar una aplicación.</div>` : '');
+    (c.viento >= 25 ? `<div class="hint">Viento fuerte: la estela se dispersa.</div>` : '');
 }
 
 /* Tres tarjetas con el mismo puntaje y las mismas razones no son una
@@ -900,16 +935,25 @@ function armarValija(tempAMano) {
 
   salida.innerHTML = '<p class="hint">Buscando el pronóstico del destino…</p>';
   const url = `${CLIMA_API}?latitude=${viaje.lugar.lat}&longitude=${viaje.lugar.lon}` +
-    '&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code&timezone=auto' +
+    '&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,' +
+    'relative_humidity_2m_mean,wind_speed_10m_max,precipitation_sum,weather_code&timezone=auto' +
     `&start_date=${desde}&end_date=${hasta}`;
 
   pedirJSON(url, 12000).then(d => {
     const dd = d && d.daily;
     if (!dd || !dd.time || !dd.time.length) throw new Error('sin pronóstico');
+    /* Igual que en Hoy: para decidir manda la sensación térmica, que ya trae
+       adentro el viento y la humedad. Si el destino no la devuelve, se cae a
+       la temperatura real. */
+    const sens = (arr, i, respaldo) =>
+      (arr && typeof arr[i] === 'number') ? arr[i] : respaldo;
     const dias = dd.time.map((f, i) => ({
       fecha: f,
-      media: (dd.temperature_2m_max[i] + dd.temperature_2m_min[i]) / 2,
+      media: (sens(dd.apparent_temperature_max, i, dd.temperature_2m_max[i]) +
+              sens(dd.apparent_temperature_min, i, dd.temperature_2m_min[i])) / 2,
       max: dd.temperature_2m_max[i], min: dd.temperature_2m_min[i],
+      humedad: dd.relative_humidity_2m_mean ? dd.relative_humidity_2m_mean[i] : null,
+      viento: dd.wind_speed_10m_max ? dd.wind_speed_10m_max[i] : null,
       lluvia: (dd.precipitation_sum[i] || 0) >= 1 || estaLloviendo(dd.weather_code[i])
     }));
     pintarValija(dias, ocasiones, cuantos, { estimado: false });
@@ -944,6 +988,7 @@ function pintarValija(dias, ocasiones, cuantos, opciones) {
   const puntajes = candidatos.map(p => casillas.map(cs => puntuar(p, m, {
     temp: cs.dia.media, ocasion: cs.oc, momento: 'ambos',
     estacion: estacionDe(cs.dia.fecha, hemi), lluvia: cs.dia.lluvia,
+    humedad: cs.dia.humedad, viento: cs.dia.viento,
     sinMomento: true, sinRotacion: true
   }).score));
 
@@ -997,6 +1042,9 @@ function pintarValija(dias, ocasiones, cuantos, opciones) {
 
   const temps = dias.map(d => d.media);
   const conLluvia = dias.filter(d => d.lluvia).length;
+  const humedades = dias.map(d => d.humedad).filter(h => typeof h === 'number');
+  const humedadMedia = humedades.length
+    ? Math.round(humedades.reduce((a, b) => a + b, 0) / humedades.length) : null;
   const estacionAllá = estacionDe(dias[0].fecha, hemi);
   const mlPorDia = 3 * S.ajustes.mlSpray;
 
@@ -1005,7 +1053,9 @@ function pintarValija(dias, ocasiones, cuantos, opciones) {
     del ${fmtFecha(dias[0].fecha)} al ${fmtFecha(dias[dias.length - 1].fecha)}.<br>
     ${opciones.estimado
       ? `Sin pronóstico: calculado con <b>${Math.round(temps[0])}°</b> que pusiste vos.`
-      : `De <b>${Math.round(Math.min.apply(null, dias.map(d => d.min)))}°</b> a <b>${Math.round(Math.max.apply(null, dias.map(d => d.max)))}°</b>${conLluvia ? `, con lluvia ${conLluvia} día${conLluvia === 1 ? '' : 's'}` : ', sin lluvia'}.`}
+      : `De <b>${Math.round(Math.min.apply(null, dias.map(d => d.min)))}°</b> a <b>${Math.round(Math.max.apply(null, dias.map(d => d.max)))}°</b>` +
+        `${conLluvia ? `, con lluvia ${conLluvia} día${conLluvia === 1 ? '' : 's'}` : ', sin lluvia'}` +
+        `${humedadMedia != null ? `, humedad ${humedadMedia} %` : ''}. Decido por la sensación térmica.`}
     Allá es <b>${nombreEstacion(estacionAllá)}</b>.
   </div>`;
 

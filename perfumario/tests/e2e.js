@@ -372,7 +372,7 @@ const check = (n, c, d = '') => {
   let climaFalla = false;
   const respuesta = cuerpo => ({ status: 200, contentType: 'application/json',
     headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(cuerpo) });
-  let llamadasGeo = 0, climaCodigo = 3, climaViento = 8, viajeFalla = false;
+  let llamadasGeo = 0, climaCodigo = 3, climaViento = 8, climaHumedad = 80, viajeFalla = false;
   await p.route('**/geocoding-api.open-meteo.com/**', r => {
     llamadasGeo++;
     return r.fulfill(respuesta({
@@ -393,12 +393,16 @@ const check = (n, c, d = '') => {
         time: dias,
         temperature_2m_max: dias.map((_, i) => 8 + (i % 3)),
         temperature_2m_min: dias.map(() => -1),
+        apparent_temperature_max: dias.map((_, i) => 5 + (i % 3)),
+        apparent_temperature_min: dias.map(() => -5),
+        relative_humidity_2m_mean: dias.map(() => 78),
+        wind_speed_10m_max: dias.map(() => 32),
         precipitation_sum: dias.map((_, i) => (i === 1 ? 6 : 0)),
         weather_code: dias.map((_, i) => (i === 1 ? 63 : 1))
       } }));
     }
-    return r.fulfill(respuesta({ current: { temperature_2m: 11.3, relative_humidity_2m: 80,
-      weather_code: climaCodigo, wind_speed_10m: climaViento } }));
+    return r.fulfill(respuesta({ current: { temperature_2m: 11.3, apparent_temperature: 8.2,
+      relative_humidity_2m: climaHumedad, weather_code: climaCodigo, wind_speed_10m: climaViento } }));
   });
 
   await p.tap('#btnSettings'); await p.waitForTimeout(250);
@@ -450,12 +454,19 @@ const check = (n, c, d = '') => {
   check('prende el clima solo', d.ajustes.clima === true);
   check('trae la temperatura', !!d.meta.clima && Math.round(d.meta.clima.temp) === 11,
     JSON.stringify(d.meta.clima));
+  check('y también la sensación térmica', Math.round(d.meta.clima.sensacion) === 8,
+    String(d.meta.clima.sensacion));
 
   await ir('hoy');
   const linea = await p.textContent('#climaLinea');
   check('la muestra en Hoy', /Nublado en Rosario/.test(linea), linea.replace(/\s+/g, ' ').slice(0, 70));
-  check('la aplica al contexto', (await p.textContent('#ctxTempOut')) === '11°');
-  check('avisa cuando hay humedad alta', /Humedad 80/.test(linea));
+  check('decide por la sensación, no por la temperatura al sol',
+    (await p.textContent('#ctxTempOut')) === '8°', await p.textContent('#ctxTempOut'));
+  check('muestra la real al lado', /Real 11°/.test(linea), linea.replace(/\s+/g, ' ').slice(0, 80));
+  check('y avisa por la humedad alta', /Humedad alta/.test(linea));
+  check('la humedad entra en las razones',
+    /humedad va a proyectar de más|humedad lo va a levantar/.test(await p.textContent('#sugerencias')),
+    (await p.textContent('#sugerencias')).replace(/\s+/g, ' ').slice(0, 90));
 
   await p.evaluate(() => {
     const s = document.querySelector('#ctxTemp');
@@ -467,14 +478,28 @@ const check = (n, c, d = '') => {
   check('lo que ponés a mano le gana a la API', (await p.textContent('#ctxTempOut')) === '31°');
   check('y lo dice', /a mano/.test(await p.textContent('#climaLinea')));
   await p.tap('#btnRefrescarClima'); await p.waitForTimeout(600);
-  check('actualizar vuelve al dato real', (await p.textContent('#ctxTempOut')) === '11°');
+  check('actualizar vuelve al dato real', (await p.textContent('#ctxTempOut')) === '8°');
+
+  // aire seco: cambia a quién conviene
+  climaHumedad = 22;
+  await p.tap('#btnRefrescarClima'); await p.waitForTimeout(700);
+  check('con aire seco lo dice', /Aire seco/.test(await p.textContent('#climaLinea')));
+  check('y lo usa para elegir',
+    /aire seco/i.test(await p.textContent('#sugerencias')),
+    (await p.textContent('#sugerencias')).replace(/\s+/g, ' ').slice(0, 90));
+  climaHumedad = 80;
+  await p.tap('#btnRefrescarClima'); await p.waitForTimeout(600);
 
   // llueve y sopla: el dato ya estaba y no se usaba
   climaCodigo = 63; climaViento = 30;
   await p.tap('#btnRefrescarClima'); await p.waitForTimeout(700);
   const conLluvia = await p.textContent('#climaLinea');
   check('avisa que llueve', /Llueve: los frescos livianos/.test(conLluvia), conLluvia.replace(/\s+/g,' ').slice(0,70));
-  check('y que hay viento', /Viento de 30 km\/h/.test(conLluvia));
+  check('y que hay viento', /viento 30 km\/h/i.test(conLluvia) && /Viento fuerte/.test(conLluvia),
+    conLluvia.replace(/\s+/g, ' ').slice(0, 110));
+  check('el viento entra en las razones de las sugerencias',
+    /viento de 30 km\/h/i.test(await p.textContent('#sugerencias')),
+    (await p.textContent('#sugerencias')).replace(/\s+/g, ' ').slice(0, 90));
   check('la lluvia entra en las razones de las sugerencias',
     /Llueve y este aguanta|se va enseguida/.test(await p.textContent('#sugerencias')),
     (await p.textContent('#sugerencias')).replace(/\s+/g, ' ').slice(0, 90));
@@ -511,6 +536,9 @@ const check = (n, c, d = '') => {
   check('resume el viaje con el pronóstico real', /5 días/.test(resumen) && /-1°/.test(resumen), resumen.replace(/\s+/g,' ').slice(0,110));
   check('cuenta los días de lluvia', /lluvia 1 día/.test(resumen), resumen.replace(/\s+/g,' ').slice(0,110));
   check('dice en qué estación está el destino', /invierno|primavera|verano|otoño/.test(resumen));
+  check('el viaje también decide por la sensación térmica',
+    /Decido por la sensación térmica/.test(resumen) && /humedad 78 %/.test(resumen),
+    resumen.replace(/\s+/g, ' ').slice(0, 130));
   check('elige dos perfumes', await cuantos('.valija .pf') === 2);
   check('dice cuántos días cubre cada uno o que va de compañía',
     /de 5 días|de compañía/.test(await p.textContent('.valija')));

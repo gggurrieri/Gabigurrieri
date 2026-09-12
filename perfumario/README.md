@@ -58,7 +58,9 @@ tres razones que más pesaron.
 | Qué mira | Cómo pesa |
 |---|---|
 | Estación actual | +18 si coincide, −12 si lo marcaste para otra, **pesado por la temperatura** (ver abajo) |
-| Temperatura contra la familia | hasta −20, según cuánto se aleje del ideal de esa familia (un gourmand a 35° pierde, un cítrico a 5° también) |
+| Temperatura contra la familia | hasta −20, según cuánto se aleje del ideal de esa familia (un gourmand a 35° pierde, un cítrico a 5° también). Es la **sensación térmica**, no la del termómetro al sol |
+| Humedad | con 75 % o más: −6 a los de mucha estela, +4 a los discretos. Con 30 % o menos: +5 a los que duran, −4 a los que se evaporan |
+| Viento | desde 25 km/h: +5 a los de estela fuerte, −5 a los discretos |
 | Momento del día | +12 si coincide, +4 si sirve para ambos, −10 si no |
 | Ocasión | +14 si la tiene marcada, −8 si no |
 | Estela contra el ambiente | −12 si deja mucha estela para la oficina o el gimnasio, +8 si la ocasión pide presencia |
@@ -153,10 +155,21 @@ publicar, hay que subir ese sello en los dos archivos.
 > elegís la ciudad de la lista incluida y seguís con la temperatura a mano.
 > Servida desde GitHub Pages, el clima y la ubicación funcionan normal.
 
-La app usa además lo que ya venía en la respuesta: con **humedad** de 70 % o más
-avisa que proyecta más y que con dos aplicaciones alcanza; con **lluvia** baja el
-puntaje de los que duran poco y lo sube el de los que aguantan; con **viento** de
-25 km/h o más avisa que la estela se dispersa.
+**Todo el clima entra en la decisión, no solo la temperatura.** La consulta trae
+sensación térmica, humedad, viento y estado del cielo, y las cuatro pesan:
+
+- **Sensación térmica en vez de temperatura.** Es lo que la piel recibe, y ya
+  tiene adentro el viento y la humedad. La pantalla muestra las dos ("1° de
+  sensación · real 6°") para que se entienda de dónde sale el número que decide.
+- **Humedad.** Con aire húmedo un perfume proyecta más de lo que uno quiere, y
+  con aire seco se evapora antes. En una noche de verano a 26°, Layton (estela 5)
+  es el segundo con 25 % de humedad y cae al cuarto con 88 %.
+- **Viento.** Desde 25 km/h la estela liviana no llega a ningún lado.
+- **Lluvia.** Sube el que aguanta, baja el liviano.
+
+El dato vale 15 minutos, así que "hoy a la noche" usa el clima de hace un rato,
+no el de la mañana. En el viaje pasa lo mismo por día: sensación térmica media,
+humedad media y viento máximo de cada jornada.
 
 ## Comparar dos, lado a lado
 
@@ -304,7 +317,7 @@ mano, que la ciudad se encuentre sin red y que falle sin romper nada) y la
 colección incluida (que entre sola, que no
 resucite después de borrarla y que no se duplique), la corrección de un uso con
 su recálculo de ml, el aprendizaje por temperatura y la descarga de la copia.
-154 comprobaciones, incluidos candados que fallan si alguna nota usada en una
+161 comprobaciones, incluidos candados que fallan si alguna nota usada en una
 ficha quedó sin explicación en el diccionario, o si el ícono de "Agregar a
 pantalla de inicio" vuelve a quedar liso (ya pasó una vez: salía negro).
 
