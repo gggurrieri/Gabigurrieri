@@ -660,45 +660,6 @@ window.PERFUMARIO_COLECCION = {
       "nota": "Caja cerrada. La foto es del lateral sin los ml: falta la cara que los trae. Notas sin confirmar."
     },
     {
-      "id": "col00j",
-      "creado": "2026-09-12",
-      "nombre": "Fahrenheit",
-      "casa": "Dior",
-      "conc": "EDT",
-      "familia": "cuero",
-      "salida": [
-        "Mandarina",
-        "Nuez moscada"
-      ],
-      "corazon": [
-        "Violeta",
-        "Madreselva",
-        "Cuero"
-      ],
-      "fondo": [
-        "Cuero",
-        "Haba tonka",
-        "Vetiver"
-      ],
-      "ml": 100,
-      "mlRestante": 100,
-      "precio": 0,
-      "comprado": null,
-      "longevidad": 8,
-      "estela": 4,
-      "estaciones": [
-        "otoño",
-        "invierno"
-      ],
-      "ocasiones": [
-        "evento",
-        "cita"
-      ],
-      "momento": "noche",
-      "rating": 0,
-      "nota": ""
-    },
-    {
       "id": "col00k",
       "creado": "2026-09-12",
       "nombre": "Ombré Leather",
@@ -814,6 +775,57 @@ window.PERFUMARIO_COLECCION = {
       "momento": "ambos",
       "rating": 0,
       "nota": "Tester."
+    },
+    {
+      "ml": 100,
+      "mlRestante": 100,
+      "precio": 0,
+      "comprado": null,
+      "longevidad": 0,
+      "estela": 3,
+      "rating": 0,
+      "salida": [],
+      "corazon": [],
+      "fondo": [],
+      "creado": "2026-09-12",
+      "id": "col023",
+      "nombre": "Bird of Paradise",
+      "casa": "Carolina Herrera",
+      "conc": "EDP",
+      "familia": null,
+      "estaciones": [],
+      "ocasiones": [],
+      "momento": "ambos",
+      "nota": "Recién agregado. Falta familia, notas y tamaño: cargalos y entra en todo lo demás."
+    },
+    {
+      "ml": 100,
+      "mlRestante": 100,
+      "precio": 0,
+      "comprado": null,
+      "longevidad": 6,
+      "estela": 3,
+      "rating": 0,
+      "salida": [],
+      "corazon": [],
+      "fondo": [],
+      "creado": "2026-09-12",
+      "id": "col024",
+      "nombre": "Homme Marine",
+      "casa": "Kenzo",
+      "conc": "EDT",
+      "familia": "acuatica",
+      "estaciones": [
+        "verano",
+        "primavera"
+      ],
+      "ocasiones": [
+        "casual",
+        "trabajo",
+        "deporte"
+      ],
+      "momento": "dia",
+      "nota": "Recién agregado. Familia tomada del propio nombre; notas y tamaño sin confirmar."
     }
   ]
 };
