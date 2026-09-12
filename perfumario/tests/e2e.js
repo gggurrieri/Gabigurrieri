@@ -361,6 +361,27 @@ const check = (n, c, d = '') => {
   check('explica el permiso denegado y ofrece salida',
     /no entregó la ubicación/.test(avisoUb) && /elegí tu ciudad/i.test(avisoUb), avisoUb.slice(0, 80));
   check('y no lo repite en un globito', await p.evaluate(() => document.querySelector('#toast').hidden));
+
+  // con permiso, la ubicación del dispositivo tiene que tener nombre
+  await p.evaluate(() => {
+    navigator.geolocation.getCurrentPosition = ok =>
+      ok({ coords: { latitude: -38.0055, longitude: -57.5426 } });   // Mar del Plata
+  });
+  await p.tap('#btnUbicacion'); await p.waitForTimeout(900);
+  const lugarGeo = (await db()).meta.lugar;
+  check('le pone nombre a la ubicación del GPS, no "Mi ubicación"',
+    !!lugarGeo && lugarGeo.nombre === 'Mar del Plata', JSON.stringify(lugarGeo));
+  check('y muestra las coordenadas guardadas',
+    /-38\.0\d+, -57\.5\d+/.test(await p.textContent('#lugarActual')), await p.textContent('#lugarActual'));
+
+  // en el medio del campo no inventa una ciudad
+  await p.evaluate(() => {
+    navigator.geolocation.getCurrentPosition = ok =>
+      ok({ coords: { latitude: -47.5, longitude: -70.5 } });          // Santa Cruz profunda
+  });
+  await p.tap('#btnUbicacion'); await p.waitForTimeout(900);
+  check('lejos de toda ciudad, muestra coordenadas',
+    /^-47\.50, -70\.50$/.test((await db()).meta.lugar.nombre), (await db()).meta.lugar.nombre);
   await p.fill('#buscaCiudad', 'Rosario'); await p.waitForTimeout(900);
   check('encuentra la ciudad', await cuantos('#ciudadResultados [data-lat]') === 1);
   check('sin consultar la API: la lista viaja en la app', llamadasGeo === 0, String(llamadasGeo));

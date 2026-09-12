@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-09-12.4';
+const VERSION = '2026-09-12.5';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -291,13 +291,42 @@ function fijarLugar(nombre, lat, lon) {
   traerClima(true);
 }
 
+/* Qué ciudad de la lista incluida cae más cerca de unas coordenadas.
+   Fórmula de Haversine: distancia sobre la esfera, que para estas escalas
+   alcanza y sobra. Sirve para ponerle nombre a la ubicación del dispositivo
+   sin mandársela a ningún servicio de geocodificación inversa. */
+function ciudadMasCercana(lat, lon) {
+  const R = 6371; // km
+  const rad = x => x * Math.PI / 180;
+  let mejor = null;
+  (D.CIUDADES || []).forEach(c => {
+    const dLat = rad(c.lat - lat), dLon = rad(c.lon - lon);
+    const a = Math.pow(Math.sin(dLat / 2), 2) +
+      Math.cos(rad(lat)) * Math.cos(rad(c.lat)) * Math.pow(Math.sin(dLon / 2), 2);
+    const km = 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+    if (!mejor || km < mejor.km) mejor = { c: c, km: Math.round(km) };
+  });
+  return mejor;
+}
+
+/* "Mi ubicación" no dice nada: el clima se lee mejor con un nombre. Si la
+   ciudad más cercana está lejos, se dice que es una referencia, y si no hay
+   ninguna cerca se muestran las coordenadas antes que inventar un lugar. */
+function nombrarUbicacion(lat, lon) {
+  const cerca = ciudadMasCercana(lat, lon);
+  if (cerca && cerca.km <= 20) return cerca.c.n;
+  if (cerca && cerca.km <= 90) return `cerca de ${cerca.c.n}`;
+  return `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+}
+
 function usarUbicacion() {
   if (!navigator.geolocation) { avisoUbicacion('Este navegador no da la ubicación.'); return; }
   avisoUbicacion('Buscando tu ubicación…');
   navigator.geolocation.getCurrentPosition(
     pos => {
       avisoUbicacion('');
-      fijarLugar('Mi ubicación', pos.coords.latitude.toFixed(3), pos.coords.longitude.toFixed(3));
+      const lat = pos.coords.latitude, lon = pos.coords.longitude;
+      fijarLugar(nombrarUbicacion(lat, lon), lat.toFixed(3), lon.toFixed(3));
     },
     err => avisoUbicacion(textoErrorUbicacion(err)),
     { timeout: 10000, maximumAge: 600000 }
@@ -1496,7 +1525,8 @@ function renderAjustes() {
   if (ver) ver.textContent = 'Versión ' + VERSION;
   const c = S.meta.clima;
   $('#lugarActual').textContent = S.meta.lugar
-    ? `${S.meta.lugar.nombre}${c ? ` · ${Math.round(c.temp)}° hace ${minutosDesde(c.ts)} min` : ' · todavía sin datos'}`
+    ? `${S.meta.lugar.nombre} (${S.meta.lugar.lat}, ${S.meta.lugar.lon})` +
+      (c ? ` · ${Math.round(c.temp)}° hace ${minutosDesde(c.ts)} min` : ' · todavía sin datos')
     : 'Sin ubicación: la temperatura se carga a mano.';
   const hay = !!(window.PERFUMARIO_COLECCION && (window.PERFUMARIO_COLECCION.perfumes || []).length);
   $('#btnMiColeccion').hidden = !hay;

@@ -103,6 +103,12 @@ Reglas que sigue:
   mano. El clima es una comodidad, no un requisito.
 - **Sale solo la ciudad.** Se envían las coordenadas elegidas y nada más: tu
   colección no viaja a ningún lado.
+- **La ubicación del dispositivo se nombra sin consultar a nadie.** En vez de
+  guardar un "Mi ubicación" que no dice nada, se busca la ciudad más cercana de
+  la lista incluida (distancia de Haversine): hasta 20 km se usa su nombre, hasta
+  90 km se aclara que es una referencia ("cerca de…") y más lejos se muestran las
+  coordenadas antes que inventar un lugar. No hay geocodificación inversa, así
+  que tus coordenadas exactas no salen del teléfono.
 - **El service worker no lo cachea.** Solo guarda los archivos propios; si
   cachearan el clima, la temperatura quedaría congelada en la primera consulta.
 
@@ -239,7 +245,7 @@ mano, que la ciudad se encuentre sin red y que falle sin romper nada) y la
 colección incluida (que entre sola, que no
 resucite después de borrarla y que no se duplique), la corrección de un uso con
 su recálculo de ml, el aprendizaje por temperatura y la descarga de la copia.
-126 comprobaciones, incluidos candados que fallan si alguna nota usada en una
+129 comprobaciones, incluidos candados que fallan si alguna nota usada en una
 ficha quedó sin explicación en el diccionario, o si el ícono de "Agregar a
 pantalla de inicio" vuelve a quedar liso (ya pasó una vez: salía negro).
 
