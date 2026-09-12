@@ -381,5 +381,79 @@ const CATALOGO = [
     estaciones:['primavera','otoño'], ocasiones:['trabajo','cita','evento'], momento:'ambos', longevidad:8, estela:3 }
 ];
 
-w.PERFUMARIO_DATOS = { FAMILIAS, NOTAS, CATALOGO };
+
+/* --------------------------- ciudades ------------------------------
+   Coordenadas guardadas en la app para no depender de la API de
+   geocodificación: elegir la ciudad funciona sin internet y sin que la
+   página tenga permiso de hacer pedidos externos. Si lo que buscás no
+   está acá, recién ahí se consulta la API.                            */
+const CIUDADES = [
+  { n:'Buenos Aires', p:'CABA', lat:-34.61, lon:-58.38 },
+  { n:'La Plata', p:'Buenos Aires', lat:-34.92, lon:-57.95 },
+  { n:'Mar del Plata', p:'Buenos Aires', lat:-38.00, lon:-57.56 },
+  { n:'Bahía Blanca', p:'Buenos Aires', lat:-38.72, lon:-62.27 },
+  { n:'Tandil', p:'Buenos Aires', lat:-37.32, lon:-59.13 },
+  { n:'Necochea', p:'Buenos Aires', lat:-38.55, lon:-58.74 },
+  { n:'Olavarría', p:'Buenos Aires', lat:-36.89, lon:-60.32 },
+  { n:'Pergamino', p:'Buenos Aires', lat:-33.89, lon:-60.57 },
+  { n:'Junín', p:'Buenos Aires', lat:-34.58, lon:-60.94 },
+  { n:'San Nicolás', p:'Buenos Aires', lat:-33.33, lon:-60.21 },
+  { n:'Zárate', p:'Buenos Aires', lat:-34.10, lon:-59.03 },
+  { n:'Pinamar', p:'Buenos Aires', lat:-37.11, lon:-56.86 },
+  { n:'Villa Gesell', p:'Buenos Aires', lat:-37.26, lon:-56.97 },
+  { n:'Rosario', p:'Santa Fe', lat:-32.95, lon:-60.64 },
+  { n:'Santa Fe', p:'Santa Fe', lat:-31.63, lon:-60.70 },
+  { n:'Rafaela', p:'Santa Fe', lat:-31.25, lon:-61.49 },
+  { n:'Venado Tuerto', p:'Santa Fe', lat:-33.75, lon:-61.97 },
+  { n:'Córdoba', p:'Córdoba', lat:-31.42, lon:-64.18 },
+  { n:'Villa Carlos Paz', p:'Córdoba', lat:-31.42, lon:-64.50 },
+  { n:'Río Cuarto', p:'Córdoba', lat:-33.12, lon:-64.35 },
+  { n:'Villa María', p:'Córdoba', lat:-32.41, lon:-63.24 },
+  { n:'Mendoza', p:'Mendoza', lat:-32.89, lon:-68.84 },
+  { n:'San Rafael', p:'Mendoza', lat:-34.62, lon:-68.33 },
+  { n:'San Juan', p:'San Juan', lat:-31.54, lon:-68.53 },
+  { n:'San Luis', p:'San Luis', lat:-33.30, lon:-66.34 },
+  { n:'La Rioja', p:'La Rioja', lat:-29.41, lon:-66.86 },
+  { n:'Catamarca', p:'Catamarca', lat:-28.47, lon:-65.79 },
+  { n:'San Miguel de Tucumán', p:'Tucumán', lat:-26.82, lon:-65.22 },
+  { n:'Santiago del Estero', p:'Santiago del Estero', lat:-27.80, lon:-64.26 },
+  { n:'Salta', p:'Salta', lat:-24.79, lon:-65.41 },
+  { n:'San Salvador de Jujuy', p:'Jujuy', lat:-24.19, lon:-65.30 },
+  { n:'Resistencia', p:'Chaco', lat:-27.45, lon:-58.99 },
+  { n:'Corrientes', p:'Corrientes', lat:-27.47, lon:-58.83 },
+  { n:'Posadas', p:'Misiones', lat:-27.37, lon:-55.90 },
+  { n:'Formosa', p:'Formosa', lat:-26.18, lon:-58.17 },
+  { n:'Paraná', p:'Entre Ríos', lat:-31.73, lon:-60.53 },
+  { n:'Concordia', p:'Entre Ríos', lat:-31.39, lon:-58.02 },
+  { n:'Gualeguaychú', p:'Entre Ríos', lat:-33.01, lon:-58.51 },
+  { n:'Santa Rosa', p:'La Pampa', lat:-36.62, lon:-64.29 },
+  { n:'Neuquén', p:'Neuquén', lat:-38.95, lon:-68.06 },
+  { n:'San Martín de los Andes', p:'Neuquén', lat:-40.16, lon:-71.35 },
+  { n:'General Roca', p:'Río Negro', lat:-39.03, lon:-67.58 },
+  { n:'San Carlos de Bariloche', p:'Río Negro', lat:-41.13, lon:-71.31 },
+  { n:'Viedma', p:'Río Negro', lat:-40.81, lon:-63.00 },
+  { n:'Puerto Madryn', p:'Chubut', lat:-42.77, lon:-65.04 },
+  { n:'Trelew', p:'Chubut', lat:-43.25, lon:-65.31 },
+  { n:'Comodoro Rivadavia', p:'Chubut', lat:-45.86, lon:-67.50 },
+  { n:'Río Gallegos', p:'Santa Cruz', lat:-51.62, lon:-69.22 },
+  { n:'El Calafate', p:'Santa Cruz', lat:-50.34, lon:-72.27 },
+  { n:'Ushuaia', p:'Tierra del Fuego', lat:-54.80, lon:-68.30 },
+  { n:'Montevideo', p:'Uruguay', lat:-34.90, lon:-56.16 },
+  { n:'Punta del Este', p:'Uruguay', lat:-34.95, lon:-54.93 },
+  { n:'Santiago', p:'Chile', lat:-33.45, lon:-70.67 },
+  { n:'São Paulo', p:'Brasil', lat:-23.55, lon:-46.63 },
+  { n:'Río de Janeiro', p:'Brasil', lat:-22.91, lon:-43.17 },
+  { n:'Florianópolis', p:'Brasil', lat:-27.60, lon:-48.55 },
+  { n:'Lima', p:'Perú', lat:-12.05, lon:-77.04 },
+  { n:'Bogotá', p:'Colombia', lat:4.71, lon:-74.07 },
+  { n:'Ciudad de México', p:'México', lat:19.43, lon:-99.13 },
+  { n:'Miami', p:'Estados Unidos', lat:25.76, lon:-80.19 },
+  { n:'Nueva York', p:'Estados Unidos', lat:40.71, lon:-74.01 },
+  { n:'Madrid', p:'España', lat:40.42, lon:-3.70 },
+  { n:'Barcelona', p:'España', lat:41.39, lon:2.17 },
+  { n:'París', p:'Francia', lat:48.86, lon:2.35 },
+  { n:'Roma', p:'Italia', lat:41.90, lon:12.50 }
+];
+
+w.PERFUMARIO_DATOS = { FAMILIAS, NOTAS, CATALOGO, CIUDADES };
 })(window);

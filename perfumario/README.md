@@ -77,9 +77,12 @@ CORS abierto (*Cross-Origin Resource Sharing*: el permiso que da un servidor par
 que una página de otro dominio lea su respuesta), así que la app lo consulta
 directo desde el navegador, sin backend propio. Dos llamadas:
 
-- `geocoding-api.open-meteo.com/v1/search` para pasar de "Rosario" a coordenadas,
-  una sola vez y con la escritura pausada 400 ms (*debounce*: esperar a que la
-  persona deje de tipear antes de consultar, en lugar de una llamada por tecla).
+- **Ninguna**, si la ciudad está en la lista de 65 que viaja dentro de la app
+  (`assets/datos.js`): ahí las coordenadas ya están y elegirla funciona sin
+  internet.
+- `geocoding-api.open-meteo.com/v1/search` solo para las que no están en esa
+  lista, con la escritura pausada 400 ms (*debounce*: esperar a que la persona
+  deje de tipear antes de consultar, en lugar de una llamada por tecla).
 - `api.open-meteo.com/v1/forecast` para la temperatura, la humedad y el estado del
   cielo (códigos WMO, el estándar meteorológico que traduce 3 a "nublado").
 
@@ -97,10 +100,12 @@ Reglas que sigue:
 - **El service worker no lo cachea.** Solo guarda los archivos propios; si
   cachearan el clima, la temperatura quedaría congelada en la primera consulta.
 
-> En la vista publicada como Artifact los pedidos a dominios externos están
-> bloqueados por la política de seguridad de esa página, así que ahí el clima
-> siempre va a fallar y hay que usar la temperatura a mano. Servida desde GitHub
-> Pages funciona normal.
+> **En la vista previa embebida (Artifact) el clima no puede funcionar**: esa
+> página corre dentro de un iframe que bloquea tanto los pedidos a otros dominios
+> como el permiso de ubicación del navegador. La app lo detecta (`window.self !==
+> window.top`) y lo dice con todas las letras, en vez de un "no pude" genérico:
+> elegís la ciudad de la lista incluida y seguís con la temperatura a mano.
+> Servida desde GitHub Pages, el clima y la ubicación funcionan normal.
 
 Con humedad de 70 % o más, avisa que el perfume proyecta más de lo normal y que
 con dos aplicaciones alcanza.
@@ -188,8 +193,9 @@ el contexto, registro y borrado de usos con el descuento de ml, buscador y filtr
 alta desde el catálogo, ficha, diccionario de notas, estadísticas de uso, copia de
 seguridad y borrado, más el aprendizaje (que aparezca, que se pueda apagar) y la
 carga por lotes, y el clima con la API simulada (que llegue, que se pueda pisar a
-mano y que falle sin romper nada) y la colección incluida (que entre sola, que no
-resucite después de borrarla y que no se duplique). 95 comprobaciones.
+mano, que la ciudad se encuentre sin red y que falle sin romper nada) y la
+colección incluida (que entre sola, que no
+resucite después de borrarla y que no se duplique). 98 comprobaciones.
 
 ```
 node perfumario/tests/e2e.js      # sale con código 1 si algo falla

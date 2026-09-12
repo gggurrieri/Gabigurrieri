@@ -222,7 +222,9 @@ function traerClima(forzar) {
     if (vistaActual === 'hoy') renderHoy();
     else if (vistaActual === 'ajustes') renderAjustes();
   }).catch(() => {
-    climaEstado('No pude traer el clima. Movés la temperatura a mano.');
+    climaEstado(enVistaPrevia()
+      ? 'Esta vista previa bloquea los pedidos al clima. Abrila publicada, o movés la temperatura a mano.'
+      : 'No pude traer el clima (¿sin internet?). Movés la temperatura a mano.');
   }).then(() => { climaPidiendo = false; });
 }
 
@@ -238,7 +240,25 @@ function climaEstado(txt) {
   if (l) l.textContent = txt;
 }
 
+/* Dentro de un iframe (la vista previa publicada) el navegador bloquea tanto
+   la ubicación como los pedidos a otros dominios. Saberlo permite decir qué
+   pasa en vez de un "no pude" genérico. */
+const enVistaPrevia = () => { try { return window.self !== window.top; } catch (e) { return true; } };
+
+/* Primero la lista que viaja con la app: instantánea y sin depender de nada.
+   La API solo entra si acá no hay nada. */
+function buscarCiudadLocal(q) {
+  const n = normaliza(q);
+  if (!n) return [];
+  return (D.CIUDADES || [])
+    .filter(c => normaliza(c.n).includes(n) || normaliza(c.p).includes(n))
+    .slice(0, 6)
+    .map(c => ({ name: c.n, admin1: c.p, country: '', latitude: c.lat, longitude: c.lon, local: true }));
+}
+
 function buscarCiudad(q) {
+  const locales = buscarCiudadLocal(q);
+  if (locales.length) return Promise.resolve(locales);
   return pedirJSON(`${GEO_API}?name=${encodeURIComponent(q)}&count=5&language=es&format=json`)
     .then(d => (d && d.results) || []);
 }
@@ -255,13 +275,27 @@ function fijarLugar(nombre, lat, lon) {
 }
 
 function usarUbicacion() {
-  if (!navigator.geolocation) { toast('Este navegador no da la ubicación'); return; }
-  toast('Buscando tu ubicación…');
+  if (!navigator.geolocation) { avisoUbicacion('Este navegador no da la ubicación.'); return; }
+  avisoUbicacion('Buscando tu ubicación…');
   navigator.geolocation.getCurrentPosition(
     pos => fijarLugar('Mi ubicación', pos.coords.latitude.toFixed(3), pos.coords.longitude.toFixed(3)),
-    () => toast('No me dio la ubicación: buscá la ciudad a mano'),
+    err => {
+      // 1 = permiso denegado, que es lo que pasa siempre dentro de un iframe
+      if (err && err.code === 1 && enVistaPrevia())
+        avisoUbicacion('Esta vista previa no permite la ubicación. Elegí tu ciudad de la lista de abajo.');
+      else if (err && err.code === 1)
+        avisoUbicacion('No diste permiso de ubicación. Elegí tu ciudad de la lista de abajo.');
+      else
+        avisoUbicacion('No pude ubicarte. Elegí tu ciudad de la lista de abajo.');
+    },
     { timeout: 10000, maximumAge: 600000 }
   );
+}
+
+function avisoUbicacion(txt) {
+  const e = $('#avisoUbicacion');
+  if (e) { e.textContent = txt; e.hidden = false; }
+  toast(txt);
 }
 
 /* --------------------------- navegación ---------------------------- */
@@ -1423,7 +1457,9 @@ function conectar() {
               <div class="it-sub">${esc([r.admin1, r.country].filter(Boolean).join(' · '))}</div></div></button>`).join('')
           : '<p class="hint">No encontré esa ciudad.</p>';
       }).catch(() => {
-        $('#ciudadResultados').innerHTML = '<p class="hint">No pude buscar la ciudad. ¿Hay internet?</p>';
+        $('#ciudadResultados').innerHTML = enVistaPrevia()
+          ? '<p class="hint">Esa ciudad no está en la lista incluida, y esta vista previa no deja consultar el buscador online.</p>'
+          : '<p class="hint">No pude buscar esa ciudad. ¿Hay internet?</p>';
       });
     }, 400);
   });

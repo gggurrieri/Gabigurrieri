@@ -279,16 +279,27 @@ const check = (n, c, d = '') => {
   let climaFalla = false;
   const respuesta = cuerpo => ({ status: 200, contentType: 'application/json',
     headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(cuerpo) });
-  await p.route('**/geocoding-api.open-meteo.com/**', r => r.fulfill(respuesta({
-    results: [{ name: 'Rosario', latitude: -32.94, longitude: -60.63,
-                country: 'Argentina', admin1: 'Provincia de Santa Fe' }] })));
+  let llamadasGeo = 0;
+  await p.route('**/geocoding-api.open-meteo.com/**', r => {
+    llamadasGeo++;
+    return r.fulfill(respuesta({
+      results: [{ name: 'Trenque Lauquen', latitude: -35.97, longitude: -62.73,
+                  country: 'Argentina', admin1: 'Provincia de Buenos Aires' }] }));
+  });
   await p.route('**/api.open-meteo.com/v1/forecast**', r => climaFalla ? r.abort() : r.fulfill(respuesta({
     current: { temperature_2m: 11.3, relative_humidity_2m: 80, weather_code: 3 } })));
 
   await p.tap('#btnSettings'); await p.waitForTimeout(250);
   check('arranca sin ubicación', /Sin ubicación/.test(await p.textContent('#lugarActual')));
   await p.fill('#buscaCiudad', 'Rosario'); await p.waitForTimeout(900);
-  check('busca la ciudad', await cuantos('#ciudadResultados [data-lat]') === 1);
+  check('encuentra la ciudad', await cuantos('#ciudadResultados [data-lat]') === 1);
+  check('sin consultar la API: la lista viaja en la app', llamadasGeo === 0, String(llamadasGeo));
+
+  await p.fill('#buscaCiudad', 'Trenque Lauquen'); await p.waitForTimeout(900);
+  check('para una que no está incluida, recién ahí consulta', llamadasGeo === 1, String(llamadasGeo));
+  check('y la ofrece', /Trenque Lauquen/.test(await p.textContent('#ciudadResultados')));
+
+  await p.fill('#buscaCiudad', 'Rosario'); await p.waitForTimeout(900);
   await p.tap('#ciudadResultados [data-lat]'); await p.waitForTimeout(600);
   d = await db();
   check('guarda la ubicación elegida', !!d.meta.lugar && /Rosario/.test(d.meta.lugar.nombre));
