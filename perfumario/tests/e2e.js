@@ -52,8 +52,14 @@ const check = (n, c, d = '') => {
   const cuantos = async s => p.evaluate(x => document.querySelectorAll(x).length, s);
 
   console.log('\nA · La colección viene en el build');
-  check('la carga sola en el primer arranque', (await db()).perfumes.length === 22,
-    String((await db()).perfumes.length));
+  /* Cuántos trae la semilla lo dice la semilla, no un número escrito acá: si
+     se agrega o se saca un perfume, la prueba sigue midiendo lo que importa
+     (que entre completa) en vez de romperse por el conteo. */
+  const enElBuild = await p.evaluate(() =>
+    ((window.PERFUMARIO_COLECCION || { perfumes: [] }).perfumes || []).length);
+  check('la carga sola en el primer arranque',
+    enElBuild > 0 && (await db()).perfumes.length === enElBuild,
+    `${(await db()).perfumes.length} guardados vs ${enElBuild} en el build`);
   check('y sugiere sin que cargues nada', await cuantos('#sugerencias article.card') === 3);
   check('no le inventa usos', (await db()).usos.length === 0);
 
@@ -105,9 +111,9 @@ const check = (n, c, d = '') => {
 
   await p.tap('#btnSettings'); await p.waitForTimeout(200);
   await p.tap('#btnMiColeccion'); await p.waitForTimeout(400);
-  check('se puede volver a cargar a pedido', (await db()).perfumes.length === 22);
+  check('se puede volver a cargar a pedido', (await db()).perfumes.length === enElBuild);
   await p.tap('#btnMiColeccion'); await p.waitForTimeout(350);
-  check('y no la duplica', (await db()).perfumes.length === 22);
+  check('y no la duplica', (await db()).perfumes.length === enElBuild);
 
   await p.tap('#btnBorrar'); await p.waitForTimeout(300);
   await p.tap('#btnConfirmarBorrado'); await p.waitForTimeout(400);  // el resto corre en vacío
