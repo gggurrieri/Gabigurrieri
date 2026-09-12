@@ -623,6 +623,22 @@ const check = (n, c, d = '') => {
   check('un perfume sin puntuar no arranca castigado', sinYcon && puntajes[0] === puntajes[1],
     puntajes.join(' vs '));
 
+  // esta sección ensució la colección con dos clones: se deja una con
+  // variedad, porque las secciones que siguen comparan perfumes distintos
+  await p.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('perfumario_v1'));
+    d.perfumes = [
+      Object.assign({}, d.perfumes[0], { id: 'x1', nombre: 'Abrigado', familia: 'ambar',
+        estaciones: ['invierno'], longevidad: 9, estela: 4, rating: 4, precio: 100000,
+        salida: ['Cardamomo'], corazon: ['Cuero'], fondo: ['Vainilla'] }),
+      Object.assign({}, d.perfumes[0], { id: 'x2', nombre: 'Liviano', familia: 'citrica',
+        estaciones: ['verano'], longevidad: 4, estela: 2, rating: 2, precio: 40000,
+        salida: ['Limón'], corazon: ['Neroli'], fondo: ['Almizcle blanco'] })
+    ];
+    localStorage.setItem('perfumario_v1', JSON.stringify(d));
+  });
+  await p.reload(); await p.waitForTimeout(500);
+
   console.log('\nP · Descargar la copia');
   await p.tap('#btnSettings'); await p.waitForTimeout(250);
   await p.tap('#btnExportar'); await p.waitForTimeout(350);
