@@ -72,6 +72,31 @@ const check = (n, c, d = '') => {
   check('toda nota usada está explicada en el diccionario', notasHuerfanas.length === 0,
     notasHuerfanas.join(', '));
 
+  // candado: el ícono de "Agregar a pantalla de inicio" no puede ser un cuadrado
+  // liso. Ya pasó una vez: el generador recortaba el SVG en vez de escalarlo
+  // se pasa como data: URL porque un PNG traído por file:// ensucia el canvas
+  // y el navegador prohíbe leerle los píxeles
+  const iconoB64 = require('fs').readFileSync(
+    path.resolve(__dirname, '..', 'assets', 'icon-180.png')).toString('base64');
+  const dibujo = await p.evaluate(async b64 => {
+    const img = new Image();
+    img.src = 'data:image/png;base64,' + b64;
+    await img.decode();
+    const c = document.createElement('canvas');
+    c.width = img.width; c.height = img.height;
+    const g = c.getContext('2d');
+    g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    const fondo = [d[0], d[1], d[2]];
+    let distintos = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (Math.abs(d[i] - fondo[0]) + Math.abs(d[i+1] - fondo[1]) + Math.abs(d[i+2] - fondo[2]) > 30) distintos++;
+    }
+    return { lado: c.width, porcentaje: Math.round((distintos / (d.length / 4)) * 100) };
+  }, iconoB64);
+  check('el ícono tiene algo dibujado, no es un cuadrado liso',
+    dibujo.lado === 180 && dibujo.porcentaje >= 5, JSON.stringify(dibujo));
+
   await p.tap('#btnSettings'); await p.waitForTimeout(200);
   await p.tap('#btnBorrar'); await p.waitForTimeout(300);
   await p.tap('#btnConfirmarBorrado'); await p.waitForTimeout(400);
