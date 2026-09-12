@@ -179,6 +179,17 @@ const WMO = {
   95: ['Tormenta', '⛈'], 96: ['Tormenta con granizo', '⛈'], 99: ['Tormenta con granizo', '⛈']
 };
 const describirClima = c => WMO[c] || ['Sin datos del cielo', '🌡'];
+/* códigos de llovizna, lluvia, chaparrón y tormenta */
+const LLUVIA = [51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99];
+const estaLloviendo = c => LLUVIA.indexOf(c) >= 0;
+
+/* El clima solo pesa en el puntaje si es reciente: un dato de ayer diciendo
+   que llueve es peor que no tener dato. */
+function climaParaPuntaje() {
+  const c = S.meta.clima;
+  if (!S.ajustes.clima || !c) return null;
+  return minutosDesde(c.ts) <= 180 ? c : null;
+}
 
 const minutosDesde = iso => Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
 
@@ -208,14 +219,15 @@ function traerClima(forzar) {
   climaPidiendo = true;
   climaEstado('Consultando el clima…');
   const url = `${CLIMA_API}?latitude=${encodeURIComponent(lugar.lat)}&longitude=${encodeURIComponent(lugar.lon)}` +
-    '&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto';
+    '&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=auto';
 
   return pedirJSON(url).then(d => {
     const c = d && d.current;
     if (!c || typeof c.temperature_2m !== 'number') throw new Error('respuesta sin temperatura');
     S.meta.clima = {
       temp: c.temperature_2m, humedad: c.relative_humidity_2m,
-      codigo: c.weather_code, lugar: lugar.nombre, ts: new Date().toISOString()
+      codigo: c.weather_code, viento: c.wind_speed_10m,
+      lugar: lugar.nombre, ts: new Date().toISOString()
     };
     guardar();
     aplicarTempDelClima();
@@ -356,7 +368,7 @@ const MIN_USOS_MODELO = 6;       // menos que esto no alcanza para concluir nada
 const MIN_USOS_OCASION = 3;
 
 function modeloAprendido() {
-  const vacio = { activo: false, ocFam: {}, ocPerf: {}, totOc: {}, share: {}, notasTop: [], usos: 0 };
+  const vacio = { activo: false, ocFam: {}, ocPerf: {}, totOc: {}, share: {}, notasTop: [], tempFam: {}, usos: 0 };
   if (!S.ajustes.aprender || !S.perfumes.length) return vacio;
 
   const corte = addDays(today(), -VENTANA_APRENDIZAJE);
@@ -368,20 +380,32 @@ function modeloAprendido() {
   S.perfumes.forEach(x => { const k = x.familia || 'sin'; share[k] = (share[k] || 0) + 1; });
   Object.keys(share).forEach(k => { share[k] = share[k] / S.perfumes.length; });
 
-  const ocFam = {}, ocPerf = {}, totOc = {}, notas = {};
+  const ocFam = {}, ocPerf = {}, totOc = {}, notas = {}, temps = {};
   usos.forEach(u => {
     const x = perfume(u.perfumeId), oc = u.ocasion || 'casual';
     totOc[oc] = (totOc[oc] || 0) + 1;
     ocFam[oc + '|' + (x.familia || 'sin')] = (ocFam[oc + '|' + (x.familia || 'sin')] || 0) + 1;
     ocPerf[oc + '|' + x.id] = (ocPerf[oc + '|' + x.id] || 0) + 1;
     notasDe(x).forEach(n => { const k = n.toLowerCase(); notas[k] = (notas[k] || 0) + 1; });
+    if (typeof u.temp === 'number') {
+      const k = x.familia || 'sin';
+      (temps[k] = temps[k] || []).push(u.temp);
+    }
+  });
+
+  /* A qué temperatura usás cada familia. Con menos de tres usos el promedio
+     es ruido, así que esa familia no opina. */
+  const tempFam = {};
+  Object.keys(temps).forEach(k => {
+    const a = temps[k];
+    if (a.length >= MIN_USOS_OCASION) tempFam[k] = { media: a.reduce((s, v) => s + v, 0) / a.length, n: a.length };
   });
 
   const notasTop = Object.keys(notas).map(n => ({ n, c: notas[n] }))
     .filter(x => x.c >= Math.max(2, Math.round(usos.length * 0.25)))
     .sort((a, b) => b.c - a.c).slice(0, 10);
 
-  return { activo: true, ocFam, ocPerf, totOc, share, notasTop, usos: usos.length };
+  return { activo: true, ocFam, ocPerf, totOc, share, notasTop, tempFam, usos: usos.length };
 }
 
 /* Puntaje de un perfume para el contexto actual.
@@ -451,6 +475,14 @@ function puntuar(p, m) {
   const pct = porcRestante(p);
   if (p.ml > 0 && pct <= 10) { score -= 8; razones.push({ txt: `Queda ${pct} %: guardalo para algo que valga`, bien: false }); }
 
+  // lluvia: los frescos livianos no sobreviven al agua
+  const cl = climaParaPuntaje();
+  if (cl && estaLloviendo(cl.codigo)) {
+    const dur = p.longevidad || 0;
+    if (dur >= 8) { score += 6; razones.push({ txt: 'Llueve y este aguanta', bien: true, clima: true }); }
+    else if (dur && dur <= 5) { score -= 6; razones.push({ txt: 'Con lluvia, uno tan liviano se va enseguida', bien: false, clima: true }); }
+  }
+
   // lo aprendido de tus elecciones anteriores
   if (m.activo) {
     const oc = ctx.ocasion, tot = m.totOc[oc] || 0;
@@ -474,6 +506,20 @@ function puntuar(p, m) {
                        bien: true, aprendido: true });
       }
     }
+    // la temperatura a la que usás esa familia
+    const tf = (m.tempFam || {})[p.familia || 'sin'];
+    if (tf) {
+      const dif = ctx.temp - tf.media;
+      if (Math.abs(dif) >= 8) {
+        score -= Math.min(12, 3 + (Math.abs(dif) - 8) * 1.2);
+        razones.push({ txt: `Lo usás con ${Math.round(tf.media)}° y hoy hay ${Math.round(ctx.temp)}°`,
+                       bien: false, aprendido: true });
+      } else if (Math.abs(dif) <= 3) {
+        score += 5;
+        razones.push({ txt: 'Es la temperatura a la que solés usarlo', bien: true, aprendido: true });
+      }
+    }
+
     // notas que se repiten en lo que realmente usás
     if (m.notasTop.length) {
       const mias = notasDe(p).map(n => n.toLowerCase());
@@ -491,11 +537,21 @@ function puntuar(p, m) {
 
 function sugerir(n, m) {
   m = m || modeloAprendido();
-  return S.perfumes
-    .filter(p => !(p.ml > 0 && p.mlRestante <= 0))
+  const cuantos = n || 3;
+  const disponibles = S.perfumes.filter(p => !(p.ml > 0 && p.mlRestante <= 0));
+
+  /* Lo que ya te pusiste hoy queda afuera, no castigado: con el aprendizaje
+     encendido, los bonus podían tapar el castigo y volvía a recomendarte lo
+     que ya tenías puesto. Solo vuelve si sin él no llegan a tres. */
+  const usadosHoy = {};
+  S.usos.filter(u => u.fecha === today()).forEach(u => { usadosHoy[u.perfumeId] = true; });
+  const frescos = disponibles.filter(p => !usadosHoy[p.id]);
+  const base = frescos.length >= cuantos ? frescos : disponibles;
+
+  return base
     .map(p => Object.assign({ p }, puntuar(p, m)))
     .sort((a, b) => b.score - a.score || a.p.nombre.localeCompare(b.p.nombre))
-    .slice(0, n || 3);
+    .slice(0, cuantos);
 }
 
 function renderHoy() {
@@ -525,9 +581,9 @@ function renderHoy() {
   $('#cardHoyUsos').hidden = !hoy.length;
   $('#hoyUsos').innerHTML = hoy.map(u => {
     const p = perfume(u.perfumeId);
-    return `<div class="item"><div class="it-main">
+    return `<div class="item" data-editar-uso="${u.id}" role="button" tabindex="0"><div class="it-main">
         <div class="it-name">${esc(p ? p.nombre : 'Perfume borrado')}</div>
-        <div class="it-sub">${u.sprays} aplicaciones · ${OCASIONES[u.ocasion] || '—'}</div>
+        <div class="it-sub">${u.sprays} aplicaciones · ${OCASIONES[u.ocasion] || '—'} · tocá para corregir</div>
       </div>
       <div class="it-act"><button data-borrar-uso="${u.id}" aria-label="Borrar uso">🗑</button></div></div>`;
   }).join('');
@@ -550,13 +606,17 @@ function renderClima() {
     `${mins < 1 ? 'recién' : 'hace ' + mins + ' min'} ` +
     `<button class="link" id="btnRefrescarClima">Actualizar</button>` +
     (ctx.manual ? ` <span class="hint">· estás usando ${Math.round(ctx.temp)}° a mano</span>` : '') +
-    (c.humedad >= 70 ? `<div class="hint">Humedad ${c.humedad} %: proyecta más de lo normal, con dos aplicaciones alcanza.</div>` : '');
+    (c.humedad >= 70 ? `<div class="hint">Humedad ${c.humedad} %: proyecta más de lo normal, con dos aplicaciones alcanza.</div>` : '') +
+    (estaLloviendo(c.codigo) ? `<div class="hint">Llueve: los frescos livianos se van enseguida.</div>` : '') +
+    (c.viento >= 25 ? `<div class="hint">Viento de ${Math.round(c.viento)} km/h: la estela se dispersa, podés sumar una aplicación.</div>` : '');
 }
 
 function fichaSugerencia(s, i) {
   const p = s.p, f = familia(p.familia);
-  // primero lo aprendido: es lo que distingue esta sugerencia de una regla fija
-  const ordenadas = s.razones.slice().sort((a, b) => (b.aprendido ? 1 : 0) - (a.aprendido ? 1 : 0));
+  /* Orden: primero lo aprendido (es lo que distingue esta sugerencia de una
+     regla fija), después lo que pasa hoy afuera, y al final el resto. */
+  const peso = r => (r.aprendido ? 2 : (r.clima ? 1 : 0));
+  const ordenadas = s.razones.slice().sort((a, b) => peso(b) - peso(a));
   const razones = ordenadas.slice(0, 3).map(r =>
     `<li${r.aprendido ? ' class="aprendida"' : ''}>${r.aprendido ? '✦' : (r.bien ? '✓' : '·')} <b>${esc(r.txt)}</b></li>`).join('');
   const pct = porcRestante(p);
@@ -605,6 +665,10 @@ function renderAprendizaje(m) {
     });
     if (mejor && mejor.dif > 0.05) reglas.push(
       `<div class="linea"><span>${OCASIONES[oc]}</span><b>${esc(familia(mejor.fam).nombre.toLowerCase())} · ${mejor.c} de ${m.totOc[oc]}</b></div>`);
+  });
+  Object.keys(m.tempFam || {}).forEach(fam => {
+    const t = m.tempFam[fam];
+    reglas.push(`<div class="linea"><span>${esc(familia(fam).nombre)}</span><b>lo usás con ${Math.round(t.media)}° · ${t.n} usos</b></div>`);
   });
   if (m.notasTop.length) reglas.push(
     `<div class="linea"><span>Notas que repetís</span><b>${esc(m.notasTop.slice(0, 3).map(x => x.n).join(', '))}</b></div>`);
@@ -757,7 +821,7 @@ function abrirFicha(id) {
     ${p.nota ? `<section class="card"><h2>Tus notas</h2><p class="hint" style="margin-top:6px">${esc(p.nota)}</p></section>` : ''}
 
     ${us.length ? `<section class="card"><h2>Historial</h2><div class="stack-sm" style="margin-top:10px">
-      ${us.slice(0, 8).map(u => `<div class="item"><div class="it-main">
+      ${us.slice(0, 8).map(u => `<div class="item" data-editar-uso="${u.id}" role="button" tabindex="0"><div class="it-main">
         <div class="it-name">${fmtFecha(u.fecha)} · ${OCASIONES[u.ocasion] || '—'}</div>
         <div class="it-sub">${u.sprays} aplicaciones${u.temp != null ? ` · ${Math.round(u.temp)}°` : ''}${u.nota ? ' · ' + esc(u.nota) : ''}</div>
       </div><div class="it-act"><button data-borrar-uso="${u.id}" aria-label="Borrar uso">🗑</button></div></div>`).join('')}
@@ -1031,26 +1095,40 @@ function abrirLote() {
   });
 }
 
+/* --------------------------- usos ---------------------------------- */
+/* Todo cambio de un uso mueve los ml del frasco. Centralizarlo acá evita que
+   editar deje el nivel del frasco mintiendo. */
+function aplicarMl(perfumeId, sprays, signo) {
+  const p = perfume(perfumeId);
+  if (p && p.ml > 0) p.mlRestante = clamp(p.mlRestante + signo * sprays * S.ajustes.mlSpray, 0, p.ml);
+}
+
 /* -------------------------- registrar uso -------------------------- */
-function abrirUso(id) {
-  const p = perfume(id);
+function abrirUso(id, usoId) {
+  const editando = usoId ? S.usos.find(u => u.id === usoId) : null;
+  const p = perfume(editando ? editando.perfumeId : id);
   if (!p) return;
   ctxInicial();
-  abrirModal('Registrar uso', `
+  const ocElegida = editando ? editando.ocasion : ctx.ocasion;
+  abrirModal(editando ? 'Editar uso' : 'Registrar uso', `
     <p class="sub">${esc(p.nombre)} · ${esc(p.casa)}</p>
     <form id="formUso">
+      ${editando ? `<label class="field"><span>Perfume</span>
+        <select id="uPerfume">${S.perfumes.map(x =>
+          `<option value="${x.id}"${x.id === p.id ? ' selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select></label>` : ''}
       <div class="field-row">
-        <label class="field"><span>Fecha</span><input type="date" id="uFecha" value="${today()}" max="${today()}"></label>
-        <label class="field"><span>Aplicaciones</span><input type="number" id="uSprays" min="1" max="20" step="1" value="3"></label>
+        <label class="field"><span>Fecha</span><input type="date" id="uFecha" value="${editando ? editando.fecha : today()}" max="${today()}"></label>
+        <label class="field"><span>Aplicaciones</span><input type="number" id="uSprays" min="1" max="20" step="1" value="${editando ? editando.sprays : 3}"></label>
       </div>
       <div class="field">
         <span>Ocasión</span>
         <div class="chips" id="uOcasion">${Object.keys(OCASIONES).map(k =>
-          `<button type="button" class="chip${ctx.ocasion === k ? ' on' : ''}" data-val="${k}">${OCASIONES[k]}</button>`).join('')}</div>
+          `<button type="button" class="chip${ocElegida === k ? ' on' : ''}" data-val="${k}">${OCASIONES[k]}</button>`).join('')}</div>
       </div>
-      <label class="field"><span>Nota (opcional)</span><input id="uNota" placeholder="Duró poco, me lo elogiaron, etc."></label>
+      <label class="field"><span>Nota (opcional)</span><input id="uNota" value="${esc(editando ? (editando.nota || '') : '')}" placeholder="Duró poco, me lo elogiaron, etc."></label>
       <p class="hint">Cada aplicación descuenta ${S.ajustes.mlSpray} ml del frasco. Lo cambiás en Ajustes.</p>
-      <div class="btn-row"><button type="submit" class="btn btn-accent">Guardar uso</button></div>
+      <div class="btn-row"><button type="submit" class="btn btn-accent">${editando ? 'Guardar cambios' : 'Guardar uso'}</button></div>
+      ${editando ? `<div class="btn-row"><button type="button" class="btn btn-danger" data-borrar-uso="${editando.id}">Borrar este uso</button></div>` : ''}
     </form>`);
 
   $('#uOcasion').addEventListener('click', e => {
@@ -1064,22 +1142,37 @@ function abrirUso(id) {
     e.preventDefault();
     const sprays = clamp(num($('#uSprays').value, 1), 1, 20);
     const oc = ($('#uOcasion .chip.on') || {}).dataset;
-    S.usos.push({
-      id: uid(),
-      fecha: $('#uFecha').value || today(),
-      perfumeId: p.id,
-      sprays,
-      ocasion: oc ? oc.val : ctx.ocasion,
-      momento: ctx.momento,
-      temp: ctx.temp,
-      nota: $('#uNota').value.trim()
-    });
-    if (p.ml > 0) p.mlRestante = clamp(p.mlRestante - sprays * S.ajustes.mlSpray, 0, p.ml);
+    const destinoId = $('#uPerfume') ? $('#uPerfume').value : p.id;
+
+    if (editando) {
+      // deshacer el descuento viejo antes de aplicar el nuevo
+      aplicarMl(editando.perfumeId, editando.sprays, +1);
+      editando.perfumeId = destinoId;
+      editando.fecha = $('#uFecha').value || editando.fecha;
+      editando.sprays = sprays;
+      editando.ocasion = oc ? oc.val : editando.ocasion;
+      editando.nota = $('#uNota').value.trim();
+      aplicarMl(destinoId, sprays, -1);
+    } else {
+      S.usos.push({
+        id: uid(),
+        fecha: $('#uFecha').value || today(),
+        perfumeId: p.id,
+        sprays,
+        ocasion: oc ? oc.val : ctx.ocasion,
+        momento: ctx.momento,
+        temp: ctx.temp,
+        nota: $('#uNota').value.trim()
+      });
+      aplicarMl(p.id, sprays, -1);
+    }
+
     guardar(); cerrarModal(); render();
-    const pct = porcRestante(p);
-    toast(p.ml > 0 && pct <= 15
-      ? `Anotado. Ojo: queda ${pct} % de ${p.nombre}`
-      : `Anotado: ${p.nombre}`);
+    const destino = perfume(destinoId) || p;
+    const pct = porcRestante(destino);
+    toast(editando ? 'Uso actualizado'
+      : (destino.ml > 0 && pct <= 15 ? `Anotado. Ojo: queda ${pct} % de ${destino.nombre}`
+                                     : `Anotado: ${destino.nombre}`));
   });
 }
 
@@ -1245,7 +1338,7 @@ function renderUso() {
   const hist = S.usos.slice().sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 20);
   $('#historialUsos').innerHTML = hist.length ? hist.map(u => {
     const p = perfume(u.perfumeId);
-    return `<div class="item"><div class="it-main">
+    return `<div class="item" data-editar-uso="${u.id}" role="button" tabindex="0"><div class="it-main">
       <div class="it-name">${esc(p ? p.nombre : 'Perfume borrado')}</div>
       <div class="it-sub">${fmtFecha(u.fecha)} · ${OCASIONES[u.ocasion] || '—'} · ${u.sprays} aplicaciones</div>
     </div><div class="it-act"><button data-borrar-uso="${u.id}" aria-label="Borrar uso">🗑</button></div></div>`;
@@ -1276,7 +1369,13 @@ function exportar() {
   abrirModal('Copia de seguridad', `
     <p class="sub">Copiá este texto y guardalo donde quieras (mail, notas, Drive). Para restaurarlo, usá “Importar copia”.</p>
     <label class="field"><textarea id="modalText" readonly style="min-height:180px;font-family:ui-monospace,monospace;font-size:11px">${esc(texto)}</textarea></label>
-    <div class="btn-row"><button class="btn btn-accent" id="btnCopiar">Copiar al portapapeles</button></div>`);
+    <div class="btn-row">
+      <button class="btn btn-accent" id="btnCopiar">Copiar al portapapeles</button>
+      ${enVistaPrevia() ? '' : '<button class="btn" id="btnDescargar">Descargar archivo</button>'}
+    </div>
+    ${enVistaPrevia() ? '<p class="hint">La vista previa embebida no deja descargar archivos: por ahora, copiá el texto.</p>' : ''}`);
+  const bd = $('#btnDescargar');
+  if (bd) bd.addEventListener('click', descargarCopia);
   $('#btnCopiar').addEventListener('click', async () => {
     const ta = $('#modalText');
     try {
@@ -1289,6 +1388,24 @@ function exportar() {
     S.meta.ultimaCopia = today(); guardar(); renderAjustes(); avisoCopia();
   });
   S.meta.ultimaCopia = today(); guardar(); renderAjustes();
+}
+
+/* Copiar y pegar un JSON largo desde el teléfono es incómodo; un archivo se
+   guarda en Archivos o se manda por mail de una. */
+function descargarCopia() {
+  try {
+    const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `perfumario-${today()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    S.meta.ultimaCopia = today(); guardar(); renderAjustes(); avisoCopia();
+    toast('Copia descargada');
+  } catch (e) { toast('No pude descargar: copiá el texto'); }
 }
 
 function importar() {
@@ -1503,8 +1620,8 @@ function conectar() {
       e.stopPropagation();
       const i = S.usos.findIndex(u => u.id === bu.dataset.borrarUso);
       if (i >= 0) {
-        const u = S.usos[i], p = perfume(u.perfumeId);
-        if (p && p.ml > 0) p.mlRestante = clamp(p.mlRestante + u.sprays * S.ajustes.mlSpray, 0, p.ml);
+        const u = S.usos[i];
+        aplicarMl(u.perfumeId, u.sprays, +1);
         S.usos.splice(i, 1); guardar();
         if (!$('#modal').hidden) cerrarModal();
         render(); toast('Uso borrado');
@@ -1514,6 +1631,11 @@ function conectar() {
 
     if (e.target.closest('#btnActivarClima')) { ir('ajustes'); $('#buscaCiudad').focus(); return; }
     if (e.target.closest('#btnRefrescarClima')) { ctx.manual = false; traerClima(true); return; }
+
+    // el editar-uso va DESPUÉS del borrar: el botón de borrar vive dentro de la
+    // fila editable, y si se evalúa primero la fila, el tacho deja de borrar
+    const eu = e.target.closest('[data-editar-uso]');
+    if (eu) { abrirUso(null, eu.dataset.editarUso); return; }
 
     const nota = e.target.closest('[data-nota]');
     if (nota) {

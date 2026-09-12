@@ -42,8 +42,8 @@ inicio". Queda como una app nativa y funciona sin señal.
 |---|---|
 | **Hoy** | La temperatura la trae sola del clima de tu ciudad; elegís momento del día y ocasión, y te propone tres perfumes con un puntaje y las razones de cada uno. Un toque para registrar que te lo pusiste. |
 | **Colección** | Alta, edición y borrado de perfumes con casa, concentración, familia, pirámide de notas, ml, precio, estaciones, ocasiones, duración, estela y puntaje. Buscador por nombre, casa o **nota**, filtro por familia y siete criterios de orden. **Carga rápida** para pegar una lista entera de una vez. |
-| **Notas** | Diccionario de 96 notas y 11 familias explicadas, tu perfil olfativo (qué tenés contra qué usás) y comparador de parecidos entre perfumes de tu colección. |
-| **Uso** | Usos del mes, ml gastados, el más puesto, costo por uso, rotación de los últimos 90 días, los que juntan polvo, los que se están por acabar e historial. |
+| **Notas** | Diccionario de 112 notas y 11 familias explicadas, tu perfil olfativo (qué tenés contra qué usás) y comparador de parecidos entre perfumes de tu colección. |
+| **Uso** | Usos del mes, ml gastados, el más puesto, costo por uso, rotación de los últimos 90 días, los que juntan polvo, los que se están por acabar e historial. Tocando un uso se corrige (fecha, perfume, aplicaciones, ocasión) y los ml del frasco se recalculan solos. |
 | **Ajustes** | ml por aplicación, moneda, hemisferio, exportar/importar/borrar y seis perfumes de ejemplo para mirar la app con contenido. |
 
 ## Cómo decide qué recomendarte
@@ -59,9 +59,15 @@ tres razones que más pesaron.
 | Momento del día | +12 si coincide, +4 si sirve para ambos, −10 si no |
 | Ocasión | +14 si la tiene marcada, −8 si no |
 | Estela contra el ambiente | −12 si deja mucha estela para la oficina o el gimnasio, +8 si la ocasión pide presencia |
-| Rotación | +10 si hace más de tres semanas que no lo usás, −30 si ya te lo pusiste hoy |
+| Rotación | +10 si hace más de tres semanas que no lo usás |
+| Lluvia | +6 si dura 8 horas o más, −6 si es de los que duran 5 o menos |
 | Tu puntaje | ±8 según las estrellas que le diste |
 | Lo que queda en el frasco | −8 si queda 10 % o menos |
+
+Lo que ya te pusiste hoy no se sugiere: es una regla dura, no un castigo de
+puntaje. Cuando era un −30, los bonus del aprendizaje podían taparlo y la app
+terminaba recomendando lo que ya tenías puesto. Solo vuelve a aparecer si sin él
+no llegan a tres sugerencias.
 
 A eso se le suma lo que aprende de vos (se apaga en Ajustes).
 
@@ -107,8 +113,10 @@ Reglas que sigue:
 > elegís la ciudad de la lista incluida y seguís con la temperatura a mano.
 > Servida desde GitHub Pages, el clima y la ubicación funcionan normal.
 
-Con humedad de 70 % o más, avisa que el perfume proyecta más de lo normal y que
-con dos aplicaciones alcanza.
+La app usa además lo que ya venía en la respuesta: con **humedad** de 70 % o más
+avisa que proyecta más y que con dos aplicaciones alcanza; con **lluvia** baja el
+puntaje de los que duran poco y lo sube el de los que aguantan; con **viento** de
+25 km/h o más avisa que la estela se dispersa.
 
 ## Cómo aprende de tus elecciones
 
@@ -123,6 +131,7 @@ es una preferencia y no una casualidad.
 | Familia que elegís para esa ocasión | de −10 a +16, según la diferencia entre lo observado y lo esperable |
 | Ese perfume en esa ocasión | +8 si ya lo elegiste 2 veces o más para lo mismo |
 | Notas que se repiten en lo que usás | +6 si el perfume tiene 2 o más de tus notas más frecuentes |
+| La temperatura a la que usás esa familia | +5 si estás en esa temperatura, hasta −12 si te alejás más de 8 grados |
 
 Tres decisiones de producto detrás de esto:
 
@@ -195,7 +204,10 @@ seguridad y borrado, más el aprendizaje (que aparezca, que se pueda apagar) y l
 carga por lotes, y el clima con la API simulada (que llegue, que se pueda pisar a
 mano, que la ciudad se encuentre sin red y que falle sin romper nada) y la
 colección incluida (que entre sola, que no
-resucite después de borrarla y que no se duplique). 98 comprobaciones.
+resucite después de borrarla y que no se duplique), la corrección de un uso con
+su recálculo de ml, el aprendizaje por temperatura y la descarga de la copia.
+113 comprobaciones, incluido un candado que falla si alguna nota usada en una
+ficha quedó sin explicación en el diccionario.
 
 ```
 node perfumario/tests/e2e.js      # sale con código 1 si algo falla
@@ -207,6 +219,10 @@ disponible, pasale uno: `CHROME_PATH=/ruta/al/chrome node perfumario/tests/e2e.j
 ## Lo que falta
 
 Ideas anotadas para las próximas vueltas:
+
+- Comparar dos perfumes lado a lado: notas, duración y costo por uso.
+- Un campo de devolución después del uso ("me lo elogiaron", "no duró nada") que
+  alimente el puntaje; hoy eso queda en una nota libre que el modelo no lee.
 
 - Foto del frasco en cada ficha.
 - Lista de deseados con precio objetivo.

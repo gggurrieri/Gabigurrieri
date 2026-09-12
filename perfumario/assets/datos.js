@@ -153,6 +153,22 @@ const NOTAS = [
   { n:'Osmanthus', f:'floral', d:'Flor china entre el durazno y el cuero suave.' },
   { n:'Heliotropo', f:'gourmand', d:'Almendra y polvo de talco: huele a bebé y a mazapán.' },
   { n:'Mimosa', f:'floral', d:'Flor amarilla, polvorienta y miel, muy suave.' },
+  { n:'Jacinto', f:'floral', d:'Flor verde y punzante, con aire de bulbo recién cortado. Aparece mucho en los masculinos clásicos.' },
+  { n:'Madreselva', f:'floral', d:'Flor blanca, dulce y con miel, sostenida por un fondo verde.' },
+  { n:'Rosa blanca', f:'floral', d:'Rosa más limpia y jabonosa que la roja: nada de mermelada.' },
+  { n:'Campanilla', f:'floral', d:'Flor acuosa y verde, casi sin dulzor; da transparencia.' },
+  { n:'Grosella negra', f:'floral', d:'Cassis: frutal ácido con un costado sulfuroso que lo vuelve adulto.' },
+  { n:'Cilantro', f:'aromatica', d:'Hoja verde y jabonosa con filo especiado.' },
+  { n:'Hoja de laurel', f:'aromatica', d:'Verde seca y algo medicinal, habitual en los masculinos frescos.' },
+  { n:'Enebro', f:'aromatica', d:'La baya de la ginebra: resinosa, fría y mordiente.' },
+  { n:'Alcaravea', f:'aromatica', d:'Semilla del pan de centeno: anisada, seca y algo licorosa.' },
+  { n:'Membrillo', f:'verde', d:'Fruta ácida y perfumada, más seca y astringente que la manzana.' },
+  { n:'Dátil', f:'gourmand', d:'Fruta seca y melosa, firma de la perfumería árabe moderna.' },
+  { n:'Ron', f:'ambar', d:'Licoroso y cálido, con madera y azúcar quemada.' },
+  { n:'Palo de rosa', f:'amaderada', d:'Madera cremosa con un toque de rosa y limón.' },
+  { n:'Especias', f:'ambar', d:'Genérica: la ficha no aclara cuáles. Si reconocés canela, cardamomo o pimienta, reemplazala por esas: el perfil olfativo y los parecidos mejoran con notas precisas.' },
+  { n:'Frutos secos', f:'gourmand', d:'Genérica: almendra, avellana o nuez. Conviene precisarla cuando la reconozcas.' },
+  { n:'Madera', f:'amaderada', d:'Genérica: cedro, sándalo o maderas sintéticas. Conviene precisarla cuando la reconozcas.' },
   { n:'Vetiver de Haití', f:'amaderada', d:'Versión más limpia y ahumada de la raíz.' }
 ];
 

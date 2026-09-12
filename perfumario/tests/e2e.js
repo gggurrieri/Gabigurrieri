@@ -34,6 +34,21 @@ const check = (n, c, d = '') => {
   const db = () => p.evaluate(() => JSON.parse(localStorage.getItem('perfumario_v1') || 'null'));
   const ir = async v => { await p.tap(`.tab[data-view="${v}"]`); await p.waitForTimeout(200); };
   const visible = async s => p.evaluate(x => { const e = document.querySelector(x); return !!e && !e.hidden; }, s);
+  // razones de la tarjeta de un perfume concreto: '' si no entró en el podio
+  const razonesDe = async nombre => p.evaluate(n => {
+    const card = Array.from(document.querySelectorAll('#sugerencias .pf'))
+      .find(e => e.querySelector('.pf-name').textContent.includes(n));
+    return card ? card.querySelector('.razones').textContent.replace(/\s+/g, ' ').trim() : '';
+  }, nombre);
+  const termometro = async grados => {
+    await p.evaluate(g => {
+      const s = document.querySelector('#ctxTemp');
+      s.value = g;
+      s.dispatchEvent(new Event('input', { bubbles: true }));
+      s.dispatchEvent(new Event('change', { bubbles: true }));
+    }, grados);
+    await p.waitForTimeout(400);
+  };
   const cuantos = async s => p.evaluate(x => document.querySelectorAll(x).length, s);
 
   console.log('\nA · La colección viene en el build');
@@ -41,6 +56,21 @@ const check = (n, c, d = '') => {
     String((await db()).perfumes.length));
   check('y sugiere sin que cargues nada', await cuantos('#sugerencias article.card') === 3);
   check('no le inventa usos', (await db()).usos.length === 0);
+
+  // candado: una nota que aparece en una ficha y no está en el diccionario es
+  // una nota que no se puede tocar para leer qué es
+  const notasHuerfanas = await p.evaluate(() => {
+    const { NOTAS, CATALOGO } = window.PERFUMARIO_DATOS;
+    const dic = new Set(NOTAS.map(n => n.n.toLowerCase()));
+    const propias = (window.PERFUMARIO_COLECCION || { perfumes: [] }).perfumes;
+    const faltan = new Set();
+    CATALOGO.concat(propias).forEach(p => []
+      .concat(p.salida || [], p.corazon || [], p.fondo || [])
+      .forEach(n => { if (!dic.has(n.toLowerCase())) faltan.add(n); }));
+    return Array.from(faltan);
+  });
+  check('toda nota usada está explicada en el diccionario', notasHuerfanas.length === 0,
+    notasHuerfanas.join(', '));
 
   await p.tap('#btnSettings'); await p.waitForTimeout(200);
   await p.tap('#btnBorrar'); await p.waitForTimeout(300);
@@ -107,7 +137,8 @@ const check = (n, c, d = '') => {
     (await p.textContent('#sugerencias .pf-name')).trim());
 
   console.log('\nE · Registrar un uso');
-  await p.tap('#ctxOcasion .chip[data-val="casual"]'); await p.waitForTimeout(250);
+  await p.tap('#ctxOcasion .chip[data-val="salida"]'); await p.waitForTimeout(250);
+  await p.tap('#ctxMomento .chip[data-val="noche"]'); await p.waitForTimeout(250);
   const elegido = (await p.textContent('#sugerencias .pf-name')).replace('★', '').trim();
   const mlAntes = await p.evaluate(n => {
     const d = JSON.parse(localStorage.getItem('perfumario_v1'));
@@ -229,11 +260,13 @@ const check = (n, c, d = '') => {
 
   console.log('\nK · Aprende de las elecciones');
   await ir('hoy');
-  await p.tap('#ctxOcasion .chip[data-val="evento"]'); await p.waitForTimeout(350);
-  const conAprendizaje = await p.textContent('#sugerencias');
-  check('usa el historial para esa ocasión', /elección habitual para evento/.test(conAprendizaje),
-    conAprendizaje.replace(/\s+/g, ' ').slice(0, 90));
-  check('reconoce la familia que elegís para esa ocasión', /solés elegir/.test(conAprendizaje));
+  await p.tap('#ctxOcasion .chip[data-val="evento"]'); await p.waitForTimeout(250);
+  await p.tap('#ctxMomento .chip[data-val="noche"]'); await p.waitForTimeout(250);
+  await termometro(21);   // la temperatura de esos usos, para comparar peras con peras
+  const razonesBaccarat = await razonesDe('Baccarat');
+  check('usa el historial para esa ocasión', /elección habitual para evento/.test(razonesBaccarat),
+    razonesBaccarat.slice(0, 90) || 'no entró al podio');
+  check('reconoce la familia que elegís para esa ocasión', /solés elegir/.test(razonesBaccarat));
   check('muestra lo que aprendió', await visible('#cardAprendizaje'));
   check('y sobre cuántos usos lo calculó', /Sobre tus \d+ usos/.test(await p.textContent('#aprendizajeSub')));
   check('lo explica por ocasión', /Evento/.test(await p.textContent('#aprendizajeReglas')));
@@ -279,7 +312,7 @@ const check = (n, c, d = '') => {
   let climaFalla = false;
   const respuesta = cuerpo => ({ status: 200, contentType: 'application/json',
     headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(cuerpo) });
-  let llamadasGeo = 0;
+  let llamadasGeo = 0, climaCodigo = 3, climaViento = 8;
   await p.route('**/geocoding-api.open-meteo.com/**', r => {
     llamadasGeo++;
     return r.fulfill(respuesta({
@@ -287,7 +320,8 @@ const check = (n, c, d = '') => {
                   country: 'Argentina', admin1: 'Provincia de Buenos Aires' }] }));
   });
   await p.route('**/api.open-meteo.com/v1/forecast**', r => climaFalla ? r.abort() : r.fulfill(respuesta({
-    current: { temperature_2m: 11.3, relative_humidity_2m: 80, weather_code: 3 } })));
+    current: { temperature_2m: 11.3, relative_humidity_2m: 80, weather_code: climaCodigo,
+               wind_speed_10m: climaViento } })));
 
   await p.tap('#btnSettings'); await p.waitForTimeout(250);
   check('arranca sin ubicación', /Sin ubicación/.test(await p.textContent('#lugarActual')));
@@ -325,13 +359,99 @@ const check = (n, c, d = '') => {
   await p.tap('#btnRefrescarClima'); await p.waitForTimeout(600);
   check('actualizar vuelve al dato real', (await p.textContent('#ctxTempOut')) === '11°');
 
+  // llueve y sopla: el dato ya estaba y no se usaba
+  climaCodigo = 63; climaViento = 30;
+  await p.tap('#btnRefrescarClima'); await p.waitForTimeout(700);
+  const conLluvia = await p.textContent('#climaLinea');
+  check('avisa que llueve', /Llueve: los frescos livianos/.test(conLluvia), conLluvia.replace(/\s+/g,' ').slice(0,70));
+  check('y que hay viento', /Viento de 30 km\/h/.test(conLluvia));
+  check('la lluvia entra en las razones de las sugerencias',
+    /Llueve y este aguanta|se va enseguida/.test(await p.textContent('#sugerencias')),
+    (await p.textContent('#sugerencias')).replace(/\s+/g, ' ').slice(0, 90));
+  climaCodigo = 3; climaViento = 8;
+  await p.tap('#btnRefrescarClima'); await p.waitForTimeout(600);
+
   climaFalla = true;
   await p.tap('#btnRefrescarClima'); await p.waitForTimeout(700);
   check('si la API falla, lo dice sin romperse', /No pude traer el clima/.test(await p.textContent('#climaLinea')));
   check('y las sugerencias siguen ahí', await cuantos('#sugerencias article.card') === 3);
   climaFalla = false;
 
-  console.log('\nN · Copia y borrado');
+  console.log('\nN · Corregir un uso');
+  await ir('uso');
+  const usoPrevio = await p.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('perfumario_v1'));
+    const u = d.usos.slice().sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
+    const p = d.perfumes.find(x => x.id === u.perfumeId);
+    return { id: u.id, sprays: u.sprays, ocasion: u.ocasion, perfume: p.nombre, ml: p.mlRestante };
+  });
+  await p.tap('#historialUsos .item'); await p.waitForTimeout(400);
+  check('el uso se abre para editar', /Editar uso/.test(await p.textContent('#modalTitulo')));
+  check('viene con lo que habías puesto', (await p.inputValue('#uSprays')) === String(usoPrevio.sprays));
+  check('deja cambiar de perfume', !!(await p.$('#uPerfume')));
+  await p.fill('#uSprays', String(usoPrevio.sprays + 2));
+  await p.tap('#uOcasion .chip[data-val="evento"]');
+  await p.tap('#formUso button[type=submit]'); await p.waitForTimeout(500);
+  const usoNuevo = await p.evaluate(id => {
+    const d = JSON.parse(localStorage.getItem('perfumario_v1'));
+    const u = d.usos.find(x => x.id === id);
+    const p = d.perfumes.find(x => x.id === u.perfumeId);
+    return { sprays: u.sprays, ocasion: u.ocasion, ml: p.mlRestante, usos: d.usos.length };
+  }, usoPrevio.id);
+  check('guarda los cambios sin duplicar', usoNuevo.sprays === usoPrevio.sprays + 2 && usoNuevo.ocasion === 'evento');
+  check('y corrige los ml del frasco', Math.abs((usoPrevio.ml - usoNuevo.ml) - 0.2) < 0.001,
+    `${usoPrevio.ml} → ${usoNuevo.ml}`);
+
+  console.log('\nO · Aprende de la temperatura');
+  // historial a medida: un gourmand usado siempre con frío, un cítrico con calor
+  const protagonistas = await p.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('perfumario_v1'));
+    const gour = d.perfumes.find(x => x.familia === 'gourmand');
+    const cit = d.perfumes.find(x => x.familia === 'citrica');
+    const iso = n => { const x = new Date(); x.setDate(x.getDate() - n); return x.toISOString().slice(0, 10); };
+    // colección chica a propósito: así el podio no depende de lo que se acumuló
+    // en las secciones anteriores y la prueba mide lo que dice medir
+    d.perfumes = [gour, cit, d.perfumes.find(x => x.familia === 'amaderada')].filter(Boolean);
+    d.usos = [];
+    for (let i = 0; i < 4; i++) {
+      d.usos.push({ id: 'g' + i, fecha: iso(i * 4 + 1), perfumeId: gour.id, sprays: 3,
+                    ocasion: 'salida', momento: 'noche', temp: 9, nota: '' });
+      d.usos.push({ id: 'c' + i, fecha: iso(i * 4 + 2), perfumeId: cit.id, sprays: 3,
+                    ocasion: 'casual', momento: 'dia', temp: 28, nota: '' });
+    }
+    d.ajustes.clima = false;
+    localStorage.setItem('perfumario_v1', JSON.stringify(d));
+    return { gour: gour.nombre, cit: cit.nombre };
+  });
+  await p.reload(); await p.waitForTimeout(500);
+  await p.tap('#ctxOcasion .chip[data-val="casual"]'); await p.waitForTimeout(250);
+  await termometro(9);
+  const conFrio = await razonesDe(protagonistas.gour);
+  check('con frío reconoce que es su temperatura',
+    /Es la temperatura a la que solés usarlo/.test(conFrio), conFrio.slice(0, 90) || 'no entró al podio');
+  check('y lo explica en la tarjeta', /lo usás con 9°/.test(await p.textContent('#aprendizajeReglas')),
+    (await p.textContent('#aprendizajeReglas')).replace(/\s+/g, ' ').slice(0, 120));
+
+  await termometro(30);
+  const conCalor = await razonesDe(protagonistas.gour);
+  check('con 30° avisa que no es la temperatura en que lo usás',
+    conCalor === '' || /Lo usás con 9° y hoy hay 30°/.test(conCalor), conCalor.slice(0, 90));
+  const conCalorCitrico = await razonesDe(protagonistas.cit);
+  check('y el cítrico que usás con calor sí entra', conCalorCitrico !== '');
+
+  console.log('\nP · Descargar la copia');
+  await p.tap('#btnSettings'); await p.waitForTimeout(250);
+  await p.tap('#btnExportar'); await p.waitForTimeout(350);
+  check('ofrece bajar el archivo', !!(await p.$('#btnDescargar')));
+  const descarga = p.waitForEvent('download', { timeout: 5000 }).catch(() => null);
+  await p.tap('#btnDescargar');
+  const archivo = await descarga;
+  check('baja un .json con la fecha', !!archivo && /^perfumario-\d{4}-\d{2}-\d{2}\.json$/.test(archivo.suggestedFilename()),
+    archivo ? archivo.suggestedFilename() : 'no bajó nada');
+  await p.tap('[data-close]'); await p.waitForTimeout(250);
+  await ir('hoy');   // el engranaje alterna: si quedamos en Ajustes, la sección que sigue lo cierra
+
+  console.log('\nQ · Copia y borrado');
   await p.tap('#btnSettings'); await p.waitForTimeout(250);
   await p.tap('#btnExportar'); await p.waitForTimeout(300);
   check('exporta un JSON legible', await p.evaluate(() => {
@@ -356,7 +476,7 @@ const check = (n, c, d = '') => {
   check('borra todo', d.perfumes.length === 0 && d.usos.length === 0);
   check('y vuelve al estado inicial', /Todav[íi]a no cargaste/.test(await p.textContent('#sugerencias')));
 
-  console.log('\nO · Sin errores');
+  console.log('\nR · Sin errores');
   check('la consola quedó limpia', errs.length === 0, errs.slice(0, 3).join(' | '));
 
   await b.close();
