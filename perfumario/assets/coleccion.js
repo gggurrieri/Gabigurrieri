@@ -95,14 +95,28 @@ window.PERFUMARIO_COLECCION = {
       "casa": "Asten",
       "conc": "EDP",
       "familia": "citrica",
-      "salida": [],
-      "corazon": [],
-      "fondo": [],
+      "salida": [
+        "Bergamota",
+        "Limón",
+        "Naranja",
+        "Lavanda"
+      ],
+      "corazon": [
+        "Romero",
+        "Verbena",
+        "Rosa"
+      ],
+      "fondo": [
+        "Vetiver",
+        "Almizcle blanco",
+        "Pachulí",
+        "Sándalo"
+      ],
       "ml": 100,
       "mlRestante": 95,
       "precio": 0,
       "comprado": null,
-      "longevidad": 0,
+      "longevidad": 5,
       "estela": 3,
       "estaciones": [
         "verano",
@@ -114,7 +128,7 @@ window.PERFUMARIO_COLECCION = {
       ],
       "momento": "dia",
       "rating": 0,
-      "nota": "Notas a completar: no las tengo confirmadas. Concentración y nivel leídos de la foto."
+      "nota": "Declarado como inspirado en Acqua di Parma Colonia (90 % de parecido según el vendedor). Las notas cargadas son LAS DEL ORIGINAL, no una ficha propia de Asten: sirven como aproximación. Borralas si no te convence."
     },
     {
       "id": "col004",
@@ -369,14 +383,24 @@ window.PERFUMARIO_COLECCION = {
       "casa": "Kenzo",
       "conc": "EDT",
       "familia": "aromatica",
-      "salida": [],
-      "corazon": [],
-      "fondo": [],
+      "salida": [
+        "Cilantro",
+        "Cardamomo",
+        "Bergamota"
+      ],
+      "corazon": [
+        "Flores"
+      ],
+      "fondo": [
+        "Bálsamo de Tolú",
+        "Labdanum",
+        "Cedro"
+      ],
       "ml": 60,
       "mlRestante": 60,
       "precio": 0,
       "comprado": null,
-      "longevidad": 0,
+      "longevidad": 7,
       "estela": 3,
       "estaciones": [
         "primavera",
@@ -389,7 +413,7 @@ window.PERFUMARIO_COLECCION = {
       ],
       "momento": "ambos",
       "rating": 0,
-      "nota": "Notas a completar: no las tengo confirmadas. Frasco opaco: el nivel no se ve."
+      "nota": "Pirámide cargada de la ficha que me pasaste. \"Flores\" viene genérica en la fuente: si reconocés cuáles, precisalas."
     },
     {
       "id": "col00b",
@@ -505,17 +529,28 @@ window.PERFUMARIO_COLECCION = {
       "id": "col00e",
       "creado": "2026-09-12",
       "nombre": "Stallion 53",
-      "casa": "",
+      "casa": "Emper",
       "conc": "EDP",
       "familia": "amaderada",
-      "salida": [],
-      "corazon": [],
-      "fondo": [],
+      "salida": [
+        "Cardamomo",
+        "Violeta"
+      ],
+      "corazon": [
+        "Ámbar",
+        "Iris / Orris"
+      ],
+      "fondo": [
+        "Sándalo",
+        "Cuero",
+        "Cedro de Virginia",
+        "Papiro"
+      ],
       "ml": 100,
       "mlRestante": 65,
       "precio": 0,
       "comprado": null,
-      "longevidad": 0,
+      "longevidad": 8,
       "estela": 3,
       "estaciones": [
         "otoño",
@@ -528,7 +563,7 @@ window.PERFUMARIO_COLECCION = {
       ],
       "momento": "ambos",
       "rating": 0,
-      "nota": "La etiqueta lo describe como amaderado intenso (\"rich woody\"), desarrollado en Francia y hecho en Emiratos. Notas sin confirmar."
+      "nota": "Emper. Pirámide cargada de la ficha que me pasaste; sus acordes principales son amaderado, cuero y cálido especiado. Nivel ~65 % leído de la foto."
     },
     {
       "id": "col00f",

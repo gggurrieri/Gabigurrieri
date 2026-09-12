@@ -169,6 +169,11 @@ const NOTAS = [
   { n:'Especias', f:'ambar', d:'Genérica: la ficha no aclara cuáles. Si reconocés canela, cardamomo o pimienta, reemplazala por esas: el perfil olfativo y los parecidos mejoran con notas precisas.' },
   { n:'Frutos secos', f:'gourmand', d:'Genérica: almendra, avellana o nuez. Conviene precisarla cuando la reconozcas.' },
   { n:'Madera', f:'amaderada', d:'Genérica: cedro, sándalo o maderas sintéticas. Conviene precisarla cuando la reconozcas.' },
+  { n:'Bálsamo de Tolú', f:'ambar', d:'Resina dulce y canelada, entre la vainilla y el clavo. Suaviza los fondos cálidos.' },
+  { n:'Verbena', f:'citrica', d:'Hierba cítrica y limonada, más verde y menos dulce que el limón.' },
+  { n:'Cedro de Virginia', f:'amaderada', d:'Cedro rojo americano: más seco y lapicero que el del Atlas.' },
+  { n:'Ámbar', f:'ambar', d:'Genérica: el acorde cálido de resinas, vainilla y labdanum. Si la ficha aclara cuál, conviene precisarla.' },
+  { n:'Flores', f:'floral', d:'Genérica: la ficha no aclara cuáles. Conviene reemplazarla por las que reconozcas.' },
   { n:'Vetiver de Haití', f:'amaderada', d:'Versión más limpia y ahumada de la raíz.' }
 ];
 
@@ -394,7 +399,16 @@ const CATALOGO = [
     estaciones:['verano','primavera'], ocasiones:['casual','trabajo'], momento:'dia', longevidad:5, estela:2 },
   { casa:'Xerjoff', nombre:'More Than Words', conc:'EDP', familia:'almizclada',
     salida:['Bergamota','Pimienta rosa'], corazon:['Rosa','Iris / Orris'], fondo:['Almizcle blanco','Vainilla','Sándalo'],
-    estaciones:['primavera','otoño'], ocasiones:['trabajo','cita','evento'], momento:'ambos', longevidad:8, estela:3 }
+    estaciones:['primavera','otoño'], ocasiones:['trabajo','cita','evento'], momento:'ambos', longevidad:8, estela:3 },
+  { casa:'Kenzo', nombre:'Power', conc:'EDT', familia:'aromatica',
+    salida:['Cilantro','Cardamomo','Bergamota'], corazon:['Flores'], fondo:['Bálsamo de Tolú','Labdanum','Cedro'],
+    estaciones:['primavera','otoño'], ocasiones:['trabajo','casual','salida'], momento:'ambos', longevidad:7, estela:3 },
+  { casa:'Emper', nombre:'Stallion 53', conc:'EDP', familia:'amaderada',
+    salida:['Cardamomo','Violeta'], corazon:['Ámbar','Iris / Orris'], fondo:['Sándalo','Cuero','Cedro de Virginia','Papiro'],
+    estaciones:['otoño','invierno','primavera'], ocasiones:['trabajo','casual','evento'], momento:'ambos', longevidad:8, estela:3 },
+  { casa:'Acqua di Parma', nombre:'Colonia', conc:'EDC', familia:'citrica',
+    salida:['Bergamota','Limón','Naranja','Lavanda'], corazon:['Romero','Verbena','Rosa'], fondo:['Vetiver','Almizcle blanco','Pachulí','Sándalo'],
+    estaciones:['verano','primavera'], ocasiones:['trabajo','casual','evento'], momento:'dia', longevidad:5, estela:3 }
 ];
 
 
