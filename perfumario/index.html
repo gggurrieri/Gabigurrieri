@@ -52,6 +52,8 @@
         <h2>¿Qué me pongo?</h2>
         <p class="sub" id="contextoResumen">—</p>
 
+        <p class="clima" id="climaLinea">—</p>
+
         <div class="field-row">
           <label class="field">
             <span>Temperatura</span>
@@ -208,6 +210,21 @@
           <input type="checkbox" id="setAprender"> Aprender de mis elecciones
         </label>
         <p class="hint">Con esto prendido, las sugerencias se corrigen según lo que realmente usás en cada ocasión. Apagalo y vuelve a recomendar solo por las reglas fijas.</p>
+      </section>
+
+      <section class="card">
+        <h2>Clima</h2>
+        <p class="sub" id="lugarActual">—</p>
+        <label class="check"><input type="checkbox" id="setClima"> Traer la temperatura sola</label>
+        <div class="btn-row">
+          <button class="btn" id="btnUbicacion">📍 Usar mi ubicación</button>
+        </div>
+        <label class="field" style="margin-top:10px">
+          <span>O buscar una ciudad</span>
+          <input type="search" id="buscaCiudad" placeholder="Rosario, Buenos Aires…">
+        </label>
+        <div id="ciudadResultados" class="stack-sm"></div>
+        <p class="hint">Los datos salen de Open-Meteo, gratis y sin clave. Sale del dispositivo solo la ciudad que elijas, nada de tu colección. Si no hay internet, la app sigue andando con la temperatura a mano.</p>
       </section>
 
       <section class="card">

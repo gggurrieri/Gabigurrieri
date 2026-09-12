@@ -50,8 +50,10 @@ const DEFAULTS = {
   perfumes: [],  // {id,nombre,casa,conc,familia,salida[],corazon[],fondo[],ml,mlRestante,
                  //  precio,comprado,longevidad,estela,estaciones[],ocasiones[],momento,rating,nota,creado}
   usos: [],      // {id,fecha,perfumeId,sprays,ocasion,momento,temp,nota}
-  ajustes: { mlSpray: 0.1, moneda: '$', hemisferio: 'sur', aprender: true },
-  meta: { version: 1, ultimaCopia: null }
+  ajustes: { mlSpray: 0.1, moneda: '$', hemisferio: 'sur', aprender: true, clima: false },
+  meta: { version: 1, ultimaCopia: null,
+          lugar: null,   // {nombre, lat, lon} elegido una vez en Ajustes
+          clima: null }  // último dato traído: {temp, humedad, codigo, lugar, ts}
 };
 
 let S = clonar(DEFAULTS);
@@ -81,6 +83,7 @@ const ESTACIONES = {
 };
 /* las fichas guardan "otoño" con eñe; la clave interna va sin tilde */
 const claveEstacion = e => (e === 'otoño' ? 'otono' : e);
+const articuloEstacion = k => (k === 'primavera' ? 'la' : 'el');
 const nombreEstacion = k => (k === 'otono' ? 'otoño' : k);
 
 function estacionDe(fecha) {
@@ -126,6 +129,115 @@ const OCASIONES = {
 };
 const MOMENTOS = { dia: 'Día', noche: 'Noche', ambos: 'Día y noche' };
 
+/* ------------------------------ clima ------------------------------
+   Open-Meteo: gratis, sin clave y con CORS abierto, así que la app lo
+   consulta directo desde el navegador. Se le mandan solo las coordenadas
+   de la ciudad elegida. Si no hay red, o si la página corre con una
+   política que bloquea pedidos externos, se sigue con la temperatura a
+   mano: el clima es una comodidad, no un requisito.                    */
+const CLIMA_API = 'https://api.open-meteo.com/v1/forecast';
+const GEO_API = 'https://geocoding-api.open-meteo.com/v1/search';
+const CLIMA_VIGENCIA = 30; // minutos que vale un dato antes de volver a pedirlo
+
+/* códigos WMO, que es lo que devuelve la API */
+const WMO = {
+  0: ['Despejado', '☀️'], 1: ['Casi despejado', '🌤'], 2: ['Parcialmente nublado', '⛅'], 3: ['Nublado', '☁️'],
+  45: ['Niebla', '🌫'], 48: ['Niebla con escarcha', '🌫'],
+  51: ['Llovizna leve', '🌦'], 53: ['Llovizna', '🌦'], 55: ['Llovizna fuerte', '🌦'],
+  56: ['Llovizna helada', '🌧'], 57: ['Llovizna helada', '🌧'],
+  61: ['Lluvia leve', '🌧'], 63: ['Lluvia', '🌧'], 65: ['Lluvia fuerte', '🌧'],
+  66: ['Lluvia helada', '🌧'], 67: ['Lluvia helada', '🌧'],
+  71: ['Nieve leve', '🌨'], 73: ['Nieve', '🌨'], 75: ['Nieve fuerte', '🌨'], 77: ['Granos de nieve', '🌨'],
+  80: ['Chaparrones', '🌦'], 81: ['Chaparrones', '🌦'], 82: ['Chaparrones fuertes', '🌦'],
+  85: ['Chaparrones de nieve', '🌨'], 86: ['Chaparrones de nieve', '🌨'],
+  95: ['Tormenta', '⛈'], 96: ['Tormenta con granizo', '⛈'], 99: ['Tormenta con granizo', '⛈']
+};
+const describirClima = c => WMO[c] || ['Sin datos del cielo', '🌡'];
+
+const minutosDesde = iso => Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+
+/* Un pedido que no corta nunca deja la app colgada esperando. */
+function pedirJSON(url, ms) {
+  const ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+  const corte = setTimeout(() => { if (ctrl) ctrl.abort(); }, ms || 8000);
+  return fetch(url, ctrl ? { signal: ctrl.signal } : {})
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(j => { clearTimeout(corte); return j; })
+    .catch(e => { clearTimeout(corte); throw e; });
+}
+
+const climaVigente = () => {
+  const c = S.meta.clima;
+  return (c && minutosDesde(c.ts) < CLIMA_VIGENCIA) ? c : null;
+};
+
+let climaPidiendo = false;
+
+function traerClima(forzar) {
+  const lugar = S.meta.lugar;
+  if (!S.ajustes.clima || !lugar || climaPidiendo) return Promise.resolve();
+  if (!forzar && climaVigente()) return Promise.resolve();
+  if (navigator.onLine === false) { climaEstado('Sin conexión: queda el último dato.'); return Promise.resolve(); }
+
+  climaPidiendo = true;
+  climaEstado('Consultando el clima…');
+  const url = `${CLIMA_API}?latitude=${encodeURIComponent(lugar.lat)}&longitude=${encodeURIComponent(lugar.lon)}` +
+    '&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto';
+
+  return pedirJSON(url).then(d => {
+    const c = d && d.current;
+    if (!c || typeof c.temperature_2m !== 'number') throw new Error('respuesta sin temperatura');
+    S.meta.clima = {
+      temp: c.temperature_2m, humedad: c.relative_humidity_2m,
+      codigo: c.weather_code, lugar: lugar.nombre, ts: new Date().toISOString()
+    };
+    guardar();
+    aplicarTempDelClima();
+    if (vistaActual === 'hoy') renderHoy();
+    else if (vistaActual === 'ajustes') renderAjustes();
+  }).catch(() => {
+    climaEstado('No pude traer el clima. Movés la temperatura a mano.');
+  }).then(() => { climaPidiendo = false; });
+}
+
+/* No pisa la temperatura si la moviste vos: tu dedo gana sobre la API. */
+function aplicarTempDelClima() {
+  const c = S.meta.clima;
+  if (!S.ajustes.clima || !c || ctx.manual) return;
+  ctx.temp = c.temp;
+}
+
+function climaEstado(txt) {
+  const l = $('#climaLinea');
+  if (l) l.textContent = txt;
+}
+
+function buscarCiudad(q) {
+  return pedirJSON(`${GEO_API}?name=${encodeURIComponent(q)}&count=5&language=es&format=json`)
+    .then(d => (d && d.results) || []);
+}
+
+function fijarLugar(nombre, lat, lon) {
+  S.meta.lugar = { nombre, lat, lon };
+  S.ajustes.clima = true;
+  S.meta.clima = null;
+  ctx.manual = false;
+  guardar();
+  renderAjustes();
+  toast(`Clima de ${nombre}`);
+  traerClima(true);
+}
+
+function usarUbicacion() {
+  if (!navigator.geolocation) { toast('Este navegador no da la ubicación'); return; }
+  toast('Buscando tu ubicación…');
+  navigator.geolocation.getCurrentPosition(
+    pos => fijarLugar('Mi ubicación', pos.coords.latitude.toFixed(3), pos.coords.longitude.toFixed(3)),
+    () => toast('No me dio la ubicación: buscá la ciudad a mano'),
+    { timeout: 10000, maximumAge: 600000 }
+  );
+}
+
 /* --------------------------- navegación ---------------------------- */
 let vistaActual = 'hoy';
 
@@ -159,7 +271,7 @@ function toast(msg) {
 
 /* ============================== HOY ================================= */
 /* contexto: lo que la persona elige antes de pedir una sugerencia */
-const ctx = { temp: null, momento: null, ocasion: 'casual' };
+const ctx = { temp: null, momento: null, ocasion: 'casual', manual: false };
 
 function momentoPorHora() {
   const h = new Date().getHours();
@@ -168,6 +280,7 @@ function momentoPorHora() {
 function ctxInicial() {
   if (ctx.temp === null) ctx.temp = ESTACIONES[estacionHoy()].temp;
   if (ctx.momento === null) ctx.momento = momentoPorHora();
+  aplicarTempDelClima();
 }
 
 /* Lo que la app aprende de tus elecciones.
@@ -225,7 +338,7 @@ function puntuar(p, m) {
   if (estaciones.length) {
     if (estaciones.includes(est)) {
       score += 18;
-      razones.push({ txt: `Va con el ${nombreEstacion(est)}`, bien: true });
+      razones.push({ txt: `Va con ${articuloEstacion(est)} ${nombreEstacion(est)}`, bien: true });
     } else {
       score -= 12;
       razones.push({ txt: `Lo marcaste para ${estaciones.map(nombreEstacion).join(' y ')}`, bien: false });
@@ -334,6 +447,8 @@ function renderHoy() {
   $$('#ctxOcasion .chip').forEach(c => c.classList.toggle('on', c.dataset.val === ctx.ocasion));
   $('#contextoResumen').textContent =
     `${ESTACIONES[est].emoji} Estamos en ${nombreEstacion(est)} · ${MOMENTOS[ctx.momento]} · ${OCASIONES[ctx.ocasion]}`;
+  renderClima();
+  traerClima();
 
   const modelo = modeloAprendido();
   const cont = $('#sugerencias');
@@ -358,6 +473,24 @@ function renderHoy() {
   }).join('');
 
   avisoCopia();
+}
+
+function renderClima() {
+  const l = $('#climaLinea');
+  if (!S.ajustes.clima || !S.meta.lugar) {
+    l.innerHTML = `<button class="link" id="btnActivarClima">📍 Traer la temperatura sola</button>`;
+    return;
+  }
+  const c = S.meta.clima;
+  if (!c) { l.textContent = 'Consultando el clima…'; return; }
+  const [txt, emo] = describirClima(c.codigo);
+  const mins = minutosDesde(c.ts);
+  l.innerHTML =
+    `${emo} <b>${Math.round(c.temp)}°</b> · ${esc(txt)} en ${esc(c.lugar)} · ` +
+    `${mins < 1 ? 'recién' : 'hace ' + mins + ' min'} ` +
+    `<button class="link" id="btnRefrescarClima">Actualizar</button>` +
+    (ctx.manual ? ` <span class="hint">· estás usando ${Math.round(ctx.temp)}° a mano</span>` : '') +
+    (c.humedad >= 70 ? `<div class="hint">Humedad ${c.humedad} %: proyecta más de lo normal, con dos aplicaciones alcanza.</div>` : '');
 }
 
 function fichaSugerencia(s, i) {
@@ -1065,6 +1198,11 @@ function renderAjustes() {
   $('#setMoneda').value = S.ajustes.moneda;
   $('#setHemisferio').value = S.ajustes.hemisferio;
   $('#setAprender').checked = S.ajustes.aprender !== false;
+  $('#setClima').checked = !!S.ajustes.clima;
+  const c = S.meta.clima;
+  $('#lugarActual').textContent = S.meta.lugar
+    ? `${S.meta.lugar.nombre}${c ? ` · ${Math.round(c.temp)}° hace ${minutosDesde(c.ts)} min` : ' · todavía sin datos'}`
+    : 'Sin ubicación: la temperatura se carga a mano.';
   const u = S.meta.ultimaCopia;
   $('#copiaEstado').textContent = u
     ? `Última copia: ${fmtHace(u)} (${fmtFecha(u)}).`
@@ -1184,6 +1322,7 @@ function conectar() {
   // contexto de Hoy
   $('#ctxTemp').addEventListener('input', e => {
     ctx.temp = num(e.target.value, 20);
+    ctx.manual = true;   // a partir de acá manda lo que elegiste vos
     $('#ctxTempOut').textContent = Math.round(ctx.temp) + '°';
   });
   $('#ctxTemp').addEventListener('change', renderHoy);
@@ -1232,6 +1371,41 @@ function conectar() {
   $('#setHemisferio').addEventListener('change', e => {
     S.ajustes.hemisferio = e.target.value; guardar(); toast(`Ahora estás en ${nombreEstacion(estacionHoy())}`);
   });
+  $('#setClima').addEventListener('change', e => {
+    S.ajustes.clima = e.target.checked; guardar();
+    if (e.target.checked && !S.meta.lugar) toast('Elegí una ciudad o usá tu ubicación');
+    else if (e.target.checked) { ctx.manual = false; traerClima(true); }
+    renderAjustes();
+  });
+  $('#btnUbicacion').addEventListener('click', usarUbicacion);
+
+  let buscandoCiudad = null;
+  $('#buscaCiudad').addEventListener('input', e => {
+    const q = e.target.value.trim();
+    clearTimeout(buscandoCiudad);
+    if (q.length < 3) { $('#ciudadResultados').innerHTML = ''; return; }
+    // esperar a que deje de escribir: una consulta por tecla es maltratar la API
+    buscandoCiudad = setTimeout(() => {
+      $('#ciudadResultados').innerHTML = '<p class="hint">Buscando…</p>';
+      buscarCiudad(q).then(res => {
+        $('#ciudadResultados').innerHTML = res.length
+          ? res.map(r => `<button class="item" data-lat="${r.latitude}" data-lon="${r.longitude}"
+              data-nombre="${esc(r.name)}${r.admin1 ? ', ' + esc(r.admin1) : ''}">
+              <div class="it-main"><div class="it-name">${esc(r.name)}</div>
+              <div class="it-sub">${esc([r.admin1, r.country].filter(Boolean).join(' · '))}</div></div></button>`).join('')
+          : '<p class="hint">No encontré esa ciudad.</p>';
+      }).catch(() => {
+        $('#ciudadResultados').innerHTML = '<p class="hint">No pude buscar la ciudad. ¿Hay internet?</p>';
+      });
+    }, 400);
+  });
+  $('#ciudadResultados').addEventListener('click', e => {
+    const b = e.target.closest('[data-lat]');
+    if (!b) return;
+    fijarLugar(b.dataset.nombre, b.dataset.lat, b.dataset.lon);
+    $('#buscaCiudad').value = ''; $('#ciudadResultados').innerHTML = '';
+  });
+
   $('#btnExportar').addEventListener('click', exportar);
   $('#btnImportar').addEventListener('click', importar);
   $('#btnBorrar').addEventListener('click', borrarTodo);
@@ -1272,6 +1446,9 @@ function conectar() {
       }
       return;
     }
+
+    if (e.target.closest('#btnActivarClima')) { ir('ajustes'); $('#buscaCiudad').focus(); return; }
+    if (e.target.closest('#btnRefrescarClima')) { ctx.manual = false; traerClima(true); return; }
 
     const nota = e.target.closest('[data-nota]');
     if (nota) {

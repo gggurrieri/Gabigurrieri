@@ -21,7 +21,10 @@ const check = (n, c, d = '') => {
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', e => errs.push(e.message));
-  p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
+  p.on('console', m => {
+    // net::ERR_FAILED es el corte de red que simula la prueba del clima, no un bug
+    if (m.type() === 'error' && !/net::ERR_FAILED/.test(m.text())) errs.push(m.text());
+  });
 
   await p.goto('file://' + path.resolve(__dirname, '..', 'index.html'));
   await p.evaluate(() => localStorage.clear());
@@ -58,11 +61,16 @@ const check = (n, c, d = '') => {
   check('dice en qué estación estamos', /(verano|otoño|invierno|primavera)/.test(await p.textContent('#contextoResumen')));
   check('ahora avisa de la copia', await visible('#avisoCopia'));
 
-  const primero = (await p.textContent('#sugerencias .pf-name')).replace('★', '').trim();
+  // fijar el momento: si no, la prueba depende de la hora a la que se corra
+  await p.tap('#ctxMomento .chip[data-val="dia"]'); await p.waitForTimeout(250);
+  const ranking = () => p.evaluate(() => Array.from(document.querySelectorAll('#sugerencias .pf'))
+    .map(e => e.querySelector('.pf-name').textContent.replace('★', '').trim() + ':' +
+              e.querySelector('.pf-score').textContent.trim()).join(' | '));
+  const casual = await ranking();
   await p.tap('#ctxOcasion .chip[data-val="deporte"]'); await p.waitForTimeout(300);
   check('la ocasión cambia el contexto', /Deporte/.test(await p.textContent('#contextoResumen')));
-  const deporte = (await p.textContent('#sugerencias .pf-name')).replace('★', '').trim();
-  check('y cambia lo que sugiere', deporte !== primero, `${primero} → ${deporte}`);
+  const deporte = await ranking();
+  check('y cambia lo que sugiere', deporte !== casual, `${casual} → ${deporte}`);
 
   const temp0 = await p.textContent('#ctxTempOut');
   await p.evaluate(() => {
@@ -245,7 +253,53 @@ const check = (n, c, d = '') => {
   check('lo marca como pendiente de completar', /completar/.test(await p.textContent('#listaColeccion')));
   await p.fill('#busca', ''); await p.waitForTimeout(200);
 
-  console.log('\nL · Copia y borrado');
+  console.log('\nL · Clima automático');
+  // la API se simula: la prueba no puede depender de que haya red ni del tiempo real
+  let climaFalla = false;
+  const respuesta = cuerpo => ({ status: 200, contentType: 'application/json',
+    headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(cuerpo) });
+  await p.route('**/geocoding-api.open-meteo.com/**', r => r.fulfill(respuesta({
+    results: [{ name: 'Rosario', latitude: -32.94, longitude: -60.63,
+                country: 'Argentina', admin1: 'Provincia de Santa Fe' }] })));
+  await p.route('**/api.open-meteo.com/v1/forecast**', r => climaFalla ? r.abort() : r.fulfill(respuesta({
+    current: { temperature_2m: 11.3, relative_humidity_2m: 80, weather_code: 3 } })));
+
+  await p.tap('#btnSettings'); await p.waitForTimeout(250);
+  check('arranca sin ubicación', /Sin ubicación/.test(await p.textContent('#lugarActual')));
+  await p.fill('#buscaCiudad', 'Rosario'); await p.waitForTimeout(900);
+  check('busca la ciudad', await cuantos('#ciudadResultados [data-lat]') === 1);
+  await p.tap('#ciudadResultados [data-lat]'); await p.waitForTimeout(600);
+  d = await db();
+  check('guarda la ubicación elegida', !!d.meta.lugar && /Rosario/.test(d.meta.lugar.nombre));
+  check('prende el clima solo', d.ajustes.clima === true);
+  check('trae la temperatura', !!d.meta.clima && Math.round(d.meta.clima.temp) === 11,
+    JSON.stringify(d.meta.clima));
+
+  await ir('hoy');
+  const linea = await p.textContent('#climaLinea');
+  check('la muestra en Hoy', /Nublado en Rosario/.test(linea), linea.replace(/\s+/g, ' ').slice(0, 70));
+  check('la aplica al contexto', (await p.textContent('#ctxTempOut')) === '11°');
+  check('avisa cuando hay humedad alta', /Humedad 80/.test(linea));
+
+  await p.evaluate(() => {
+    const s = document.querySelector('#ctxTemp');
+    s.value = 31;
+    s.dispatchEvent(new Event('input', { bubbles: true }));
+    s.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await p.waitForTimeout(350);
+  check('lo que ponés a mano le gana a la API', (await p.textContent('#ctxTempOut')) === '31°');
+  check('y lo dice', /a mano/.test(await p.textContent('#climaLinea')));
+  await p.tap('#btnRefrescarClima'); await p.waitForTimeout(600);
+  check('actualizar vuelve al dato real', (await p.textContent('#ctxTempOut')) === '11°');
+
+  climaFalla = true;
+  await p.tap('#btnRefrescarClima'); await p.waitForTimeout(700);
+  check('si la API falla, lo dice sin romperse', /No pude traer el clima/.test(await p.textContent('#climaLinea')));
+  check('y las sugerencias siguen ahí', await cuantos('#sugerencias article.card') === 3);
+  climaFalla = false;
+
+  console.log('\nM · Copia y borrado');
   await p.tap('#btnSettings'); await p.waitForTimeout(250);
   await p.tap('#btnExportar'); await p.waitForTimeout(300);
   check('exporta un JSON legible', await p.evaluate(() => {
@@ -270,7 +324,7 @@ const check = (n, c, d = '') => {
   check('borra todo', d.perfumes.length === 0 && d.usos.length === 0);
   check('y vuelve al estado inicial', /Todav[íi]a no cargaste/.test(await p.textContent('#sugerencias')));
 
-  console.log('\nM · Sin errores');
+  console.log('\nN · Sin errores');
   check('la consola quedó limpia', errs.length === 0, errs.slice(0, 3).join(' | '));
 
   await b.close();

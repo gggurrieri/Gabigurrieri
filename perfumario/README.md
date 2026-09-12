@@ -20,7 +20,7 @@ inicio". Queda como una app nativa y funciona sin señal.
 
 | Pestaña | Para qué sirve |
 |---|---|
-| **Hoy** | Elegís temperatura, momento del día y ocasión, y te propone tres perfumes con un puntaje y las razones de cada uno. Un toque para registrar que te lo pusiste. |
+| **Hoy** | La temperatura la trae sola del clima de tu ciudad; elegís momento del día y ocasión, y te propone tres perfumes con un puntaje y las razones de cada uno. Un toque para registrar que te lo pusiste. |
 | **Colección** | Alta, edición y borrado de perfumes con casa, concentración, familia, pirámide de notas, ml, precio, estaciones, ocasiones, duración, estela y puntaje. Buscador por nombre, casa o **nota**, filtro por familia y siete criterios de orden. **Carga rápida** para pegar una lista entera de una vez. |
 | **Notas** | Diccionario de 96 notas y 11 familias explicadas, tu perfil olfativo (qué tenés contra qué usás) y comparador de parecidos entre perfumes de tu colección. |
 | **Uso** | Usos del mes, ml gastados, el más puesto, costo por uso, rotación de los últimos 90 días, los que juntan polvo, los que se están por acabar e historial. |
@@ -46,6 +46,44 @@ tres razones que más pesaron.
 A eso se le suma lo que aprende de vos (se apaga en Ajustes).
 
 El hemisferio importa: con la opción "Sur", diciembre es verano.
+
+## El clima, automático
+
+En **Ajustes → Clima** elegís una ciudad (o tocás "Usar mi ubicación") y la
+temperatura del recomendador deja de cargarse a mano.
+
+Los datos salen de [Open-Meteo](https://open-meteo.com): gratis, sin clave y con
+CORS abierto (*Cross-Origin Resource Sharing*: el permiso que da un servidor para
+que una página de otro dominio lea su respuesta), así que la app lo consulta
+directo desde el navegador, sin backend propio. Dos llamadas:
+
+- `geocoding-api.open-meteo.com/v1/search` para pasar de "Rosario" a coordenadas,
+  una sola vez y con la escritura pausada 400 ms (*debounce*: esperar a que la
+  persona deje de tipear antes de consultar, en lugar de una llamada por tecla).
+- `api.open-meteo.com/v1/forecast` para la temperatura, la humedad y el estado del
+  cielo (códigos WMO, el estándar meteorológico que traduce 3 a "nublado").
+
+Reglas que sigue:
+
+- **El dato dura 30 minutos.** Dentro de esa ventana usa el último que trajo, en
+  vez de pedir uno nuevo en cada pantalla.
+- **Tu dedo le gana a la API.** Si movés el control de temperatura, manda ese
+  valor y la línea del clima lo aclara; "Actualizar" devuelve el dato real.
+- **Nunca bloquea.** El pedido corta a los 8 segundos, y si falla (sin internet,
+  API caída, o una política de seguridad que bloquee el pedido) lo dice y seguís a
+  mano. El clima es una comodidad, no un requisito.
+- **Sale solo la ciudad.** Se envían las coordenadas elegidas y nada más: tu
+  colección no viaja a ningún lado.
+- **El service worker no lo cachea.** Solo guarda los archivos propios; si
+  cachearan el clima, la temperatura quedaría congelada en la primera consulta.
+
+> En la vista publicada como Artifact los pedidos a dominios externos están
+> bloqueados por la política de seguridad de esa página, así que ahí el clima
+> siempre va a fallar y hay que usar la temperatura a mano. Servida desde GitHub
+> Pages funciona normal.
+
+Con humedad de 70 % o más, avisa que el perfume proyecta más de lo normal y que
+con dos aplicaciones alcanza.
 
 ## Cómo aprende de tus elecciones
 
@@ -128,7 +166,8 @@ táctiles reales: primer arranque, carga de ejemplos, sugerencias y cómo cambia
 el contexto, registro y borrado de usos con el descuento de ml, buscador y filtros,
 alta desde el catálogo, ficha, diccionario de notas, estadísticas de uso, copia de
 seguridad y borrado, más el aprendizaje (que aparezca, que se pueda apagar) y la
-carga por lotes. 76 comprobaciones.
+carga por lotes, y el clima con la API simulada (que llegue, que se pueda pisar a
+mano y que falle sin romper nada). 89 comprobaciones.
 
 ```
 node perfumario/tests/e2e.js      # sale con código 1 si algo falla
@@ -141,7 +180,6 @@ disponible, pasale uno: `CHROME_PATH=/ruta/al/chrome node perfumario/tests/e2e.j
 
 Ideas anotadas para las próximas vueltas:
 
-- Traer la temperatura real por geolocalización en vez de cargarla a mano.
 - Foto del frasco en cada ficha.
 - Lista de deseados con precio objetivo.
 - Dividir un frasco en decants y seguirlos por separado.
