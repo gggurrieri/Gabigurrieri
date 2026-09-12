@@ -93,13 +93,13 @@ window.PERFUMARIO_COLECCION = {
       "creado": "2026-09-12",
       "nombre": "Eau du Cologne Noble",
       "casa": "Asten",
-      "conc": "EDT",
+      "conc": "EDP",
       "familia": "citrica",
       "salida": [],
       "corazon": [],
       "fondo": [],
       "ml": 100,
-      "mlRestante": 100,
+      "mlRestante": 95,
       "precio": 0,
       "comprado": null,
       "longevidad": 0,
@@ -114,7 +114,7 @@ window.PERFUMARIO_COLECCION = {
       ],
       "momento": "dia",
       "rating": 0,
-      "nota": "Notas a completar: no las tengo confirmadas."
+      "nota": "Notas a completar: no las tengo confirmadas. Concentración y nivel leídos de la foto."
     },
     {
       "id": "col004",
@@ -343,8 +343,8 @@ window.PERFUMARIO_COLECCION = {
         "Sándalo",
         "Almizcle blanco"
       ],
-      "ml": 100,
-      "mlRestante": 100,
+      "ml": 60,
+      "mlRestante": 60,
       "precio": 0,
       "comprado": null,
       "longevidad": 7,
@@ -360,7 +360,7 @@ window.PERFUMARIO_COLECCION = {
       ],
       "momento": "ambos",
       "rating": 0,
-      "nota": ""
+      "nota": "Caja cerrada, 60 ml (la foto corrige los 125 que le había puesto)."
     },
     {
       "id": "col00a",
@@ -389,7 +389,7 @@ window.PERFUMARIO_COLECCION = {
       ],
       "momento": "ambos",
       "rating": 0,
-      "nota": "Notas a completar: no las tengo confirmadas."
+      "nota": "Notas a completar: no las tengo confirmadas. Frasco opaco: el nivel no se ve."
     },
     {
       "id": "col00b",
@@ -506,13 +506,13 @@ window.PERFUMARIO_COLECCION = {
       "creado": "2026-09-12",
       "nombre": "Stallion 53",
       "casa": "",
-      "conc": "EDT",
+      "conc": "EDP",
       "familia": "amaderada",
       "salida": [],
       "corazon": [],
       "fondo": [],
       "ml": 100,
-      "mlRestante": 100,
+      "mlRestante": 65,
       "precio": 0,
       "comprado": null,
       "longevidad": 0,
@@ -528,7 +528,7 @@ window.PERFUMARIO_COLECCION = {
       ],
       "momento": "ambos",
       "rating": 0,
-      "nota": "Notas a completar: no tengo la casa ni la pirámide."
+      "nota": "La etiqueta lo describe como amaderado intenso (\"rich woody\"), desarrollado en Francia y hecho en Emiratos. Notas sin confirmar."
     },
     {
       "id": "col00f",
@@ -606,7 +606,7 @@ window.PERFUMARIO_COLECCION = {
       "creado": "2026-09-12",
       "nombre": "Maahir Legacy",
       "casa": "Lattafa",
-      "conc": "EDT",
+      "conc": "EDP",
       "familia": "ambar",
       "salida": [],
       "corazon": [],
@@ -628,7 +628,7 @@ window.PERFUMARIO_COLECCION = {
       ],
       "momento": "noche",
       "rating": 0,
-      "nota": "Notas a completar: no las tengo confirmadas."
+      "nota": "Notas a completar: no las tengo confirmadas. Frasco opaco: el nivel no se ve."
     },
     {
       "id": "col00i",
