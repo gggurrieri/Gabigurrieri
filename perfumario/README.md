@@ -40,7 +40,7 @@ inicio". Queda como una app nativa y funciona sin señal.
 
 | Pestaña | Para qué sirve |
 |---|---|
-| **Hoy** | La temperatura la trae sola del clima de tu ciudad; elegís momento del día y ocasión, y te propone tres perfumes con un puntaje y las razones de cada uno. Un toque para registrar que te lo pusiste. |
+| **Hoy** | Botón **✈️ Me voy de viaje** para armar la valija. La temperatura la trae sola del clima de tu ciudad; elegís momento del día y ocasión, y te propone tres perfumes con un puntaje y las razones de cada uno. Un toque para registrar que te lo pusiste. |
 | **Colección** | Alta, edición y borrado de perfumes con casa, concentración, familia, pirámide de notas, ml, precio, estaciones, ocasiones, duración, estela y puntaje. Buscador por nombre, casa o **nota**, filtro por familia y siete criterios de orden. **Carga rápida** para pegar una lista entera de una vez. |
 | **Notas** | Diccionario de 112 notas y 11 familias explicadas, tu perfil olfativo (qué tenés contra qué usás), comparación de dos perfumes lado a lado y buscador de parecidos. |
 | **Uso** | Usos del mes, ml gastados, el más puesto, costo por uso, rotación de los últimos 90 días, los que juntan polvo, los que se están por acabar e historial. Tocando un uso se corrige (fecha, perfume, aplicaciones, ocasión) y los ml del frasco se recalculan solos. |
@@ -154,6 +154,28 @@ parecido de tu colección.
 Si ponés el mismo perfume de los dos lados, te avisa en lugar de corregirte la
 selección por atrás.
 
+## Qué llevar de viaje
+
+**Hoy → ✈️ Me voy de viaje**: destino, fechas, qué vas a hacer allá y cuántos
+perfumes llevás. La app busca el **pronóstico diario del destino** (Open-Meteo da
+hasta unos 15 días), calcula en qué estación está ese lugar —usa el hemisferio
+del destino, no el tuyo— y arma la lista.
+
+La parte interesante es cómo elige, porque **no es "los tres de mayor puntaje"**:
+esos suelen parecerse entre sí y dejan días sin cubrir. Cada día × cada ocasión
+del viaje es una casilla, y en cada vuelta entra el perfume que más sube las
+casillas peor cubiertas (cobertura máxima por pasos). Así el segundo que entra es
+el que tapa lo que el primero deja afuera.
+
+Cada elegido muestra cuántos días cubre, para qué ocasiones, y **cuántos ml vas a
+gastar** (días × aplicaciones). Avisa si no te alcanza lo que queda en el frasco,
+y si el frasco pasa de 100 ml, que en cabina no entra.
+
+Dos límites que se respetan en vez de disimularse: si no hay pronóstico (faltan
+más de 15 días, o no hay internet) **se pide la temperatura esperada** en lugar de
+inventar un clima; y si pedís tres pero con dos alcanza, lo dice, y no completa la
+lista con un perfume que no sirve para ese viaje.
+
 ## Cómo aprende de tus elecciones
 
 No hay nada mágico ni ninguna red neuronal: cuenta qué usaste en cada ocasión
@@ -245,7 +267,7 @@ mano, que la ciudad se encuentre sin red y que falle sin romper nada) y la
 colección incluida (que entre sola, que no
 resucite después de borrarla y que no se duplique), la corrección de un uso con
 su recálculo de ml, el aprendizaje por temperatura y la descarga de la copia.
-129 comprobaciones, incluidos candados que fallan si alguna nota usada en una
+143 comprobaciones, incluidos candados que fallan si alguna nota usada en una
 ficha quedó sin explicación en el diccionario, o si el ícono de "Agregar a
 pantalla de inicio" vuelve a quedar liso (ya pasó una vez: salía negro).
 

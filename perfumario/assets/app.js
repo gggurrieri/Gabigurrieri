@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-09-12.5';
+const VERSION = '2026-09-12.6';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -117,13 +117,13 @@ const claveEstacion = e => (e === 'otoño' ? 'otono' : e);
 const articuloEstacion = k => (k === 'primavera' ? 'la' : 'el');
 const nombreEstacion = k => (k === 'otono' ? 'otoño' : k);
 
-function estacionDe(fecha) {
+function estacionDe(fecha, hemisferio) {
   const m = fromISO(fecha).getMonth(); // 0 = enero
   const sur = ['verano','verano','otono','otono','otono','invierno',
                'invierno','invierno','primavera','primavera','primavera','verano'];
   const norte = ['invierno','invierno','primavera','primavera','primavera','verano',
                  'verano','verano','otono','otono','otono','invierno'];
-  return (S.ajustes.hemisferio === 'norte' ? norte : sur)[m];
+  return ((hemisferio || S.ajustes.hemisferio) === 'norte' ? norte : sur)[m];
 }
 const estacionHoy = () => estacionDe(today());
 
@@ -464,9 +464,18 @@ function modeloAprendido() {
 /* Puntaje de un perfume para el contexto actual.
    Devuelve {score, razones:[{txt, bien}]} para poder explicar la sugerencia:
    una recomendación que no se explica no se usa. */
-function puntuar(p, m) {
+function contextoActual() {
+  const cl = climaParaPuntaje();
+  return {
+    temp: ctx.temp, momento: ctx.momento, ocasion: ctx.ocasion,
+    estacion: estacionHoy(), lluvia: !!(cl && estaLloviendo(cl.codigo))
+  };
+}
+
+function puntuar(p, m, c) {
   m = m || { activo: false };
-  const est = estacionHoy();
+  c = c || contextoActual();
+  const est = c.estacion;
   const razones = [];
   let score = 50;
 
@@ -484,38 +493,41 @@ function puntuar(p, m) {
 
   // temperatura
   const ideal = TEMP_IDEAL[p.familia] != null ? TEMP_IDEAL[p.familia] : 18;
-  const dif = Math.abs(ctx.temp - ideal);
+  const dif = Math.abs(c.temp - ideal);
   score -= Math.min(20, dif * 1.2);
-  if (dif <= 4) razones.push({ txt: `${familia(p.familia).nombre} rinde bien con ${Math.round(ctx.temp)}°`, bien: true });
+  if (dif <= 4) razones.push({ txt: `${familia(p.familia).nombre} rinde bien con ${Math.round(c.temp)}°`, bien: true });
   else if (dif >= 12) razones.push({
-    txt: ctx.temp > ideal ? `Con ${Math.round(ctx.temp)}° se puede volver pesado` : `Con ${Math.round(ctx.temp)}° se va a sentir poco`,
+    txt: c.temp > ideal ? `Con ${Math.round(c.temp)}° se puede volver pesado` : `Con ${Math.round(c.temp)}° se va a sentir poco`,
     bien: false });
 
-  // momento del día
+  // momento del día (un viaje tiene mañanas y noches: ahí no se evalúa)
   const mom = p.momento || 'ambos';
-  if (mom === ctx.momento) { score += 12; razones.push({ txt: `Lo tenés anotado para ${MOMENTOS[mom].toLowerCase()}`, bien: true }); }
+  if (!c.sinMomento) {
+  if (mom === c.momento) { score += 12; razones.push({ txt: `Lo tenés anotado para ${MOMENTOS[mom].toLowerCase()}`, bien: true }); }
   else if (mom === 'ambos') score += 4;
   else { score -= 10; razones.push({ txt: `Lo anotaste para ${MOMENTOS[mom].toLowerCase()}`, bien: false }); }
+  }
 
   // ocasión
   const oc = p.ocasiones || [];
   if (oc.length) {
-    if (oc.includes(ctx.ocasion)) { score += 14; razones.push({ txt: `Sirve para ${OCASIONES[ctx.ocasion].toLowerCase()}`, bien: true }); }
+    if (oc.includes(c.ocasion)) { score += 14; razones.push({ txt: `Sirve para ${OCASIONES[c.ocasion].toLowerCase()}`, bien: true }); }
     else score -= 8;
   }
   // estela según el lugar: en la oficina o haciendo deporte, mejor discreto
   const estela = p.estela || 3;
-  if (ctx.ocasion === 'trabajo' || ctx.ocasion === 'deporte') {
+  if (c.ocasion === 'trabajo' || c.ocasion === 'deporte') {
     if (estela >= 5) { score -= 12; razones.push({ txt: 'Deja mucha estela para ese ambiente', bien: false }); }
     else if (estela <= 2) score += 5;
   }
-  if (ctx.ocasion === 'evento' || ctx.ocasion === 'cita') {
+  if (c.ocasion === 'evento' || c.ocasion === 'cita') {
     if (estela >= 4) { score += 8; razones.push({ txt: 'Tiene la presencia que pide la ocasión', bien: true }); }
   }
 
-  // rotación: premia lo olvidado, castiga repetir
-  const ult = ultimoUso(p.id);
-  if (!ult) { score += 8; razones.push({ txt: 'Todavía no lo estrenaste', bien: true }); }
+  // rotación: premia lo olvidado, castiga repetir (en un viaje da igual)
+  const ult = c.sinRotacion ? null : ultimoUso(p.id);
+  if (c.sinRotacion) { /* nada */ }
+  else if (!ult) { score += 8; razones.push({ txt: 'Todavía no lo estrenaste', bien: true }); }
   else {
     const d = daysBetween(ult, today());
     if (d === 0) { score -= 30; razones.push({ txt: 'Es el que usaste hoy', bien: false }); }
@@ -529,8 +541,7 @@ function puntuar(p, m) {
   if (p.ml > 0 && pct <= 10) { score -= 8; razones.push({ txt: `Queda ${pct} %: guardalo para algo que valga`, bien: false }); }
 
   // lluvia: los frescos livianos no sobreviven al agua
-  const cl = climaParaPuntaje();
-  if (cl && estaLloviendo(cl.codigo)) {
+  if (c.lluvia) {
     const dur = p.longevidad || 0;
     if (dur >= 8) { score += 6; razones.push({ txt: 'Llueve y este aguanta', bien: true, clima: true }); }
     else if (dur && dur <= 5) { score -= 6; razones.push({ txt: 'Con lluvia, uno tan liviano se va enseguida', bien: false, clima: true }); }
@@ -538,7 +549,7 @@ function puntuar(p, m) {
 
   // lo aprendido de tus elecciones anteriores
   if (m.activo) {
-    const oc = ctx.ocasion, tot = m.totOc[oc] || 0;
+    const oc = c.ocasion, tot = m.totOc[oc] || 0;
     if (tot >= MIN_USOS_OCASION) {
       const fam = p.familia || 'sin';
       const obs = (m.ocFam[oc + '|' + fam] || 0) / tot;
@@ -562,10 +573,10 @@ function puntuar(p, m) {
     // la temperatura a la que usás esa familia
     const tf = (m.tempFam || {})[p.familia || 'sin'];
     if (tf) {
-      const dif = ctx.temp - tf.media;
+      const dif = c.temp - tf.media;
       if (Math.abs(dif) >= 8) {
         score -= Math.min(12, 3 + (Math.abs(dif) - 8) * 1.2);
-        razones.push({ txt: `Lo usás con ${Math.round(tf.media)}° y hoy hay ${Math.round(ctx.temp)}°`,
+        razones.push({ txt: `Lo usás con ${Math.round(tf.media)}° y hoy hay ${Math.round(c.temp)}°`,
                        bien: false, aprendido: true });
       } else if (Math.abs(dif) <= 3) {
         score += 5;
@@ -742,6 +753,253 @@ function avisoCopia() {
   av.innerHTML = ult
     ? `Hace ${daysBetween(ult, today())} días que no exportás una copia. Si limpiás el navegador, se pierde todo. <b>Exportar ahora →</b>`
     : `No tenés ninguna copia de tus datos. Si limpiás el navegador, se pierde todo. <b>Exportar ahora →</b>`;
+}
+
+/* ============================== VIAJE ===============================
+   "Qué me pongo hoy" y "qué me llevo siete días" son preguntas distintas:
+   la segunda no se resuelve eligiendo los tres perfumes de mayor puntaje,
+   porque suelen parecerse entre sí y dejan días sin cubrir. Se resuelve
+   cubriendo el viaje: cada día y cada ocasión es una casilla a tapar, y
+   cada perfume se elige por lo que agrega sobre los ya elegidos.        */
+let viaje = { lugar: null, dias: null };
+
+function abrirViaje() {
+  const d1 = addDays(today(), 7), d2 = addDays(today(), 12);
+  viaje = { lugar: null, dias: null };
+  abrirModal('Me voy de viaje', `
+    <p class="sub">Decime adónde y cuándo y armo la valija: busco el pronóstico del destino y elijo los que cubren todo el viaje.</p>
+    <form id="formViaje">
+      <label class="field"><span>Destino</span>
+        <input type="search" id="vDestino" placeholder="Bariloche, Madrid, Río…" autocomplete="off"></label>
+      <div id="vResultados" class="stack-sm"></div>
+      <p class="hint" id="vElegido" hidden></p>
+
+      <div class="field-row">
+        <label class="field"><span>Desde</span><input type="date" id="vDesde" value="${d1}"></label>
+        <label class="field"><span>Hasta</span><input type="date" id="vHasta" value="${d2}"></label>
+      </div>
+
+      <div class="field"><span>Qué vas a hacer allá</span>
+        <div class="chips" id="vOcasiones">${Object.keys(OCASIONES).map(k =>
+          `<button type="button" class="chip${(k === 'casual' || k === 'salida') ? ' on' : ''}" data-val="${k}">${OCASIONES[k]}</button>`).join('')}</div>
+      </div>
+
+      <label class="field"><span>Cuántos llevás</span>
+        <select id="vCuantos">
+          <option value="1">1</option><option value="2" selected>2</option>
+          <option value="3">3</option><option value="4">4</option>
+        </select></label>
+
+      <div class="btn-row"><button type="submit" class="btn btn-accent">Armar la valija</button></div>
+    </form>
+    <div id="vSalida"></div>`);
+
+  let buscando = null;
+  $('#vDestino').addEventListener('input', e => {
+    const q = e.target.value.trim();
+    clearTimeout(buscando);
+    if (q.length < 3) { $('#vResultados').innerHTML = ''; return; }
+    buscando = setTimeout(() => {
+      $('#vResultados').innerHTML = '<p class="hint">Buscando…</p>';
+      buscarCiudad(q).then(res => {
+        $('#vResultados').innerHTML = res.length
+          ? res.map(r => `<button type="button" class="item" data-lat="${r.latitude}" data-lon="${r.longitude}"
+              data-nombre="${esc(r.name)}"><div class="it-main"><div class="it-name">${esc(r.name)}</div>
+              <div class="it-sub">${esc([r.admin1, r.country].filter(Boolean).join(' · '))}</div></div></button>`).join('')
+          : '<p class="hint">No encontré ese destino.</p>';
+      }).catch(() => { $('#vResultados').innerHTML = '<p class="hint">No pude buscar el destino. ¿Hay internet?</p>'; });
+    }, 400);
+  });
+
+  $('#vResultados').addEventListener('click', e => {
+    const b = e.target.closest('[data-lat]');
+    if (!b) return;
+    viaje.lugar = { nombre: b.dataset.nombre, lat: Number(b.dataset.lat), lon: Number(b.dataset.lon) };
+    $('#vResultados').innerHTML = '';
+    $('#vDestino').value = viaje.lugar.nombre;
+    const e2 = $('#vElegido');
+    e2.hidden = false;
+    e2.textContent = `Destino: ${viaje.lugar.nombre} · ${viaje.lugar.lat.toFixed(2)}, ${viaje.lugar.lon.toFixed(2)}`;
+  });
+
+  $('#vOcasiones').addEventListener('click', e => {
+    const c = e.target.closest('.chip');
+    if (c) c.classList.toggle('on');
+  });
+
+  $('#formViaje').addEventListener('submit', e => { e.preventDefault(); armarValija(); });
+}
+
+function diasDelViaje(desde, hasta) {
+  const dias = [];
+  for (let f = desde; f <= hasta && dias.length < 14; f = addDays(f, 1)) dias.push(f);
+  return dias;
+}
+
+function armarValija(tempAMano) {
+  const salida = $('#vSalida');
+  if (!viaje.lugar) { salida.innerHTML = '<div class="vacio">Elegí un destino de la lista.</div>'; return; }
+
+  const desde = $('#vDesde').value || today();
+  const hasta = $('#vHasta').value || desde;
+  if (hasta < desde) { salida.innerHTML = '<div class="vacio">La vuelta no puede ser antes de la ida.</div>'; return; }
+
+  const ocasiones = $$('#vOcasiones .chip.on').map(c => c.dataset.val);
+  if (!ocasiones.length) { salida.innerHTML = '<div class="vacio">Marcá al menos una cosa que vayas a hacer.</div>'; return; }
+  if (!S.perfumes.length) { salida.innerHTML = '<div class="vacio">Primero cargá tu colección.</div>'; return; }
+
+  const cuantos = num($('#vCuantos').value, 2);
+  const fechas = diasDelViaje(desde, hasta);
+
+  if (typeof tempAMano === 'number') {
+    pintarValija(fechas.map(f => ({ fecha: f, media: tempAMano, lluvia: false })),
+                 ocasiones, cuantos, { estimado: true });
+    return;
+  }
+
+  salida.innerHTML = '<p class="hint">Buscando el pronóstico del destino…</p>';
+  const url = `${CLIMA_API}?latitude=${viaje.lugar.lat}&longitude=${viaje.lugar.lon}` +
+    '&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code&timezone=auto' +
+    `&start_date=${desde}&end_date=${hasta}`;
+
+  pedirJSON(url, 12000).then(d => {
+    const dd = d && d.daily;
+    if (!dd || !dd.time || !dd.time.length) throw new Error('sin pronóstico');
+    const dias = dd.time.map((f, i) => ({
+      fecha: f,
+      media: (dd.temperature_2m_max[i] + dd.temperature_2m_min[i]) / 2,
+      max: dd.temperature_2m_max[i], min: dd.temperature_2m_min[i],
+      lluvia: (dd.precipitation_sum[i] || 0) >= 1 || estaLloviendo(dd.weather_code[i])
+    }));
+    pintarValija(dias, ocasiones, cuantos, { estimado: false });
+  }).catch(() => {
+    /* Más de dos semanas adelante no hay pronóstico, y sin red tampoco.
+       En vez de inventar un clima, se pide la temperatura esperada. */
+    const estimada = ESTACIONES[estacionDe(desde, viaje.lugar.lat < 0 ? 'sur' : 'norte')].temp;
+    salida.innerHTML = `
+      <div class="viaje-resumen">
+        No hay pronóstico para esas fechas (el pronóstico llega hasta unos 15 días) o no hay internet.
+        Poné la temperatura que esperás y lo calculo igual.
+        <div class="temp-row" style="margin-top:10px">
+          <input type="range" id="vTemp" min="-5" max="42" step="1" value="${estimada}">
+          <output id="vTempOut">${estimada}°</output>
+        </div>
+        <div class="btn-row"><button class="btn btn-accent" id="vCalcular">Calcular con eso</button></div>
+      </div>`;
+    $('#vTemp').addEventListener('input', ev => { $('#vTempOut').textContent = ev.target.value + '°'; });
+    $('#vCalcular').addEventListener('click', () => armarValija(num($('#vTemp').value, estimada)));
+  });
+}
+
+function pintarValija(dias, ocasiones, cuantos, opciones) {
+  const hemi = viaje.lugar.lat < 0 ? 'sur' : 'norte';
+  const m = modeloAprendido();
+  const candidatos = S.perfumes.filter(p => !(p.ml > 0 && p.mlRestante <= 0));
+
+  // una casilla por cada día y cada ocasión del viaje
+  const casillas = [];
+  dias.forEach(d => ocasiones.forEach(oc => casillas.push({ dia: d, oc })));
+
+  const puntajes = candidatos.map(p => casillas.map(cs => puntuar(p, m, {
+    temp: cs.dia.media, ocasion: cs.oc, momento: 'ambos',
+    estacion: estacionDe(cs.dia.fecha, hemi), lluvia: cs.dia.lluvia,
+    sinMomento: true, sinRotacion: true
+  }).score));
+
+  /* Elección por cobertura: en cada vuelta gana el que más sube el puntaje
+     de las casillas todavía mal cubiertas, no el que tiene mejor promedio.
+     Así el segundo que entra es el que tapa lo que el primero no tapaba. */
+  const mejorPorCasilla = casillas.map(() => 0);
+  const elegidos = [];
+  while (elegidos.length < Math.min(cuantos, candidatos.length)) {
+    let mejorIdx = -1, mejorGanancia = 0;
+    puntajes.forEach((fila, i) => {
+      if (elegidos.some(e => e.i === i)) return;
+      let ganancia = 0;
+      fila.forEach((sc, j) => { if (sc > mejorPorCasilla[j]) ganancia += sc - mejorPorCasilla[j]; });
+      if (ganancia > mejorGanancia) { mejorGanancia = ganancia; mejorIdx = i; }
+    });
+    if (mejorIdx < 0) break;
+    puntajes[mejorIdx].forEach((sc, j) => { if (sc > mejorPorCasilla[j]) mejorPorCasilla[j] = sc; });
+    elegidos.push({ i: mejorIdx, p: candidatos[mejorIdx] });
+  }
+
+  /* Si uno solo ya cubría todo, la cobertura no agrega a nadie más. Si pediste
+     llevar más, se completan por promedio... pero solo con los que de verdad
+     sirven para ese viaje: rellenar hasta el número pedido con un perfume que
+     puntúa 20 es darte una recomendación que no recomienda nada. */
+  const MINIMO_ACOMPANANTE = 45;
+  let porCobertura = elegidos.length;
+  if (elegidos.length < Math.min(cuantos, candidatos.length)) {
+    const resto = candidatos.map((p, i) => ({ i, p, prom: puntajes[i].reduce((a, b) => a + b, 0) / puntajes[i].length }))
+      .filter(x => !elegidos.some(e => e.i === x.i) && x.prom >= MINIMO_ACOMPANANTE)
+      .sort((a, b) => b.prom - a.prom);
+    while (elegidos.length < Math.min(cuantos, candidatos.length) && resto.length)
+      elegidos.push(resto.shift());
+  }
+
+  // cada casilla se la queda el elegido que mejor puntúa ahí
+  elegidos.forEach(e => {
+    e.dias = {}; e.ocasiones = {}; e.casillas = 0;
+    // el puntaje que se muestra es el promedio sobre TODO el viaje, igual para
+    // todos: el promedio de las casillas asignadas daba 0 a los acompañantes
+    e.prom = puntajes[e.i].reduce((a, b) => a + b, 0) / puntajes[e.i].length;
+  });
+  casillas.forEach((cs, j) => {
+    let duenio = null;
+    elegidos.forEach(e => { if (!duenio || puntajes[e.i][j] > puntajes[duenio.i][j]) duenio = e; });
+    if (!duenio) return;
+    duenio.dias[cs.dia.fecha] = true;
+    duenio.ocasiones[cs.oc] = true;
+    duenio.casillas++;
+  });
+
+  const temps = dias.map(d => d.media);
+  const conLluvia = dias.filter(d => d.lluvia).length;
+  const estacionAllá = estacionDe(dias[0].fecha, hemi);
+  const mlPorDia = 3 * S.ajustes.mlSpray;
+
+  const resumen = `<div class="viaje-resumen">
+    <b>${esc(viaje.lugar.nombre)}</b> · ${dias.length} día${dias.length === 1 ? '' : 's'},
+    del ${fmtFecha(dias[0].fecha)} al ${fmtFecha(dias[dias.length - 1].fecha)}.<br>
+    ${opciones.estimado
+      ? `Sin pronóstico: calculado con <b>${Math.round(temps[0])}°</b> que pusiste vos.`
+      : `De <b>${Math.round(Math.min.apply(null, dias.map(d => d.min)))}°</b> a <b>${Math.round(Math.max.apply(null, dias.map(d => d.max)))}°</b>${conLluvia ? `, con lluvia ${conLluvia} día${conLluvia === 1 ? '' : 's'}` : ', sin lluvia'}.`}
+    Allá es <b>${nombreEstacion(estacionAllá)}</b>.
+  </div>`;
+
+  const tarjetas = elegidos.map(e => {
+    const p = e.p, f = familia(p.familia);
+    const diasCubiertos = Object.keys(e.dias).length;
+    const ocasionesCubiertas = Object.keys(e.ocasiones).map(o => OCASIONES[o].toLowerCase());
+    const mlNecesarios = diasCubiertos * mlPorDia;
+    const alertas = [];
+    if (p.ml > 0 && p.mlRestante < mlNecesarios)
+      alertas.push(`Te quedan ${Math.round(p.mlRestante * 10) / 10} ml y vas a usar unos ${Math.round(mlNecesarios * 10) / 10}.`);
+    if (p.ml > 100)
+      alertas.push(`El frasco es de ${p.ml} ml: en cabina solo entran envases de hasta 100 ml.`);
+    const acompania = elegidos.indexOf(e) >= porCobertura;
+    return `<div class="pf" data-ficha="${p.id}" role="button" tabindex="0">
+      <div class="pf-mark" style="border-color:${f.color}33">${f.emoji}</div>
+      <div class="pf-main">
+        <div class="pf-name">${esc(p.nombre)}</div>
+        <div class="pf-house">${esc(p.casa)}${p.conc ? ' · ' + esc(p.conc) : ''}</div>
+        <div class="cubre">
+          <span>${acompania ? 'de compañía' : diasCubiertos + ' de ' + dias.length + ' días'}</span>
+          ${ocasionesCubiertas.map(o => `<span>${esc(o)}</span>`).join('')}
+          ${diasCubiertos ? `<span>~${Math.round(mlNecesarios * 10) / 10} ml</span>` : ''}
+        </div>
+        ${alertas.map(a => `<div class="alerta">${esc(a)}</div>`).join('')}
+      </div>
+      <div class="pf-right"><div class="pf-score">${Math.round(e.prom)}</div></div>
+    </div>`;
+  }).join('');
+
+  $('#vSalida').innerHTML = resumen + `<div class="valija">${tarjetas ||
+    '<div class="vacio">Ninguno de tu colección sirve para ese viaje.</div>'}</div>
+    <p class="hint">Se eligen por cobertura: el segundo es el que tapa lo que el primero deja afuera, no el segundo de la lista.${
+      elegidos.length > porCobertura ? ` Con ${porCobertura} te alcanzaba para todo el viaje; el resto va por gusto.` : ''}${
+      elegidos.length < cuantos ? ` Te muestro ${elegidos.length} y no ${cuantos}: el resto de tu colección no suma nada para este viaje.` : ''}</p>`;
 }
 
 /* ============================ COLECCIÓN ============================= */
@@ -1707,6 +1965,7 @@ function conectar() {
     ctx.ocasion = c.dataset.val; renderHoy();
   });
   $('#avisoCopia').addEventListener('click', () => { ir('ajustes'); exportar(); });
+  $('#btnViaje').addEventListener('click', abrirViaje);
 
   // colección
   $('#btnNuevo').addEventListener('click', () => abrirFormulario(null));

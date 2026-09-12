@@ -337,16 +337,34 @@ const check = (n, c, d = '') => {
   let climaFalla = false;
   const respuesta = cuerpo => ({ status: 200, contentType: 'application/json',
     headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(cuerpo) });
-  let llamadasGeo = 0, climaCodigo = 3, climaViento = 8;
+  let llamadasGeo = 0, climaCodigo = 3, climaViento = 8, viajeFalla = false;
   await p.route('**/geocoding-api.open-meteo.com/**', r => {
     llamadasGeo++;
     return r.fulfill(respuesta({
       results: [{ name: 'Trenque Lauquen', latitude: -35.97, longitude: -62.73,
                   country: 'Argentina', admin1: 'Provincia de Buenos Aires' }] }));
   });
-  await p.route('**/api.open-meteo.com/v1/forecast**', r => climaFalla ? r.abort() : r.fulfill(respuesta({
-    current: { temperature_2m: 11.3, relative_humidity_2m: 80, weather_code: climaCodigo,
-               wind_speed_10m: climaViento } })));
+  await p.route('**/api.open-meteo.com/v1/forecast**', r => {
+    if (climaFalla) return r.abort();
+    // el pedido del viaje trae daily y un rango de fechas; el de hoy, current
+    if (/daily=/.test(r.request().url())) {
+      if (viajeFalla) return r.abort();
+      const u = new URL(r.request().url());
+      const desde = u.searchParams.get('start_date'), hasta = u.searchParams.get('end_date');
+      const dias = [];
+      for (let f = new Date(desde + 'T00:00:00'); f <= new Date(hasta + 'T00:00:00'); f.setDate(f.getDate() + 1))
+        dias.push(f.toISOString().slice(0, 10));
+      return r.fulfill(respuesta({ daily: {
+        time: dias,
+        temperature_2m_max: dias.map((_, i) => 8 + (i % 3)),
+        temperature_2m_min: dias.map(() => -1),
+        precipitation_sum: dias.map((_, i) => (i === 1 ? 6 : 0)),
+        weather_code: dias.map((_, i) => (i === 1 ? 63 : 1))
+      } }));
+    }
+    return r.fulfill(respuesta({ current: { temperature_2m: 11.3, relative_humidity_2m: 80,
+      weather_code: climaCodigo, wind_speed_10m: climaViento } }));
+  });
 
   await p.tap('#btnSettings'); await p.waitForTimeout(250);
   check('arranca sin ubicación', /Sin ubicación/.test(await p.textContent('#lugarActual')));
@@ -433,6 +451,47 @@ const check = (n, c, d = '') => {
   check('si la API falla, lo dice sin romperse', /No pude traer el clima/.test(await p.textContent('#climaLinea')));
   check('y las sugerencias siguen ahí', await cuantos('#sugerencias article.card') === 3);
   climaFalla = false;
+
+  console.log('\nM2 · Valija para un viaje');
+  await ir('hoy');
+  await p.tap('#btnViaje'); await p.waitForTimeout(400);
+  check('abre el formulario de viaje', !!(await p.$('#formViaje')));
+
+  await p.tap('#formViaje button[type=submit]'); await p.waitForTimeout(300);
+  check('sin destino no arma nada', /Elegí un destino/.test(await p.textContent('#vSalida')));
+
+  await p.fill('#vDestino', 'Bariloche'); await p.waitForTimeout(900);
+  check('encuentra el destino', await cuantos('#vResultados [data-lat]') >= 1);
+  await p.tap('#vResultados [data-lat]'); await p.waitForTimeout(300);
+  check('lo deja elegido', /Destino: San Carlos de Bariloche/.test(await p.textContent('#vElegido')));
+
+  const d1 = new Date(); d1.setDate(d1.getDate() + 3);
+  const d2 = new Date(); d2.setDate(d2.getDate() + 7);
+  const iso = d => d.toISOString().slice(0, 10);
+  await p.fill('#vDesde', iso(d1)); await p.fill('#vHasta', iso(d2));
+  await p.selectOption('#vCuantos', '2');
+  await p.tap('#formViaje button[type=submit]'); await p.waitForTimeout(1200);
+
+  const resumen = await p.textContent('.viaje-resumen');
+  check('resume el viaje con el pronóstico real', /5 días/.test(resumen) && /-1°/.test(resumen), resumen.replace(/\s+/g,' ').slice(0,110));
+  check('cuenta los días de lluvia', /lluvia 1 día/.test(resumen), resumen.replace(/\s+/g,' ').slice(0,110));
+  check('dice en qué estación está el destino', /invierno|primavera|verano|otoño/.test(resumen));
+  check('elige dos perfumes', await cuantos('.valija .pf') === 2);
+  check('dice cuántos días cubre cada uno o que va de compañía',
+    /de 5 días|de compañía/.test(await p.textContent('.valija')));
+  check('estima los ml que vas a gastar', /~\d+(\.\d+)? ml/.test(await p.textContent('.valija')));
+  const elegidosViaje = await p.evaluate(() => Array.from(document.querySelectorAll('.valija .pf-name')).map(e => e.textContent.trim()));
+  check('y no repite el mismo dos veces', elegidosViaje[0] !== elegidosViaje[1], elegidosViaje.join(' | '));
+
+  // sin pronóstico disponible, se pide la temperatura y se calcula igual
+  viajeFalla = true;
+  await p.tap('#formViaje button[type=submit]'); await p.waitForTimeout(1000);
+  check('sin pronóstico ofrece poner la temperatura', !!(await p.$('#vTemp')));
+  await p.tap('#vCalcular'); await p.waitForTimeout(700);
+  check('y arma la valija igual', await cuantos('.valija .pf') === 2);
+  check('avisando que es una estimación tuya', /pusiste vos/.test(await p.textContent('.viaje-resumen')));
+  viajeFalla = false;
+  await p.tap('.sheet-head [data-close]'); await p.waitForTimeout(300);   // el fondo queda tapado por la hoja
 
   console.log('\nN · Corregir un uso');
   await ir('uso');

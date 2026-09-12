@@ -211,6 +211,19 @@ button.item{width:100%;text-align:left;cursor:pointer;font:inherit}
 .cmp-head span,.cmp-fila>span:first-child{color:var(--muted);font-size:11.5px}
 .cmp-fila div{font-variant-numeric:tabular-nums}
 .cmp-fila .gana{color:var(--accent);font-weight:600}
+/* valija: cada perfume elegido con lo que cubre del viaje */
+.valija{margin-top:14px}
+.valija .pf{margin-bottom:10px}
+.viaje-resumen{
+  margin-top:12px;padding:11px 12px;border-radius:12px;font-size:13px;line-height:1.55;
+  background:var(--card-2);border:1px solid var(--line);
+}
+.viaje-resumen b{color:var(--accent)}
+.cubre{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.cubre span{background:var(--card-2);border:1px solid var(--line);border-radius:999px;
+  padding:3px 9px;font-size:11.5px;color:var(--muted)}
+.alerta{margin-top:7px;font-size:12px;color:var(--danger);line-height:1.45}
+
 .cmp-notas{margin-top:12px}
 .cmp-notas h3{font-size:12px;color:var(--muted);font-weight:500;margin-top:10px}
 .cmp-veredicto{
