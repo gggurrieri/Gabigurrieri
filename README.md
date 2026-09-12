@@ -297,3 +297,12 @@ CSS para que la app conserve su identidad también sin conexión.
 
 `tools/build-artifact.sh` genera una versión de un solo archivo en `dist/` por si querés publicarla
 o compartirla sin la carpeta entera.
+
+---
+
+## Otra app en este repo
+
+En [`perfumario/`](perfumario/) vive **Perfumario**, una app aparte para llevar una
+colección de perfumes, decidir cuál ponerse según el clima y la ocasión, y consultar
+un diccionario de notas olfativas. Tiene su propio README, sus propias pruebas y su
+propio almacenamiento: las dos apps no se tocan.

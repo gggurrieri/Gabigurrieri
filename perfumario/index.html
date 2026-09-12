@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E0B12">
+<title>Perfumario</title>
+<link rel="manifest" href="manifest.json">
+<!-- iOS ignora los íconos del manifest: para "Agregar a inicio" necesita
+     un apple-touch-icon en PNG y sus propios meta. -->
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Perfumario">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 1024 1024" class="logo-mark" aria-hidden="true">
+        <defs>
+          <linearGradient id="pfGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#8A5A2B"/><stop offset="100%" stop-color="#F2D9A0"/>
+          </linearGradient>
+        </defs>
+        <rect width="1024" height="1024" fill="#0E0B12"/>
+        <rect x="446" y="196" width="132" height="96" rx="18" fill="url(#pfGrad)"/>
+        <rect x="398" y="284" width="228" height="72" rx="24" fill="#F2D9A0"/>
+        <path d="M362 420 q150 -64 300 0 v300 q0 108 -110 108 h-80 q-110 0 -110 -108 z" fill="none" stroke="url(#pfGrad)" stroke-width="46" stroke-linejoin="round"/>
+        <circle cx="512" cy="614" r="74" fill="#F2D9A0" opacity="0.22"/>
+        <circle cx="512" cy="614" r="34" fill="#F2D9A0"/>
+      </svg>
+      <div>
+        <h1>Perfumario</h1>
+        <p id="topbarSub">—</p>
+      </div>
+    </div>
+    <button class="icon-btn" id="btnSettings" title="Ajustes" aria-label="Ajustes">⚙</button>
+  </header>
+
+  <main>
+
+    <!-- ============================ HOY ============================ -->
+    <section class="view" id="view-hoy">
+
+      <button class="aviso" id="avisoCopia" hidden></button>
+
+      <section class="card" id="cardContexto">
+        <h2>¿Qué me pongo?</h2>
+        <p class="sub" id="contextoResumen">—</p>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Temperatura</span>
+            <div class="temp-row">
+              <input type="range" id="ctxTemp" min="-5" max="42" step="1">
+              <output id="ctxTempOut">20°</output>
+            </div>
+          </label>
+        </div>
+
+        <div class="field">
+          <span>Momento</span>
+          <div class="chips" id="ctxMomento" role="group" aria-label="Momento del día">
+            <button class="chip" data-val="dia">☀️ Día</button>
+            <button class="chip" data-val="noche">🌙 Noche</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <span>Ocasión</span>
+          <div class="chips" id="ctxOcasion" role="group" aria-label="Ocasión">
+            <button class="chip" data-val="trabajo">💼 Trabajo</button>
+            <button class="chip" data-val="casual">👕 Diario</button>
+            <button class="chip" data-val="salida">🍸 Salida</button>
+            <button class="chip" data-val="cita">❤️ Cita</button>
+            <button class="chip" data-val="evento">✨ Evento</button>
+            <button class="chip" data-val="deporte">🏃 Deporte</button>
+          </div>
+        </div>
+      </section>
+
+      <h2 class="section-title">Sugerencias de hoy</h2>
+      <div id="sugerencias" class="stack"></div>
+
+      <section class="card" id="cardHoyUsos" hidden>
+        <h2>Hoy te pusiste</h2>
+        <div id="hoyUsos" class="stack-sm"></div>
+      </section>
+    </section>
+
+    <!-- ========================= COLECCIÓN ========================= -->
+    <section class="view" id="view-coleccion">
+      <div class="toolbar">
+        <input type="search" id="busca" placeholder="Buscar por nombre, casa o nota…" aria-label="Buscar">
+        <button class="btn btn-accent" id="btnNuevo">+ Agregar</button>
+      </div>
+
+      <div class="chips scroll-x" id="filtroFamilia" role="group" aria-label="Filtrar por familia"></div>
+
+      <div class="toolbar toolbar-2">
+        <label class="field mini">
+          <span>Ordenar por</span>
+          <select id="orden">
+            <option value="reciente">Agregado hace poco</option>
+            <option value="nombre">Nombre</option>
+            <option value="rating">Puntaje</option>
+            <option value="usos">Más usados</option>
+            <option value="olvidados">Hace más que no uso</option>
+            <option value="costo">Costo por uso</option>
+            <option value="restante">Queda menos</option>
+          </select>
+        </label>
+        <label class="check mini"><input type="checkbox" id="soloDisponibles"> Ocultar vacíos</label>
+      </div>
+
+      <p class="sub" id="coleccionResumen">—</p>
+      <div id="listaColeccion" class="stack"></div>
+    </section>
+
+    <!-- =========================== NOTAS =========================== -->
+    <section class="view" id="view-notas">
+      <section class="card" id="cardPerfil">
+        <h2>Tu perfil olfativo</h2>
+        <p class="sub" id="perfilSub">—</p>
+        <div id="perfilFamilias" class="bars"></div>
+        <div id="perfilNotas" class="tags"></div>
+      </section>
+
+      <div class="toolbar">
+        <input type="search" id="buscaNota" placeholder="Buscar una nota…" aria-label="Buscar nota">
+      </div>
+      <div class="chips scroll-x" id="filtroFamiliaNota" role="group" aria-label="Filtrar notas por familia"></div>
+      <div id="listaNotas" class="stack-sm"></div>
+
+      <section class="card">
+        <h2>Parecidos a…</h2>
+        <p class="sub">Compara las notas de un perfume de tu colección con las del resto.</p>
+        <label class="field">
+          <span>Perfume</span>
+          <select id="simSel"></select>
+        </label>
+        <div id="simLista" class="stack-sm"></div>
+      </section>
+    </section>
+
+    <!-- ============================ USO ============================ -->
+    <section class="view" id="view-uso">
+      <div class="kpis" id="kpisUso"></div>
+
+      <section class="card">
+        <h2>Rotación</h2>
+        <p class="sub" id="rotacionSub">—</p>
+        <div id="rotacion" class="bars"></div>
+      </section>
+
+      <section class="card" id="cardPolvo" hidden>
+        <h2>Juntando polvo</h2>
+        <p class="sub">Los tenés y hace rato no los usás.</p>
+        <div id="listaPolvo" class="stack-sm"></div>
+      </section>
+
+      <section class="card" id="cardAcabando" hidden>
+        <h2>Se están por acabar</h2>
+        <p class="sub">Menos del 15 % del frasco.</p>
+        <div id="listaAcabando" class="stack-sm"></div>
+      </section>
+
+      <section class="card">
+        <h2>Últimos usos</h2>
+        <div id="historialUsos" class="stack-sm"></div>
+      </section>
+    </section>
+
+    <!-- ========================== AJUSTES ========================== -->
+    <section class="view" id="view-ajustes">
+      <section class="card">
+        <h2>Preferencias</h2>
+        <div class="field-row">
+          <label class="field">
+            <span>ml por aplicación</span>
+            <input type="number" id="setMlSpray" step="0.01" min="0.01" max="1">
+          </label>
+          <label class="field">
+            <span>Moneda</span>
+            <input type="text" id="setMoneda" maxlength="4">
+          </label>
+        </div>
+        <label class="field">
+          <span>Hemisferio</span>
+          <select id="setHemisferio">
+            <option value="sur">Sur (Argentina)</option>
+            <option value="norte">Norte</option>
+          </select>
+        </label>
+        <p class="hint">El hemisferio define en qué estación estás: acá diciembre es verano.</p>
+      </section>
+
+      <section class="card">
+        <h2>Tus datos</h2>
+        <p class="sub" id="copiaEstado">—</p>
+        <div class="btn-row">
+          <button class="btn" id="btnExportar">Exportar copia</button>
+          <button class="btn" id="btnImportar">Importar copia</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn" id="btnEjemplos">Cargar 6 de ejemplo</button>
+          <button class="btn btn-danger" id="btnBorrar">Borrar todo</button>
+        </div>
+        <p class="hint">Todo vive en este navegador (<code>localStorage</code>). Si lo limpiás o cambiás de teléfono, se pierde: exportá cada tanto.</p>
+      </section>
+
+      <section class="card">
+        <h2>Sobre la app</h2>
+        <p class="hint">Perfumario funciona sin conexión y sin cuenta: no hay servidor ni datos que salgan del dispositivo. El catálogo de fragancias es una ayuda para cargar rápido, con las notas que suelen publicarse; podés editarlas siempre.</p>
+      </section>
+    </section>
+
+  </main>
+
+  <nav class="tabbar">
+    <button class="tab" data-view="hoy"><span>✨</span>Hoy</button>
+    <button class="tab" data-view="coleccion"><span>🧴</span>Colección</button>
+    <button class="tab" data-view="notas"><span>🌿</span>Notas</button>
+    <button class="tab" data-view="uso"><span>📊</span>Uso</button>
+  </nav>
+</div>
+
+<!-- ============================ MODALES ============================ -->
+<div class="modal" id="modal" hidden>
+  <div class="modal-bg" data-close></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitulo">
+    <div class="sheet-head">
+      <h2 id="modalTitulo">—</h2>
+      <button class="icon-btn" data-close aria-label="Cerrar">✕</button>
+    </div>
+    <div class="sheet-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="assets/datos.js"></script>
+<script src="assets/app.js"></script>
+<script>
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
