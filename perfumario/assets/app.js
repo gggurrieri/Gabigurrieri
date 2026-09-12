@@ -833,6 +833,9 @@ function abrirFicha(id) {
     </div>
     <div class="btn-row">
       <button class="btn" data-rellenar="${p.id}">Rellené el frasco</button>
+      <button class="btn" data-comparar="${p.id}">Comparar</button>
+    </div>
+    <div class="btn-row">
       <button class="btn btn-danger" data-borrar="${p.id}">Borrar</button>
     </div>`);
 }
@@ -1243,6 +1246,119 @@ function renderNotas() {
     : '<option value="">—</option>';
   if (previo && S.perfumes.some(p => p.id === previo)) sel.value = previo;
   renderParecidos();
+  renderComparar();
+}
+
+/* ------------------------- comparar dos ---------------------------- */
+/* La pregunta real no es "cuál es mejor" sino "cuál de estos dos me pongo
+   hoy", así que además de la ficha enfrentada se resuelve con el mismo
+   puntaje que usa la pestaña Hoy, en el contexto elegido ahí.           */
+let comparando = { a: null, b: null };
+
+function renderComparar() {
+  const selA = $('#cmpA'), selB = $('#cmpB');
+  const lista = S.perfumes;
+
+  if (lista.length < 2) {
+    selA.innerHTML = selB.innerHTML = '<option value="">—</option>';
+    $('#cmpSalida').innerHTML = '<div class="vacio">Con dos perfumes cargados se pueden comparar.</div>';
+    return;
+  }
+
+  /* Solo se elige por vos la primera vez o si el perfume ya no existe. Si
+     ponés el mismo de los dos lados, se respeta y se avisa: cambiarte la
+     selección por atrás es peor que no comparar nada. */
+  const existe = id => lista.some(x => x.id === id);
+  if (!existe(comparando.a)) comparando.a = lista[0].id;
+  if (!existe(comparando.b)) comparando.b = (lista.find(x => x.id !== comparando.a) || lista[0]).id;
+
+  const opciones = sel => lista.map(x =>
+    `<option value="${x.id}"${x.id === sel ? ' selected' : ''}>${esc(x.nombre)}</option>`).join('');
+  selA.innerHTML = opciones(comparando.a);
+  selB.innerHTML = opciones(comparando.b);
+
+  const a = perfume(comparando.a), b = perfume(comparando.b);
+  if (!a || !b) return;
+  if (a.id === b.id) {
+    $('#cmpSalida').innerHTML = '<div class="vacio">Elegí dos distintos.</div>';
+    return;
+  }
+  $('#cmpSalida').innerHTML = tablaComparacion(a, b);
+}
+
+/* Compara un dato numérico marcando cuál gana. `mejor` dice si conviene el
+   más alto o el más bajo; sin dato de alguno, no gana nadie. */
+function filaNum(lbl, va, vb, fmt, mejor, ceroVale) {
+  const hay = v => typeof v === 'number' && isFinite(v) && (ceroVale ? v >= 0 : v > 0);
+  let ga = '', gb = '';
+  if (hay(va) && hay(vb) && va !== vb) {
+    const aGana = mejor === 'alto' ? va > vb : va < vb;
+    ga = aGana ? ' class="gana"' : '';
+    gb = aGana ? '' : ' class="gana"';
+  }
+  return `<div class="cmp-fila"><span>${esc(lbl)}</span>
+    <div${ga}>${hay(va) ? fmt(va) : '—'}</div><div${gb}>${hay(vb) ? fmt(vb) : '—'}</div></div>`;
+}
+function filaTxt(lbl, ta, tb) {
+  return `<div class="cmp-fila"><span>${esc(lbl)}</span>
+    <div>${ta || '—'}</div><div>${tb || '—'}</div></div>`;
+}
+
+function tablaComparacion(a, b) {
+  const m = modeloAprendido();
+  const pa = puntuar(a, m), pb = puntuar(b, m);
+  const sim = similitud(a, b);
+  const moneda = S.ajustes.moneda;
+  const plata = v => moneda + Math.round(v).toLocaleString('es-AR');
+  const soloDe = (x, y) => {
+    const otras = new Set(notasDe(y).map(n => n.toLowerCase()));
+    return notasDe(x).filter(n => !otras.has(n.toLowerCase()));
+  };
+  const chips = arr => arr.length
+    ? arr.map(n => `<span class="tag" data-nota="${esc(n)}">${esc(n)}</span>`).join('')
+    : '<span class="hint">—</span>';
+
+  const ganador = pa.score === pb.score ? null : (pa.score > pb.score ? a : b);
+  const razonGanadora = (ganador === a ? pa : pb).razones.filter(r => r.bien)[0];
+
+  return `<div class="cmp">
+    <div class="cmp-head"><span></span>
+      <b>${esc(a.nombre)}<br><span>${esc(a.casa)}</span></b>
+      <b>${esc(b.nombre)}<br><span>${esc(b.casa)}</span></b></div>
+    ${filaNum('Puntaje hoy', pa.score, pb.score, v => v, 'alto')}
+    ${filaTxt('Familia', esc(familia(a.familia).nombre), esc(familia(b.familia).nombre))}
+    ${filaTxt('Concentración', esc(a.conc || ''), esc(b.conc || ''))}
+    ${filaNum('Duración', a.longevidad, b.longevidad, v => v + ' h', 'alto')}
+    ${filaTxt('Estela', '▮'.repeat(a.estela || 0) + '▯'.repeat(5 - (a.estela || 0)),
+              '▮'.repeat(b.estela || 0) + '▯'.repeat(5 - (b.estela || 0)))}
+    ${filaTxt('Estaciones', (a.estaciones || []).map(nombreEstacion).join(', '),
+              (b.estaciones || []).map(nombreEstacion).join(', '))}
+    ${filaTxt('Ocasiones', (a.ocasiones || []).map(o => OCASIONES[o]).join(', '),
+              (b.ocasiones || []).map(o => OCASIONES[o]).join(', '))}
+    ${filaTxt('Momento', MOMENTOS[a.momento || 'ambos'], MOMENTOS[b.momento || 'ambos'])}
+    ${filaNum('Tu puntaje', a.rating, b.rating, v => estrellas(v), 'alto')}
+    ${filaNum('Queda', a.ml ? porcRestante(a) : 0, b.ml ? porcRestante(b) : 0, v => v + ' %', 'alto')}
+    ${filaNum('Precio por ml', a.ml && a.precio ? a.precio / a.ml : 0, b.ml && b.precio ? b.precio / b.ml : 0, plata, 'bajo')}
+    ${filaNum('Costo por uso', costoPorUso(a), costoPorUso(b), plata, 'bajo')}
+    ${filaNum('Usos', usosDe(a.id).length, usosDe(b.id).length, v => v, 'alto', true)}
+    ${filaTxt('Último uso', ultimoUso(a.id) ? fmtHace(ultimoUso(a.id)) : 'sin estrenar',
+              ultimoUso(b.id) ? fmtHace(ultimoUso(b.id)) : 'sin estrenar')}
+  </div>
+
+  <div class="cmp-notas">
+    <h3>Comparten ${sim.comunes.length} de ${new Set(notasDe(a).concat(notasDe(b)).map(n => n.toLowerCase())).size} notas · ${sim.pct} % de parecido</h3>
+    <div class="tags">${chips(sim.comunes.map(n =>
+      notasDe(a).find(x => x.toLowerCase() === n) || n))}</div>
+    <h3>Solo ${esc(a.nombre)}</h3><div class="tags">${chips(soloDe(a, b))}</div>
+    <h3>Solo ${esc(b.nombre)}</h3><div class="tags">${chips(soloDe(b, a))}</div>
+  </div>
+
+  <div class="cmp-veredicto">
+    ${ganador
+      ? `Para ${OCASIONES[ctx.ocasion].toLowerCase()}, ${MOMENTOS[ctx.momento].toLowerCase()} y ${Math.round(ctx.temp)}°: <b>${esc(ganador.nombre)}</b>, ${Math.max(pa.score, pb.score)} contra ${Math.min(pa.score, pb.score)}.${razonGanadora ? ' ' + esc(razonGanadora.txt) + '.' : ''}`
+      : `Empatan en ${pa.score} para el contexto de hoy: elegí por gusto.`}
+    <div class="hint">El contexto se cambia en la pestaña Hoy.</div>
+  </div>`;
 }
 
 function barra(lbl, val, pct, color) {
@@ -1556,6 +1672,8 @@ function conectar() {
     renderNotas();
   });
   $('#simSel').addEventListener('change', renderParecidos);
+  $('#cmpA').addEventListener('change', e => { comparando.a = e.target.value; renderComparar(); });
+  $('#cmpB').addEventListener('change', e => { comparando.b = e.target.value; renderComparar(); });
 
   // ajustes
   $('#setMlSpray').addEventListener('change', e => {
@@ -1628,6 +1746,22 @@ function conectar() {
 
     const borrar = e.target.closest('[data-borrar]');
     if (borrar) { confirmarBorrado(borrar.dataset.borrar); return; }
+
+    const comparar = e.target.closest('[data-comparar]');
+    if (comparar) {
+      const id = comparar.dataset.comparar;
+      comparando.a = id;
+      // arranca contra el más parecido: es la comparación que uno quiere ver
+      const base = perfume(id);
+      const rival = S.perfumes.filter(x => x.id !== id)
+        .map(x => ({ x, pct: similitud(base, x).pct }))
+        .sort((p, q) => q.pct - p.pct)[0];
+      comparando.b = rival ? rival.x.id : null;
+      cerrarModal(); ir('notas');
+      const card = $('#cardComparar');
+      if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
 
     const rellenar = e.target.closest('[data-rellenar]');
     if (rellenar) {

@@ -451,7 +451,48 @@ const check = (n, c, d = '') => {
   await p.tap('[data-close]'); await p.waitForTimeout(250);
   await ir('hoy');   // el engranaje alterna: si quedamos en Ajustes, la sección que sigue lo cierra
 
-  console.log('\nQ · Copia y borrado');
+  console.log('\nQ · Comparar dos');
+  await ir('notas');
+  const nombresCmp = await p.evaluate(() => ({
+    a: document.querySelector('#cmpA').selectedOptions[0].textContent,
+    b: document.querySelector('#cmpB').selectedOptions[0].textContent
+  }));
+  check('arranca con dos distintos', nombresCmp.a !== nombresCmp.b, JSON.stringify(nombresCmp));
+  check('enfrenta las dos fichas', await cuantos('#cmpSalida .cmp-fila') >= 12);
+  check('marca quién gana en cada dato', await cuantos('#cmpSalida .gana') > 0);
+  check('separa las notas compartidas de las propias',
+    /Comparten \d+ de \d+ notas/.test(await p.textContent('#cmpSalida')));
+  const veredicto = await p.textContent('#cmpSalida .cmp-veredicto');
+  check('cierra con un veredicto para el contexto de hoy',
+    new RegExp(`${nombresCmp.a}|${nombresCmp.b}|Empatan`).test(veredicto), veredicto.replace(/\s+/g, ' ').slice(0, 80));
+
+  // el mismo dos veces no compara nada
+  await p.selectOption('#cmpB', { label: nombresCmp.a }); await p.waitForTimeout(300);
+  check('avisa si elegís el mismo dos veces', /Elegí dos distintos/.test(await p.textContent('#cmpSalida')));
+
+  // y el contexto de Hoy manda sobre el veredicto
+  await p.selectOption('#cmpA', { index: 0 });
+  await p.selectOption('#cmpB', { index: 1 }); await p.waitForTimeout(300);
+  const antes = await p.textContent('#cmpSalida .cmp-veredicto');
+  await ir('hoy');
+  await p.tap('#ctxOcasion .chip[data-val="deporte"]'); await p.waitForTimeout(250);
+  await ir('notas');
+  const despues = await p.textContent('#cmpSalida .cmp-veredicto');
+  check('el veredicto sigue el contexto', antes !== despues && /deporte/.test(despues),
+    despues.replace(/\s+/g, ' ').slice(0, 70));
+
+  // entrada desde la ficha, contra el más parecido
+  await ir('coleccion');
+  await p.fill('#busca', ''); await p.waitForTimeout(200);
+  await p.tap('#listaColeccion .pf'); await p.waitForTimeout(350);
+  const elegidoCmp = (await p.textContent('#modalTitulo')).trim();
+  await p.tap('#modalBody [data-comparar]'); await p.waitForTimeout(500);
+  check('desde la ficha abre la comparación', await visible('#view-notas'));
+  check('y lo pone de un lado',
+    (await p.evaluate(() => document.querySelector('#cmpA').selectedOptions[0].textContent)) === elegidoCmp,
+    elegidoCmp);
+
+  console.log('\nR · Copia y borrado');
   await p.tap('#btnSettings'); await p.waitForTimeout(250);
   await p.tap('#btnExportar'); await p.waitForTimeout(300);
   check('exporta un JSON legible', await p.evaluate(() => {
@@ -476,7 +517,7 @@ const check = (n, c, d = '') => {
   check('borra todo', d.perfumes.length === 0 && d.usos.length === 0);
   check('y vuelve al estado inicial', /Todav[íi]a no cargaste/.test(await p.textContent('#sugerencias')));
 
-  console.log('\nR · Sin errores');
+  console.log('\nS · Sin errores');
   check('la consola quedó limpia', errs.length === 0, errs.slice(0, 3).join(' | '));
 
   await b.close();

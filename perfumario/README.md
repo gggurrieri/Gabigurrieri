@@ -42,7 +42,7 @@ inicio". Queda como una app nativa y funciona sin señal.
 |---|---|
 | **Hoy** | La temperatura la trae sola del clima de tu ciudad; elegís momento del día y ocasión, y te propone tres perfumes con un puntaje y las razones de cada uno. Un toque para registrar que te lo pusiste. |
 | **Colección** | Alta, edición y borrado de perfumes con casa, concentración, familia, pirámide de notas, ml, precio, estaciones, ocasiones, duración, estela y puntaje. Buscador por nombre, casa o **nota**, filtro por familia y siete criterios de orden. **Carga rápida** para pegar una lista entera de una vez. |
-| **Notas** | Diccionario de 112 notas y 11 familias explicadas, tu perfil olfativo (qué tenés contra qué usás) y comparador de parecidos entre perfumes de tu colección. |
+| **Notas** | Diccionario de 112 notas y 11 familias explicadas, tu perfil olfativo (qué tenés contra qué usás), comparación de dos perfumes lado a lado y buscador de parecidos. |
 | **Uso** | Usos del mes, ml gastados, el más puesto, costo por uso, rotación de los últimos 90 días, los que juntan polvo, los que se están por acabar e historial. Tocando un uso se corrige (fecha, perfume, aplicaciones, ocasión) y los ml del frasco se recalculan solos. |
 | **Ajustes** | ml por aplicación, moneda, hemisferio, exportar/importar/borrar y seis perfumes de ejemplo para mirar la app con contenido. |
 
@@ -117,6 +117,23 @@ La app usa además lo que ya venía en la respuesta: con **humedad** de 70 % o m
 avisa que proyecta más y que con dos aplicaciones alcanza; con **lluvia** baja el
 puntaje de los que duran poco y lo sube el de los que aguantan; con **viento** de
 25 km/h o más avisa que la estela se dispersa.
+
+## Comparar dos, lado a lado
+
+En **Notas → Comparar dos** (o desde cualquier ficha, con *Comparar*) se enfrentan
+dos perfumes: puntaje de hoy, familia, concentración, duración, estela,
+estaciones, ocasiones, momento, tu puntaje, cuánto queda, precio por ml, costo
+por uso, usos y último uso. En cada dato numérico se resalta cuál gana, y abajo
+se separan las notas que comparten de las propias de cada uno.
+
+Cierra con un veredicto, porque la pregunta real no es "cuál es mejor" sino
+**cuál me pongo hoy**: se resuelve con el mismo puntaje de la pestaña Hoy y en el
+contexto elegido ahí, así que cambiar la ocasión o la temperatura cambia el
+resultado. Entrando desde una ficha, del otro lado se pone automáticamente el más
+parecido de tu colección.
+
+Si ponés el mismo perfume de los dos lados, te avisa en lugar de corregirte la
+selección por atrás.
 
 ## Cómo aprende de tus elecciones
 
@@ -206,7 +223,7 @@ mano, que la ciudad se encuentre sin red y que falle sin romper nada) y la
 colección incluida (que entre sola, que no
 resucite después de borrarla y que no se duplique), la corrección de un uso con
 su recálculo de ml, el aprendizaje por temperatura y la descarga de la copia.
-113 comprobaciones, incluido un candado que falla si alguna nota usada en una
+122 comprobaciones, incluido un candado que falla si alguna nota usada en una
 ficha quedó sin explicación en el diccionario.
 
 ```
@@ -220,7 +237,6 @@ disponible, pasale uno: `CHROME_PATH=/ruta/al/chrome node perfumario/tests/e2e.j
 
 Ideas anotadas para las próximas vueltas:
 
-- Comparar dos perfumes lado a lado: notas, duración y costo por uso.
 - Un campo de devolución después del uso ("me lo elogiaron", "no duró nada") que
   alimente el puntaje; hoy eso queda en una nota libre que el modelo no lee.
 
