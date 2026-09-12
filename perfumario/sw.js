@@ -1,6 +1,6 @@
 /* Service worker mínimo: deja la app disponible sin conexión. */
 const CACHE = 'perfumario-v2';
-const ASSETS = ['./', './index.html', './assets/styles.css', './assets/app.js', './assets/datos.js',
+const ASSETS = ['./', './index.html', './assets/styles.css', './assets/app.js', './assets/datos.js', './assets/coleccion.js',
   './assets/icon.svg', './assets/icon-180.png', './assets/icon-512.png', './manifest.json'];
 
 self.addEventListener('install', e => {

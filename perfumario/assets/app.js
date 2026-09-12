@@ -59,15 +59,41 @@ const DEFAULTS = {
 let S = clonar(DEFAULTS);
 
 function cargar() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
+  let raw = null;
+  try { raw = localStorage.getItem(KEY); } catch (e) { raw = null; }
+
+  if (raw) {
+    try {
       const guardado = JSON.parse(raw);
       S = Object.assign(clonar(DEFAULTS), guardado);
       S.ajustes = Object.assign(clonar(DEFAULTS.ajustes), guardado.ajustes || {});
       S.meta = Object.assign(clonar(DEFAULTS.meta), guardado.meta || {});
-    }
-  } catch (e) { S = clonar(DEFAULTS); }
+    } catch (e) { S = clonar(DEFAULTS); }
+    return;
+  }
+
+  /* Primer arranque en este navegador: si el build trae una colección, entra
+     sola. Se guarda en el acto, así queda la marca de que la app ya arrancó:
+     si después borrás todo, no resucita. */
+  const semilla = window.PERFUMARIO_COLECCION;
+  if (semilla && Array.isArray(semilla.perfumes) && semilla.perfumes.length) {
+    S.perfumes = clonar(semilla.perfumes);
+  }
+  guardar();
+}
+
+/* La misma colección, a pedido: agrega solo lo que falte, comparando por
+   nombre. Sirve si ya venías usando la app antes de que existiera la semilla. */
+function cargarMiColeccion() {
+  const semilla = (window.PERFUMARIO_COLECCION && window.PERFUMARIO_COLECCION.perfumes) || [];
+  let n = 0;
+  semilla.forEach(x => {
+    if (S.perfumes.some(y => normaliza(y.nombre) === normaliza(x.nombre))) return;
+    S.perfumes.push(Object.assign(clonar(x), { id: uid(), creado: today() }));
+    n++;
+  });
+  guardar(); render();
+  toast(n ? `Agregados ${n} perfumes` : 'Ya los tenías a todos');
 }
 function guardar() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); }
@@ -1203,6 +1229,8 @@ function renderAjustes() {
   $('#lugarActual').textContent = S.meta.lugar
     ? `${S.meta.lugar.nombre}${c ? ` · ${Math.round(c.temp)}° hace ${minutosDesde(c.ts)} min` : ' · todavía sin datos'}`
     : 'Sin ubicación: la temperatura se carga a mano.';
+  const hay = !!(window.PERFUMARIO_COLECCION && (window.PERFUMARIO_COLECCION.perfumes || []).length);
+  $('#btnMiColeccion').hidden = !hay;
   const u = S.meta.ultimaCopia;
   $('#copiaEstado').textContent = u
     ? `Última copia: ${fmtHace(u)} (${fmtFecha(u)}).`
@@ -1410,6 +1438,7 @@ function conectar() {
   $('#btnImportar').addEventListener('click', importar);
   $('#btnBorrar').addEventListener('click', borrarTodo);
   $('#btnEjemplos').addEventListener('click', cargarEjemplos);
+  $('#btnMiColeccion').addEventListener('click', cargarMiColeccion);
 
   // modal
   $('#modal').addEventListener('click', e => { if (e.target.closest('[data-close]')) cerrarModal(); });

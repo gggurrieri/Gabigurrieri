@@ -13,6 +13,8 @@ out   = pathlib.Path(sys.argv[1])
 html  = pathlib.Path('index.html').read_text(encoding='utf-8')
 css   = pathlib.Path('assets/styles.css').read_text(encoding='utf-8')
 datos = pathlib.Path('assets/datos.js').read_text(encoding='utf-8')
+semilla_f = pathlib.Path('assets/coleccion.js')
+semilla = semilla_f.read_text(encoding='utf-8') if semilla_f.exists() else ''
 app   = pathlib.Path('assets/app.js').read_text(encoding='utf-8')
 
 title = re.search(r'<title>(.*?)</title>', html, re.S).group(1)
@@ -24,7 +26,9 @@ body  = re.sub(r'<script>.*?serviceWorker.*?</script>', '', body, flags=re.S)
 
 out.write_text(
     f'<title>{title}</title>\n<style>\n{css}\n</style>\n{body.strip()}\n'
-    f'<script>\n{datos}\n</script>\n<script>\n{app}\n</script>\n',
+    f'<script>\n{datos}\n</script>\n'
+    + (f'<script>\n{semilla}\n</script>\n' if semilla else '')
+    + f'<script>\n{app}\n</script>\n',
     encoding='utf-8')
 print(f'{out} · {out.stat().st_size // 1024} KB')
 PY

@@ -4,6 +4,26 @@ App web para tu colección de perfumes: qué tenés, qué ponerte hoy y qué sig
 cada nota olfativa. Funciona sin conexión y guarda todo en el navegador: no hay
 servidor, no hay cuenta, no hay datos que salgan del dispositivo.
 
+## La colección viene adentro
+
+`assets/coleccion.js` trae una colección cargada de fábrica: la primera vez que
+abrís la app en un navegador entra sola, sin importar nada a mano. Después manda
+lo que tengas guardado.
+
+- **Si borrás todo desde Ajustes, no vuelve.** La app guarda el estado apenas
+  arranca, así que la marca de "ya arrancó una vez" queda puesta. Un dato que
+  resucita solo después de borrarlo es un bug, no una comodidad.
+- **Se puede volver a cargar a pedido** con *Ajustes → Cargar mi colección*, que
+  agrega únicamente lo que falte, comparando por nombre. Sirve si ya venías
+  usando la app antes de que existiera este archivo.
+- **Para cambiarla**, editá `assets/coleccion.js` (es un objeto JSON con la misma
+  forma que la exportación).
+- **Para publicar la app sin ninguna colección adentro**, borrá ese archivo y
+  sacá su `<script>` del `index.html`: la app arranca vacía y no se rompe.
+
+> Ojo con dónde la publicás: ese archivo viaja con la app. Si servís el repo por
+> GitHub Pages, cualquiera que entre a la URL ve esa colección.
+
 ## Cómo usarla
 
 **En la compu:** abrí `perfumario/index.html` con doble clic.
@@ -137,6 +157,7 @@ perfumario/
 ├── assets/
 │   ├── app.js          toda la lógica: estado, recomendador, vistas
 │   ├── datos.js        familias, notas y catálogo de fragancias (solo lectura)
+│   ├── coleccion.js    la colección que viene cargada de fábrica
 │   ├── styles.css      estilos
 │   └── icon*.png/svg   el ícono
 └── tests/e2e.js        prueba de punta a punta
@@ -167,7 +188,8 @@ el contexto, registro y borrado de usos con el descuento de ml, buscador y filtr
 alta desde el catálogo, ficha, diccionario de notas, estadísticas de uso, copia de
 seguridad y borrado, más el aprendizaje (que aparezca, que se pueda apagar) y la
 carga por lotes, y el clima con la API simulada (que llegue, que se pueda pisar a
-mano y que falle sin romper nada). 89 comprobaciones.
+mano y que falle sin romper nada) y la colección incluida (que entre sola, que no
+resucite después de borrarla y que no se duplique). 95 comprobaciones.
 
 ```
 node perfumario/tests/e2e.js      # sale con código 1 si algo falla

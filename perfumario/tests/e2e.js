@@ -36,13 +36,34 @@ const check = (n, c, d = '') => {
   const visible = async s => p.evaluate(x => { const e = document.querySelector(x); return !!e && !e.hidden; }, s);
   const cuantos = async s => p.evaluate(x => document.querySelectorAll(x).length, s);
 
-  console.log('\nA · Primer arranque');
+  console.log('\nA · La colección viene en el build');
+  check('la carga sola en el primer arranque', (await db()).perfumes.length === 22,
+    String((await db()).perfumes.length));
+  check('y sugiere sin que cargues nada', await cuantos('#sugerencias article.card') === 3);
+  check('no le inventa usos', (await db()).usos.length === 0);
+
+  await p.tap('#btnSettings'); await p.waitForTimeout(200);
+  await p.tap('#btnBorrar'); await p.waitForTimeout(300);
+  await p.tap('#btnConfirmarBorrado'); await p.waitForTimeout(400);
+  await p.reload(); await p.waitForTimeout(400);
+  check('si la borrás, no resucita al recargar', (await db()).perfumes.length === 0);
+
+  await p.tap('#btnSettings'); await p.waitForTimeout(200);
+  await p.tap('#btnMiColeccion'); await p.waitForTimeout(400);
+  check('se puede volver a cargar a pedido', (await db()).perfumes.length === 22);
+  await p.tap('#btnMiColeccion'); await p.waitForTimeout(350);
+  check('y no la duplica', (await db()).perfumes.length === 22);
+
+  await p.tap('#btnBorrar'); await p.waitForTimeout(300);
+  await p.tap('#btnConfirmarBorrado'); await p.waitForTimeout(400);  // el resto corre en vacío
+
+  console.log('\nB · Primer arranque');
   check('abre en Hoy', await visible('#view-hoy') && (await p.getAttribute('#view-hoy', 'class')).includes('active'));
   check('avisa que la colección está vacía', /Todav[íi]a no cargaste/.test(await p.textContent('#sugerencias')));
   check('sin datos no molesta con la copia', !(await visible('#avisoCopia')));
   check('el subtítulo lo dice', /vac[íi]a/i.test(await p.textContent('#topbarSub')));
 
-  console.log('\nB · Datos de ejemplo');
+  console.log('\nC · Datos de ejemplo');
   await p.tap('#btnSettings'); await p.waitForTimeout(200);
   await p.tap('#btnEjemplos'); await p.waitForTimeout(400);
   let d = await db();
@@ -53,7 +74,7 @@ const check = (n, c, d = '') => {
     return (await db()).perfumes.length === 6;
   })());
 
-  console.log('\nC · Sugerencias');
+  console.log('\nD · Sugerencias');
   await ir('hoy');
   check('sugiere tres', await cuantos('#sugerencias article.card') === 3);
   check('muestra un puntaje', /^\d+$/.test((await p.textContent('#sugerencias .pf-score')).trim()));
@@ -85,7 +106,7 @@ const check = (n, c, d = '') => {
     !/Khamrah|Baccarat/.test(await p.textContent('#sugerencias')),
     (await p.textContent('#sugerencias .pf-name')).trim());
 
-  console.log('\nD · Registrar un uso');
+  console.log('\nE · Registrar un uso');
   await p.tap('#ctxOcasion .chip[data-val="casual"]'); await p.waitForTimeout(250);
   const elegido = (await p.textContent('#sugerencias .pf-name')).replace('★', '').trim();
   const mlAntes = await p.evaluate(n => {
@@ -108,7 +129,7 @@ const check = (n, c, d = '') => {
   check('deja de recomendar lo que ya usaste hoy',
     (await p.textContent('#sugerencias .pf-name')).replace('★', '').trim() !== elegido);
 
-  console.log('\nE · Colección');
+  console.log('\nF · Colección');
   await ir('coleccion');
   check('lista los seis', await cuantos('#listaColeccion .pf') === 6);
   check('resume la colección', /6 de 6/.test(await p.textContent('#coleccionResumen')));
@@ -125,7 +146,7 @@ const check = (n, c, d = '') => {
     .map(e => Number((e.querySelector('.pf-bar i') || {}).style.width.replace('%', '') || 0)));
   check('ordena por lo que queda', orden.every((v, i) => i === 0 || orden[i - 1] <= v), orden.join(' '));
 
-  console.log('\nF · Alta desde el catálogo');
+  console.log('\nG · Alta desde el catálogo');
   await p.tap('#btnNuevo'); await p.waitForTimeout(300);
   await p.fill('#fCatalogo', 'Dior · Sauvage');
   await p.evaluate(() => document.querySelector('#fCatalogo').dispatchEvent(new Event('change', { bubbles: true })));
@@ -141,7 +162,7 @@ const check = (n, c, d = '') => {
   check('lo agrega a la colección', d.perfumes.length === 7 && !!d.perfumes.find(x => x.nombre === 'Sauvage'));
   check('guarda las notas cargadas', d.perfumes.find(x => x.nombre === 'Sauvage').fondo.length === 3);
 
-  console.log('\nG · Ficha del perfume');
+  console.log('\nH · Ficha del perfume');
   await p.fill('#busca', 'Terre'); await p.waitForTimeout(250);
   await p.tap('#listaColeccion .pf'); await p.waitForTimeout(300);
   check('abre la ficha', (await p.textContent('#modalTitulo')).includes('Terre'));
@@ -152,7 +173,7 @@ const check = (n, c, d = '') => {
   const terre = d.perfumes.find(x => x.nombre.includes('Terre'));
   check('rellenar deja el frasco lleno', terre.mlRestante === terre.ml, `${terre.mlRestante}/${terre.ml}`);
 
-  console.log('\nH · Notas');
+  console.log('\nI · Notas');
   await ir('notas');
   check('arma el perfil olfativo', await cuantos('#perfilFamilias .bar-row') >= 3);
   check('cuenta las notas repetidas', await cuantos('#perfilNotas .tag') > 0);
@@ -169,7 +190,7 @@ const check = (n, c, d = '') => {
   check('compara notas entre perfumes', await cuantos('#simLista .item') >= 1 ||
     /original/.test(await p.textContent('#simLista')));
 
-  console.log('\nI · Uso');
+  console.log('\nJ · Uso');
   await ir('uso');
   check('muestra cuatro indicadores', await cuantos('#kpisUso .kpi') === 4);
   check('cuenta los usos del mes', /Usos este mes/.test(await p.textContent('#kpisUso')));
@@ -206,7 +227,7 @@ const check = (n, c, d = '') => {
     return d.perfumes.some(x => x.mlRestante > prev - 0.0001);
   }, mlPost));
 
-  console.log('\nJ · Aprende de las elecciones');
+  console.log('\nK · Aprende de las elecciones');
   await ir('hoy');
   await p.tap('#ctxOcasion .chip[data-val="evento"]'); await p.waitForTimeout(350);
   const conAprendizaje = await p.textContent('#sugerencias');
@@ -227,7 +248,7 @@ const check = (n, c, d = '') => {
   await p.tap('#setAprender'); await p.waitForTimeout(250);
   check('y se puede volver a prender', (await db()).ajustes.aprender === true);
 
-  console.log('\nK · Carga rápida');
+  console.log('\nL · Carga rápida');
   await ir('coleccion');
   const antesLote = (await db()).perfumes.length;
   await p.tap('#btnLote'); await p.waitForTimeout(300);
@@ -253,7 +274,7 @@ const check = (n, c, d = '') => {
   check('lo marca como pendiente de completar', /completar/.test(await p.textContent('#listaColeccion')));
   await p.fill('#busca', ''); await p.waitForTimeout(200);
 
-  console.log('\nL · Clima automático');
+  console.log('\nM · Clima automático');
   // la API se simula: la prueba no puede depender de que haya red ni del tiempo real
   let climaFalla = false;
   const respuesta = cuerpo => ({ status: 200, contentType: 'application/json',
@@ -299,7 +320,7 @@ const check = (n, c, d = '') => {
   check('y las sugerencias siguen ahí', await cuantos('#sugerencias article.card') === 3);
   climaFalla = false;
 
-  console.log('\nM · Copia y borrado');
+  console.log('\nN · Copia y borrado');
   await p.tap('#btnSettings'); await p.waitForTimeout(250);
   await p.tap('#btnExportar'); await p.waitForTimeout(300);
   check('exporta un JSON legible', await p.evaluate(() => {
@@ -324,7 +345,7 @@ const check = (n, c, d = '') => {
   check('borra todo', d.perfumes.length === 0 && d.usos.length === 0);
   check('y vuelve al estado inicial', /Todav[íi]a no cargaste/.test(await p.textContent('#sugerencias')));
 
-  console.log('\nN · Sin errores');
+  console.log('\nO · Sin errores');
   check('la consola quedó limpia', errs.length === 0, errs.slice(0, 3).join(' | '));
 
   await b.close();
