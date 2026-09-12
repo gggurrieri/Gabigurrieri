@@ -86,6 +86,12 @@
       <h2 class="section-title">Sugerencias de hoy</h2>
       <div id="sugerencias" class="stack"></div>
 
+      <section class="card" id="cardAprendizaje" hidden>
+        <h2>Lo que aprendí de vos</h2>
+        <p class="sub" id="aprendizajeSub">—</p>
+        <div id="aprendizajeReglas"></div>
+      </section>
+
       <section class="card" id="cardHoyUsos" hidden>
         <h2>Hoy te pusiste</h2>
         <div id="hoyUsos" class="stack-sm"></div>
@@ -115,6 +121,7 @@
           </select>
         </label>
         <label class="check mini"><input type="checkbox" id="soloDisponibles"> Ocultar vacíos</label>
+        <button class="btn mini" id="btnLote">⚡ Carga rápida</button>
       </div>
 
       <p class="sub" id="coleccionResumen">—</p>
@@ -197,6 +204,10 @@
           </select>
         </label>
         <p class="hint">El hemisferio define en qué estación estás: acá diciembre es verano.</p>
+        <label class="check" style="margin-top:12px">
+          <input type="checkbox" id="setAprender"> Aprender de mis elecciones
+        </label>
+        <p class="hint">Con esto prendido, las sugerencias se corrigen según lo que realmente usás en cada ocasión. Apagalo y vuelve a recomendar solo por las reglas fijas.</p>
       </section>
 
       <section class="card">

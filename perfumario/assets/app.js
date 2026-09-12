@@ -50,7 +50,7 @@ const DEFAULTS = {
   perfumes: [],  // {id,nombre,casa,conc,familia,salida[],corazon[],fondo[],ml,mlRestante,
                  //  precio,comprado,longevidad,estela,estaciones[],ocasiones[],momento,rating,nota,creado}
   usos: [],      // {id,fecha,perfumeId,sprays,ocasion,momento,temp,nota}
-  ajustes: { mlSpray: 0.1, moneda: '$', hemisferio: 'sur' },
+  ajustes: { mlSpray: 0.1, moneda: '$', hemisferio: 'sur', aprender: true },
   meta: { version: 1, ultimaCopia: null }
 };
 
@@ -100,7 +100,12 @@ const TEMP_IDEAL = {
   amaderada: 16, chipre: 15, cuero: 11, ambar: 10, gourmand: 9
 };
 
-const familia = id => D.FAMILIAS.find(f => f.id === id) || D.FAMILIAS[0];
+/* Un perfume cargado a las apuradas puede no tener familia todavía. Antes de
+   inventarle una, se lo muestra sin clasificar: el dato falso ensucia el
+   perfil olfativo y las sugerencias. */
+const SIN_FAMILIA = { id: null, nombre: 'Sin clasificar', emoji: '❓', color: '#6b6478',
+  desc: 'Todavía no le pusiste familia.', estaciones: [], momento: 'ambos' };
+const familia = id => D.FAMILIAS.find(f => f.id === id) || SIN_FAMILIA;
 const perfume = id => S.perfumes.find(p => p.id === id) || null;
 const notasDe = p => [].concat(p.salida || [], p.corazon || [], p.fondo || []);
 
@@ -165,10 +170,52 @@ function ctxInicial() {
   if (ctx.momento === null) ctx.momento = momentoPorHora();
 }
 
+/* Lo que la app aprende de tus elecciones.
+
+   No hay nada mágico: cuenta qué usaste en cada ocasión durante los últimos
+   seis meses y lo compara contra lo que sería esperable si eligieras al azar
+   dentro de tu propia colección. Si el 70 % de tus usos de trabajo son
+   amaderados pero los amaderados son solo el 30 % de lo que tenés, eso es una
+   preferencia y no una casualidad. Esa diferencia (observado − esperado) es
+   todo el modelo, y es la que se puede explicar en una línea.                */
+const VENTANA_APRENDIZAJE = 180; // días
+const MIN_USOS_MODELO = 6;       // menos que esto no alcanza para concluir nada
+const MIN_USOS_OCASION = 3;
+
+function modeloAprendido() {
+  const vacio = { activo: false, ocFam: {}, ocPerf: {}, totOc: {}, share: {}, notasTop: [], usos: 0 };
+  if (!S.ajustes.aprender || !S.perfumes.length) return vacio;
+
+  const corte = addDays(today(), -VENTANA_APRENDIZAJE);
+  const usos = S.usos.filter(u => u.fecha >= corte && perfume(u.perfumeId));
+  if (usos.length < MIN_USOS_MODELO) return Object.assign(vacio, { usos: usos.length });
+
+  // participación de cada familia en la colección = lo esperable al azar
+  const share = {};
+  S.perfumes.forEach(x => { const k = x.familia || 'sin'; share[k] = (share[k] || 0) + 1; });
+  Object.keys(share).forEach(k => { share[k] = share[k] / S.perfumes.length; });
+
+  const ocFam = {}, ocPerf = {}, totOc = {}, notas = {};
+  usos.forEach(u => {
+    const x = perfume(u.perfumeId), oc = u.ocasion || 'casual';
+    totOc[oc] = (totOc[oc] || 0) + 1;
+    ocFam[oc + '|' + (x.familia || 'sin')] = (ocFam[oc + '|' + (x.familia || 'sin')] || 0) + 1;
+    ocPerf[oc + '|' + x.id] = (ocPerf[oc + '|' + x.id] || 0) + 1;
+    notasDe(x).forEach(n => { const k = n.toLowerCase(); notas[k] = (notas[k] || 0) + 1; });
+  });
+
+  const notasTop = Object.keys(notas).map(n => ({ n, c: notas[n] }))
+    .filter(x => x.c >= Math.max(2, Math.round(usos.length * 0.25)))
+    .sort((a, b) => b.c - a.c).slice(0, 10);
+
+  return { activo: true, ocFam, ocPerf, totOc, share, notasTop, usos: usos.length };
+}
+
 /* Puntaje de un perfume para el contexto actual.
    Devuelve {score, razones:[{txt, bien}]} para poder explicar la sugerencia:
    una recomendación que no se explica no se usa. */
-function puntuar(p) {
+function puntuar(p, m) {
+  m = m || { activo: false };
   const est = estacionHoy();
   const razones = [];
   let score = 50;
@@ -231,13 +278,49 @@ function puntuar(p) {
   const pct = porcRestante(p);
   if (p.ml > 0 && pct <= 10) { score -= 8; razones.push({ txt: `Queda ${pct} %: guardalo para algo que valga`, bien: false }); }
 
+  // lo aprendido de tus elecciones anteriores
+  if (m.activo) {
+    const oc = ctx.ocasion, tot = m.totOc[oc] || 0;
+    if (tot >= MIN_USOS_OCASION) {
+      const fam = p.familia || 'sin';
+      const obs = (m.ocFam[oc + '|' + fam] || 0) / tot;
+      const esp = m.share[fam] || 0;
+      const b = clamp(Math.round((obs - esp) * 40), -10, 16);
+      score += b;
+      if (b >= 5) razones.push({
+        txt: `Para ${OCASIONES[oc].toLowerCase()} solés elegir ${familia(fam).nombre.toLowerCase()}`,
+        bien: true, aprendido: true });
+      else if (b <= -5) razones.push({
+        txt: `Casi nunca elegís ${familia(fam).nombre.toLowerCase()} para ${OCASIONES[oc].toLowerCase()}`,
+        bien: false, aprendido: true });
+
+      const veces = m.ocPerf[oc + '|' + p.id] || 0;
+      if (veces >= 2) {
+        score += 8;
+        razones.push({ txt: `Es tu elección habitual para ${OCASIONES[oc].toLowerCase()}: ${veces} veces`,
+                       bien: true, aprendido: true });
+      }
+    }
+    // notas que se repiten en lo que realmente usás
+    if (m.notasTop.length) {
+      const mias = notasDe(p).map(n => n.toLowerCase());
+      const coinciden = m.notasTop.filter(x => mias.includes(x.n)).map(x => x.n);
+      if (coinciden.length >= 2) {
+        score += 6;
+        razones.push({ txt: `Tiene ${coinciden.slice(0, 2).join(' y ')}, de lo que más te ponés`,
+                       bien: true, aprendido: true });
+      }
+    }
+  }
+
   return { score: Math.round(clamp(score, 0, 100)), razones };
 }
 
-function sugerir(n) {
+function sugerir(n, m) {
+  m = m || modeloAprendido();
   return S.perfumes
     .filter(p => !(p.ml > 0 && p.mlRestante <= 0))
-    .map(p => Object.assign({ p }, puntuar(p)))
+    .map(p => Object.assign({ p }, puntuar(p, m)))
     .sort((a, b) => b.score - a.score || a.p.nombre.localeCompare(b.p.nombre))
     .slice(0, n || 3);
 }
@@ -252,13 +335,15 @@ function renderHoy() {
   $('#contextoResumen').textContent =
     `${ESTACIONES[est].emoji} Estamos en ${nombreEstacion(est)} · ${MOMENTOS[ctx.momento]} · ${OCASIONES[ctx.ocasion]}`;
 
+  const modelo = modeloAprendido();
   const cont = $('#sugerencias');
   if (!S.perfumes.length) {
     cont.innerHTML = `<div class="vacio">Todavía no cargaste ningún perfume.<br>
       Andá a <b>Colección → Agregar</b>, o cargá seis de ejemplo desde Ajustes.</div>`;
   } else {
-    cont.innerHTML = sugerir(3).map((s, i) => fichaSugerencia(s, i)).join('');
+    cont.innerHTML = sugerir(3, modelo).map((s, i) => fichaSugerencia(s, i)).join('');
   }
+  renderAprendizaje(modelo);
 
   // lo que ya te pusiste hoy
   const hoy = S.usos.filter(u => u.fecha === today());
@@ -277,8 +362,10 @@ function renderHoy() {
 
 function fichaSugerencia(s, i) {
   const p = s.p, f = familia(p.familia);
-  const razones = s.razones.slice(0, 3).map(r =>
-    `<li>${r.bien ? '✓' : '·'} <b>${esc(r.txt)}</b></li>`).join('');
+  // primero lo aprendido: es lo que distingue esta sugerencia de una regla fija
+  const ordenadas = s.razones.slice().sort((a, b) => (b.aprendido ? 1 : 0) - (a.aprendido ? 1 : 0));
+  const razones = ordenadas.slice(0, 3).map(r =>
+    `<li${r.aprendido ? ' class="aprendida"' : ''}>${r.aprendido ? '✦' : (r.bien ? '✓' : '·')} <b>${esc(r.txt)}</b></li>`).join('');
   const pct = porcRestante(p);
   return `<article class="card">
     <div class="pf" data-ficha="${p.id}" role="button" tabindex="0">
@@ -295,6 +382,44 @@ function fichaSugerencia(s, i) {
       <button class="btn" data-ficha="${p.id}">Ver ficha</button>
     </div>
   </article>`;
+}
+
+/* Muestra el modelo en palabras. Si no se puede leer, no se puede confiar:
+   por eso se listan las reglas y se dice sobre cuántos usos se calcularon. */
+function renderAprendizaje(m) {
+  const card = $('#cardAprendizaje');
+  if (!m.activo) {
+    card.hidden = true;
+    if (S.ajustes.aprender && S.perfumes.length && m.usos != null && m.usos > 0) {
+      card.hidden = false;
+      $('#aprendizajeSub').textContent =
+        `Con ${m.usos} uso${m.usos === 1 ? '' : 's'} registrado${m.usos === 1 ? '' : 's'} todavía no alcanza. ` +
+        `Desde ${MIN_USOS_MODELO} empiezo a ajustar las sugerencias a lo que elegís.`;
+      $('#aprendizajeReglas').innerHTML = '';
+    }
+    return;
+  }
+
+  const reglas = [];
+  Object.keys(m.totOc).forEach(oc => {
+    if (m.totOc[oc] < MIN_USOS_OCASION) return;
+    let mejor = null;
+    Object.keys(m.share).forEach(fam => {
+      const c = m.ocFam[oc + '|' + fam] || 0;
+      if (!c) return;
+      const dif = (c / m.totOc[oc]) - (m.share[fam] || 0);
+      if (!mejor || dif > mejor.dif) mejor = { fam, c, dif };
+    });
+    if (mejor && mejor.dif > 0.05) reglas.push(
+      `<div class="linea"><span>${OCASIONES[oc]}</span><b>${esc(familia(mejor.fam).nombre.toLowerCase())} · ${mejor.c} de ${m.totOc[oc]}</b></div>`);
+  });
+  if (m.notasTop.length) reglas.push(
+    `<div class="linea"><span>Notas que repetís</span><b>${esc(m.notasTop.slice(0, 3).map(x => x.n).join(', '))}</b></div>`);
+
+  card.hidden = !reglas.length;
+  $('#aprendizajeSub').textContent =
+    `Sobre tus ${m.usos} usos de los últimos ${Math.round(VENTANA_APRENDIZAJE / 30)} meses. Lo apagás en Ajustes.`;
+  $('#aprendizajeReglas').innerHTML = reglas.join('');
 }
 
 function avisoCopia() {
@@ -383,7 +508,7 @@ function fichaLista(p) {
       <div class="pf-name">${esc(p.nombre)}</div>
       <div class="pf-house">${esc(p.casa)}${p.conc ? ' · ' + esc(p.conc) : ''}</div>
       <div class="pf-meta">
-        <span class="pill fam" style="border-color:${f.color}55">${esc(f.nombre)}</span>
+        <span class="pill fam" style="border-color:${f.color}55">${p.familia ? esc(f.nombre) : '❓ completar'}</span>
         <span class="pill">${n} uso${n === 1 ? '' : 's'}</span>
         <span class="pill">${ult ? fmtHace(ult) : 'sin estrenar'}</span>
         ${cpu != null ? `<span class="pill">${S.ajustes.moneda}${Math.round(cpu).toLocaleString('es-AR')}/uso</span>` : ''}
@@ -479,7 +604,9 @@ function abrirFormulario(id) {
           <select id="fConc">${['EDC','EDT','EDP','Parfum','Cologne','Otro']
             .map(c => `<option${v.conc === c ? ' selected' : ''}>${c}</option>`).join('')}</select></label>
         <label class="field"><span>Familia</span>
-          <select id="fFamilia">${D.FAMILIAS.map(f =>
+          <select id="fFamilia">
+            <option value=""${!v.familia ? ' selected' : ''}>❓ Sin clasificar</option>
+            ${D.FAMILIAS.map(f =>
             `<option value="${f.id}"${v.familia === f.id ? ' selected' : ''}>${f.emoji} ${esc(f.nombre)}</option>`).join('')}</select></label>
       </div>
 
@@ -570,7 +697,7 @@ function abrirFormulario(id) {
       nombre: $('#fNombre').value.trim() || 'Sin nombre',
       casa: $('#fCasa').value.trim(),
       conc: $('#fConc').value,
-      familia: $('#fFamilia').value,
+      familia: $('#fFamilia').value || null,
       salida: listar($('#fSalida').value),
       corazon: listar($('#fCorazon').value),
       fondo: listar($('#fFondo').value),
@@ -590,6 +717,116 @@ function abrirFormulario(id) {
     else S.perfumes.push(Object.assign({ id: uid(), creado: today() }, datos));
     guardar(); cerrarModal(); render();
     toast(p ? 'Cambios guardados' : `${datos.nombre} entró a la colección`);
+  });
+}
+
+/* -------------------------- carga rápida --------------------------- */
+/* Cargar veinte perfumes uno por uno con el formulario largo no lo hace
+   nadie. Acá se pegan los nombres y se buscan contra el catálogo; lo que no
+   aparece entra igual, con el nombre, y queda marcado para completar.       */
+
+/* Compara sin acentos, sin puntuación y sin la concentración, que la gente
+   escribe de cualquier manera: "Acqua di Gio EDT" y "acqua di giò" son lo
+   mismo. */
+function normaliza(s) {
+  return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’'`´]/g, '')
+    .replace(/\b(edt|edp|edc|eau de toilette|eau de parfum|eau de cologne|parfum|perfume|cologne)\b/g, ' ')
+    .replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function buscarEnCatalogo(linea) {
+  const n = normaliza(linea);
+  if (!n) return null;
+  const exacto = D.CATALOGO.find(c => normaliza(c.nombre) === n || normaliza(c.casa + ' ' + c.nombre) === n);
+  if (exacto) return { c: exacto, exacto: true };
+  const parecido = D.CATALOGO.find(c => {
+    const nn = normaliza(c.nombre);
+    return nn.length >= 4 && (n.includes(nn) || nn.includes(n));
+  });
+  return parecido ? { c: parecido, exacto: false } : null;
+}
+
+function parsearLote(texto) {
+  return texto.split('\n').map(l => l.trim()).filter(Boolean).map(linea => {
+    const partes = linea.split('|').map(x => x.trim());
+    const nombre = partes[0];
+    const hallado = buscarEnCatalogo(nombre);
+    const ref = hallado ? hallado.c.nombre : nombre;
+    return {
+      linea: nombre,
+      c: hallado ? hallado.c : null,
+      exacto: !!(hallado && hallado.exacto),
+      ml: partes[1] ? num(partes[1], 100) : 100,
+      precio: partes[2] ? num(partes[2], 0) : 0,
+      repetido: S.perfumes.some(x => normaliza(x.nombre) === normaliza(ref))
+    };
+  });
+}
+
+let lotePendiente = [];
+
+function abrirLote() {
+  abrirModal('Carga rápida', `
+    <p class="sub">Pegá un perfume por línea. Busco cada uno en el catálogo de ${D.CATALOGO.length}
+      fragancias y completo familia, notas, estaciones y ocasiones.</p>
+    <label class="field">
+      <textarea id="loteTexto" style="min-height:150px" placeholder="Bleu de Chanel&#10;Lattafa Khamrah | 100 | 70000&#10;Acqua di Giò"></textarea>
+    </label>
+    <p class="hint">Opcional, separado con barras: <code>Nombre | ml | precio</code>.</p>
+    <div class="btn-row"><button class="btn btn-accent" id="btnRevisarLote">Revisar</button></div>
+    <div id="lotePreview"></div>`);
+
+  $('#btnRevisarLote').addEventListener('click', () => {
+    lotePendiente = parsearLote($('#loteTexto').value);
+    const nuevos = lotePendiente.filter(x => !x.repetido);
+    const reconocidos = nuevos.filter(x => x.c).length;
+    const acompletar = nuevos.length - reconocidos;
+    const repetidos = lotePendiente.length - nuevos.length;
+
+    $('#lotePreview').innerHTML = !lotePendiente.length
+      ? `<div class="vacio">No escribiste ningún nombre.</div>`
+      : `<h2 class="section-title">${nuevos.length} para agregar</h2>
+        <div class="stack-sm">${lotePendiente.map(x => `<div class="item">
+          <div class="it-main">
+            <div class="it-name">${esc(x.c ? x.c.nombre : x.linea)}</div>
+            <div class="it-sub">${x.repetido ? 'Ya lo tenés: se saltea'
+              : x.c ? `${x.exacto ? '✓' : '≈'} ${esc(x.c.casa)} · ${esc(x.c.conc)} · ${esc(familia(x.c.familia).nombre)}`
+                    : 'No está en el catálogo: entra con el nombre y lo completás después'}</div>
+          </div>
+          <div class="pf-mark" style="width:34px;height:34px;font-size:15px">${x.repetido ? '⏭' : (x.c ? familia(x.c.familia).emoji : '❓')}</div>
+        </div>`).join('')}</div>
+        <p class="hint">${reconocidos} reconocidos · ${acompletar} para completar · ${repetidos} repetidos.</p>
+        ${nuevos.length ? `<div class="btn-row"><button class="btn btn-accent" id="btnConfirmarLote">Agregar ${nuevos.length} a la colección</button></div>` : ''}`;
+
+    const btn = $('#btnConfirmarLote');
+    if (btn) btn.addEventListener('click', () => {
+      let n = 0;
+      lotePendiente.filter(x => !x.repetido).forEach(x => {
+        const c = x.c;
+        S.perfumes.push({
+          id: uid(), creado: today(),
+          nombre: c ? c.nombre : x.linea,
+          casa: c ? c.casa : '',
+          conc: c ? c.conc : 'EDP',
+          familia: c ? c.familia : null,
+          salida: c ? c.salida.slice() : [],
+          corazon: c ? c.corazon.slice() : [],
+          fondo: c ? c.fondo.slice() : [],
+          ml: x.ml, mlRestante: x.ml,
+          precio: x.precio, comprado: null,
+          longevidad: c ? c.longevidad : 0,
+          estela: c ? c.estela : 3,
+          estaciones: c ? c.estaciones.slice() : [],
+          ocasiones: c ? c.ocasiones.slice() : [],
+          momento: c ? c.momento : 'ambos',
+          rating: 0, nota: ''
+        });
+        n++;
+      });
+      guardar(); cerrarModal(); render();
+      toast(`Agregados ${n} perfumes`);
+    });
   });
 }
 
@@ -819,6 +1056,7 @@ function renderAjustes() {
   $('#setMlSpray').value = S.ajustes.mlSpray;
   $('#setMoneda').value = S.ajustes.moneda;
   $('#setHemisferio').value = S.ajustes.hemisferio;
+  $('#setAprender').checked = S.ajustes.aprender !== false;
   const u = S.meta.ultimaCopia;
   $('#copiaEstado').textContent = u
     ? `Última copia: ${fmtHace(u)} (${fmtFecha(u)}).`
@@ -953,6 +1191,7 @@ function conectar() {
 
   // colección
   $('#btnNuevo').addEventListener('click', () => abrirFormulario(null));
+  $('#btnLote').addEventListener('click', abrirLote);
   $('#busca').addEventListener('input', e => { filtros.texto = e.target.value; renderColeccion(); });
   $('#orden').addEventListener('change', e => { filtros.orden = e.target.value; renderColeccion(); });
   $('#soloDisponibles').addEventListener('change', e => { filtros.soloDisponibles = e.target.checked; renderColeccion(); });
@@ -977,6 +1216,10 @@ function conectar() {
   });
   $('#setMoneda').addEventListener('change', e => {
     S.ajustes.moneda = e.target.value.trim() || '$'; guardar(); render();
+  });
+  $('#setAprender').addEventListener('change', e => {
+    S.ajustes.aprender = e.target.checked; guardar();
+    toast(e.target.checked ? 'Vuelvo a mirar tu historial' : 'Sugerencias solo por reglas fijas');
   });
   $('#setHemisferio').addEventListener('change', e => {
     S.ajustes.hemisferio = e.target.value; guardar(); toast(`Ahora estás en ${nombreEstacion(estacionHoy())}`);

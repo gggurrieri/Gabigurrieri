@@ -198,7 +198,54 @@ const check = (n, c, d = '') => {
     return d.perfumes.some(x => x.mlRestante > prev - 0.0001);
   }, mlPost));
 
-  console.log('\nJ · Copia y borrado');
+  console.log('\nJ · Aprende de las elecciones');
+  await ir('hoy');
+  await p.tap('#ctxOcasion .chip[data-val="evento"]'); await p.waitForTimeout(350);
+  const conAprendizaje = await p.textContent('#sugerencias');
+  check('usa el historial para esa ocasión', /elección habitual para evento/.test(conAprendizaje),
+    conAprendizaje.replace(/\s+/g, ' ').slice(0, 90));
+  check('reconoce la familia que elegís para esa ocasión', /solés elegir/.test(conAprendizaje));
+  check('muestra lo que aprendió', await visible('#cardAprendizaje'));
+  check('y sobre cuántos usos lo calculó', /Sobre tus \d+ usos/.test(await p.textContent('#aprendizajeSub')));
+  check('lo explica por ocasión', /Evento/.test(await p.textContent('#aprendizajeReglas')));
+
+  await p.tap('#btnSettings'); await p.waitForTimeout(200);
+  await p.tap('#setAprender'); await p.waitForTimeout(250);
+  check('se puede apagar', (await db()).ajustes.aprender === false);
+  await ir('hoy'); await p.waitForTimeout(250);
+  check('apagado, vuelve a las reglas fijas', !/elección habitual/.test(await p.textContent('#sugerencias')));
+  check('y esconde lo aprendido', !(await visible('#cardAprendizaje')));
+  await p.tap('#btnSettings'); await p.waitForTimeout(200);
+  await p.tap('#setAprender'); await p.waitForTimeout(250);
+  check('y se puede volver a prender', (await db()).ajustes.aprender === true);
+
+  console.log('\nK · Carga rápida');
+  await ir('coleccion');
+  const antesLote = (await db()).perfumes.length;
+  await p.tap('#btnLote'); await p.waitForTimeout(300);
+  await p.fill('#loteTexto', 'Versace Eros\nNautica Voyage | 100 | 45000\nPerfume Inventado XYZ\nSauvage');
+  await p.tap('#btnRevisarLote'); await p.waitForTimeout(300);
+  const preview = await p.textContent('#lotePreview');
+  check('reconoce los del catálogo', /Eros/.test(preview) && /Voyage/.test(preview));
+  check('avisa cuál ya tenías', /Ya lo tenés/.test(preview));
+  check('y cuál no encontró', /No está en el catálogo/.test(preview));
+  check('resume el lote', /2 reconocidos · 1 para completar · 1 repetidos/.test(preview),
+    preview.replace(/\s+/g, ' ').slice(-90));
+  await p.tap('#btnConfirmarLote'); await p.waitForTimeout(400);
+  d = await db();
+  check('agrega solo los nuevos', d.perfumes.length === antesLote + 3, `${antesLote} → ${d.perfumes.length}`);
+  const eros = d.perfumes.find(x => x.nombre === 'Eros');
+  check('completa notas y familia de los reconocidos',
+    !!eros && eros.familia === 'ambar' && eros.fondo.length === 4);
+  const nautica = d.perfumes.find(x => x.nombre === 'Voyage');
+  check('toma ml y precio de la línea', !!nautica && nautica.ml === 100 && nautica.precio === 45000);
+  const inventado = d.perfumes.find(x => x.nombre === 'Perfume Inventado XYZ');
+  check('no le inventa familia al desconocido', !!inventado && inventado.familia === null);
+  await p.fill('#busca', 'Inventado'); await p.waitForTimeout(250);  // venía filtrado desde G
+  check('lo marca como pendiente de completar', /completar/.test(await p.textContent('#listaColeccion')));
+  await p.fill('#busca', ''); await p.waitForTimeout(200);
+
+  console.log('\nL · Copia y borrado');
   await p.tap('#btnSettings'); await p.waitForTimeout(250);
   await p.tap('#btnExportar'); await p.waitForTimeout(300);
   check('exporta un JSON legible', await p.evaluate(() => {
@@ -223,7 +270,7 @@ const check = (n, c, d = '') => {
   check('borra todo', d.perfumes.length === 0 && d.usos.length === 0);
   check('y vuelve al estado inicial', /Todav[íi]a no cargaste/.test(await p.textContent('#sugerencias')));
 
-  console.log('\nK · Sin errores');
+  console.log('\nM · Sin errores');
   check('la consola quedó limpia', errs.length === 0, errs.slice(0, 3).join(' | '));
 
   await b.close();
