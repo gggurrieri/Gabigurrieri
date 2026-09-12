@@ -350,6 +350,17 @@ const check = (n, c, d = '') => {
 
   await p.tap('#btnSettings'); await p.waitForTimeout(250);
   check('arranca sin ubicación', /Sin ubicación/.test(await p.textContent('#lugarActual')));
+
+  // el permiso denegado se explica, y sin globito encima
+  await p.evaluate(() => {
+    navigator.geolocation.getCurrentPosition = (_ok, err) => err && err({ code: 1 });
+    document.querySelector('#toast').hidden = true;   // puede quedar uno de antes
+  });
+  await p.tap('#btnUbicacion'); await p.waitForTimeout(400);
+  const avisoUb = await p.textContent('#avisoUbicacion');
+  check('explica el permiso denegado y ofrece salida',
+    /no entregó la ubicación/.test(avisoUb) && /elegí tu ciudad/i.test(avisoUb), avisoUb.slice(0, 80));
+  check('y no lo repite en un globito', await p.evaluate(() => document.querySelector('#toast').hidden));
   await p.fill('#buscaCiudad', 'Rosario'); await p.waitForTimeout(900);
   check('encuentra la ciudad', await cuantos('#ciudadResultados [data-lat]') === 1);
   check('sin consultar la API: la lista viaja en la app', llamadasGeo === 0, String(llamadasGeo));

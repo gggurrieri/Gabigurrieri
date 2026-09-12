@@ -290,24 +290,43 @@ function usarUbicacion() {
   if (!navigator.geolocation) { avisoUbicacion('Este navegador no da la ubicación.'); return; }
   avisoUbicacion('Buscando tu ubicación…');
   navigator.geolocation.getCurrentPosition(
-    pos => fijarLugar('Mi ubicación', pos.coords.latitude.toFixed(3), pos.coords.longitude.toFixed(3)),
-    err => {
-      // 1 = permiso denegado, que es lo que pasa siempre dentro de un iframe
-      if (err && err.code === 1 && enVistaPrevia())
-        avisoUbicacion('Esta vista previa no permite la ubicación. Elegí tu ciudad de la lista de abajo.');
-      else if (err && err.code === 1)
-        avisoUbicacion('No diste permiso de ubicación. Elegí tu ciudad de la lista de abajo.');
-      else
-        avisoUbicacion('No pude ubicarte. Elegí tu ciudad de la lista de abajo.');
+    pos => {
+      avisoUbicacion('');
+      fijarLugar('Mi ubicación', pos.coords.latitude.toFixed(3), pos.coords.longitude.toFixed(3));
     },
+    err => avisoUbicacion(textoErrorUbicacion(err)),
     { timeout: 10000, maximumAge: 600000 }
   );
 }
 
+/* El código 1 (permiso denegado) tapa dos situaciones muy distintas: que la
+   persona haya dicho que no, o que el navegador ni haya preguntado porque el
+   sistema le tiene cortada la ubicación. Decir solo "no diste permiso" manda a
+   buscar un cartel que nunca apareció, así que se explican las dos, y en iOS
+   se nombran las pantallas reales. */
+function textoErrorUbicacion(err) {
+  const codigo = err && err.code;
+  if (codigo === 1 && enVistaPrevia())
+    return 'Esta vista previa no permite la ubicación. Elegí tu ciudad de la lista de abajo.';
+  if (codigo === 1) {
+    const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    return iOS
+      ? 'Safari no entregó la ubicación. Si no viste ningún cartel, está cortada desde el sistema: Ajustes → Privacidad y seguridad → Localización → Safari, en "Al usar la app". Si dijiste que no, se reabre en la barra de direcciones: tocá "aA" → Ajustes del sitio web → Ubicación → Preguntar. Mientras tanto, elegí tu ciudad acá abajo.'
+      : 'El navegador no entregó la ubicación. Habilitala para este sitio desde el candado de la barra de direcciones, o elegí tu ciudad acá abajo.';
+  }
+  if (codigo === 2) return 'El dispositivo no pudo ubicarte ahora (pasa bajo techo o con poca señal). Probá de nuevo o elegí tu ciudad acá abajo.';
+  if (codigo === 3) return 'Tardó demasiado en ubicarte. Probá de nuevo o elegí tu ciudad acá abajo.';
+  return 'No pude ubicarte. Elegí tu ciudad acá abajo.';
+}
+
+/* El aviso vive en la pantalla, no en un globito: es un texto que hay que
+   poder leer dos veces y seguir paso a paso. */
 function avisoUbicacion(txt) {
   const e = $('#avisoUbicacion');
-  if (e) { e.textContent = txt; e.hidden = false; }
-  toast(txt);
+  if (!e) return;
+  e.textContent = txt;
+  e.hidden = !txt;
 }
 
 /* --------------------------- navegación ---------------------------- */
