@@ -307,7 +307,7 @@ de esta app:
 
 ## Pruebas
 
-`tests/e2e.js` recorre la app como una usuaria, en un viewport de iPhone con eventos
+`tests/e2e.js` recorre la app como la usa su dueño, en un viewport de iPhone con eventos
 táctiles reales: primer arranque, carga de ejemplos, sugerencias y cómo cambian con
 el contexto, registro y borrado de usos con el descuento de ml, buscador y filtros,
 alta desde el catálogo, ficha, diccionario de notas, estadísticas de uso, copia de
