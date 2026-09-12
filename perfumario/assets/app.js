@@ -1371,11 +1371,9 @@ function exportar() {
     <label class="field"><textarea id="modalText" readonly style="min-height:180px;font-family:ui-monospace,monospace;font-size:11px">${esc(texto)}</textarea></label>
     <div class="btn-row">
       <button class="btn btn-accent" id="btnCopiar">Copiar al portapapeles</button>
-      ${enVistaPrevia() ? '' : '<button class="btn" id="btnDescargar">Descargar archivo</button>'}
-    </div>
-    ${enVistaPrevia() ? '<p class="hint">La vista previa embebida no deja descargar archivos: por ahora, copiá el texto.</p>' : ''}`);
-  const bd = $('#btnDescargar');
-  if (bd) bd.addEventListener('click', descargarCopia);
+      <button class="btn" id="btnDescargar">Descargar archivo</button>
+    </div>`);
+  $('#btnDescargar').addEventListener('click', descargarCopia);
   $('#btnCopiar').addEventListener('click', async () => {
     const ta = $('#modalText');
     try {
@@ -1391,21 +1389,44 @@ function exportar() {
 }
 
 /* Copiar y pegar un JSON largo desde el teléfono es incómodo; un archivo se
-   guarda en Archivos o se manda por mail de una. */
+   guarda en Archivos o se manda por mail de una.
+
+   Dos caminos: dentro de la vista publicada, el navegador no deja que la
+   página baje un archivo por su cuenta, y hay que pedírselo al anfitrión
+   (la capacidad "downloads", que muestra su propia confirmación). En un
+   navegador común, el enlace de toda la vida.                          */
 function descargarCopia() {
-  try {
-    const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `perfumario-${today()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  const nombre = `perfumario-${today()}.json`;
+  const texto = JSON.stringify(S, null, 2);
+
+  const anotarCopia = () => {
     S.meta.ultimaCopia = today(); guardar(); renderAjustes(); avisoCopia();
     toast('Copia descargada');
-  } catch (e) { toast('No pude descargar: copiá el texto'); }
+  };
+
+  const porElAnfitrion = () => {
+    if (!(window.claude && typeof window.claude.use === 'function')) return Promise.resolve(false);
+    return Promise.resolve(window.claude.use('downloads'))
+      .then(dl => dl ? Promise.resolve(dl.save({ filename: nombre, data: texto })).then(() => true) : false)
+      .catch(() => false);
+  };
+
+  const porElNavegador = () => {
+    try {
+      const url = URL.createObjectURL(new Blob([texto], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = nombre;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      return true;
+    } catch (e) { return false; }
+  };
+
+  porElAnfitrion().then(listo => {
+    if (listo) { anotarCopia(); return; }
+    if (!enVistaPrevia() && porElNavegador()) { anotarCopia(); return; }
+    toast('No pude descargar acá: copiá el texto');
+  });
 }
 
 function importar() {
