@@ -557,6 +557,72 @@ const check = (n, c, d = '') => {
   const conCalorCitrico = await razonesDe(protagonistas.cit);
   check('y el cítrico que usás con calor sí entra', conCalorCitrico !== '');
 
+  console.log('\nO2 · El termómetro le gana al almanaque');
+  // dos perfumes iguales salvo familia y estación: uno marcado para HOY,
+  // el otro para otra estación. La prueba se arma sola cualquier día del año.
+  const duelo = await p.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('perfumario_v1'));
+    const sur = ['verano','verano','otono','otono','otono','invierno',
+                 'invierno','invierno','primavera','primavera','primavera','verano'];
+    const est = sur[new Date().getMonth()];
+    const nombre = { otono: 'otoño' };
+    const otra = { verano: 'invierno', invierno: 'verano', otono: 'primavera', primavera: 'otoño' }[est];
+    const base = { ml: 100, mlRestante: 100, precio: 0, comprado: null, longevidad: 8, estela: 3,
+                   ocasiones: ['salida'], momento: 'ambos', rating: 0, nota: '',
+                   salida: [], corazon: [], fondo: [], creado: d.perfumes[0].creado };
+    d.perfumes = [
+      Object.assign({ id: 'frio', nombre: 'Abrigado', casa: 'Test', conc: 'EDP',
+                      familia: 'ambar', estaciones: [otra] }, base),
+      Object.assign({ id: 'fresco', nombre: 'Liviano', casa: 'Test', conc: 'EDT',
+                      familia: 'citrica', estaciones: [nombre[est] || est] }, base)
+    ];
+    d.usos = []; d.ajustes.clima = false;
+    localStorage.setItem('perfumario_v1', JSON.stringify(d));
+    const tipica = { verano: 28, otono: 18, invierno: 11, primavera: 21 }[est];
+    return { est, tipica };
+  });
+  await p.reload(); await p.waitForTimeout(500);
+  await p.tap('#ctxOcasion .chip[data-val="salida"]'); await p.waitForTimeout(250);
+
+  await termometro(duelo.tipica);
+  check('con la temperatura normal de la estación, manda el almanaque',
+    (await p.textContent('#sugerencias .pf-name')).includes('Liviano'),
+    await p.textContent('#sugerencias .pf-name'));
+
+  await termometro(Math.max(-5, duelo.tipica - 16));
+  check('con 16 grados menos, manda el termómetro',
+    (await p.textContent('#sugerencias .pf-name')).includes('Abrigado'),
+    await p.textContent('#sugerencias .pf-name'));
+  check('y el contexto avisa que la temperatura no es la de la estación',
+    /mando por la temperatura/.test(await p.textContent('#contextoResumen')),
+    await p.textContent('#contextoResumen'));
+
+  console.log('\nO3 · Empates y datos faltantes');
+  await p.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('perfumario_v1'));
+    const clon = (id, nombre) => Object.assign({}, d.perfumes[0], { id, nombre });
+    d.perfumes = [clon('a', 'Gemelo uno'), clon('b', 'Gemelo dos')];
+    localStorage.setItem('perfumario_v1', JSON.stringify(d));
+  });
+  await p.reload(); await p.waitForTimeout(500);
+  check('avisa cuando empatan y son indistinguibles', await visible('#avisoEmpate'));
+  const textoEmpate = await p.textContent('#avisoEmpate');
+  check('y dice qué dato falta para diferenciarlos',
+    /notas cargadas|sin puntuar/.test(textoEmpate), textoEmpate.replace(/\s+/g, ' ').slice(0, 90));
+
+  // sin puntuar no puede ser lo mismo que puntuar bajo
+  const sinYcon = await p.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('perfumario_v1'));
+    d.perfumes[1].rating = 3;   // puntaje neutro
+    localStorage.setItem('perfumario_v1', JSON.stringify(d));
+    return true;
+  });
+  await p.reload(); await p.waitForTimeout(500);
+  const puntajes = await p.evaluate(() => Array.from(document.querySelectorAll('#sugerencias .pf-score'))
+    .map(e => Number(e.textContent.trim())));
+  check('un perfume sin puntuar no arranca castigado', sinYcon && puntajes[0] === puntajes[1],
+    puntajes.join(' vs '));
+
   console.log('\nP · Descargar la copia');
   await p.tap('#btnSettings'); await p.waitForTimeout(250);
   await p.tap('#btnExportar'); await p.waitForTimeout(350);

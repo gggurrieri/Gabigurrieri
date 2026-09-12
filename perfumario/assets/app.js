@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-09-12.7';
+const VERSION = '2026-09-12.8';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -479,14 +479,23 @@ function puntuar(p, m, c) {
   const razones = [];
   let score = 50;
 
-  // estación
+  /* Estación, pero pesada por la temperatura real.
+
+     La estación es una aproximación al clima; la temperatura ES el clima. Si
+     un día de primavera hay 5°, el almanaque está mintiendo y no puede seguir
+     valiendo 30 puntos de diferencia (+18 al que dice "primavera", −12 al que
+     dice "invierno") mientras el termómetro apenas mueve 10. Cuanto más se
+     aleja la temperatura de lo típico de la estación, menos pesa la estación,
+     hasta desaparecer. */
   const estaciones = (p.estaciones || []).map(claveEstacion);
-  if (estaciones.length) {
+  const tipica = ESTACIONES[est].temp;
+  const pesoEstacion = clamp(1 - Math.abs(c.temp - tipica) / 15, 0, 1);
+  if (estaciones.length && pesoEstacion > 0.15) {
     if (estaciones.includes(est)) {
-      score += 18;
+      score += 18 * pesoEstacion;
       razones.push({ txt: `Va con ${articuloEstacion(est)} ${nombreEstacion(est)}`, bien: true });
     } else {
-      score -= 12;
+      score -= 12 * pesoEstacion;
       razones.push({ txt: `Lo marcaste para ${estaciones.map(nombreEstacion).join(' y ')}`, bien: false });
     }
   }
@@ -536,7 +545,8 @@ function puntuar(p, m, c) {
   }
 
   // gusto personal y frasco
-  if (p.rating) score += (p.rating - 3) * 4;
+  // 0 significa "todavía no lo puntuaste", no "es malo": no castiga
+  if (p.rating >= 1) score += (p.rating - 3) * 4;
   const pct = porcRestante(p);
   if (p.ml > 0 && pct <= 10) { score -= 8; razones.push({ txt: `Queda ${pct} %: guardalo para algo que valga`, bien: false }); }
 
@@ -625,8 +635,10 @@ function renderHoy() {
   $('#ctxTempOut').textContent = Math.round(ctx.temp) + '°';
   $$('#ctxMomento .chip').forEach(c => c.classList.toggle('on', c.dataset.val === ctx.momento));
   $$('#ctxOcasion .chip').forEach(c => c.classList.toggle('on', c.dataset.val === ctx.ocasion));
+  const desvío = Math.abs(ctx.temp - ESTACIONES[est].temp);
   $('#contextoResumen').textContent =
-    `${ESTACIONES[est].emoji} Estamos en ${nombreEstacion(est)} · ${MOMENTOS[ctx.momento]} · ${OCASIONES[ctx.ocasion]}`;
+    `${ESTACIONES[est].emoji} Estamos en ${nombreEstacion(est)} · ${MOMENTOS[ctx.momento]} · ${OCASIONES[ctx.ocasion]}` +
+    (desvío >= 10 ? ` · ${Math.round(ctx.temp)}° es mucho ${ctx.temp < ESTACIONES[est].temp ? 'menos' : 'más'} de lo normal, así que mando por la temperatura` : '');
   renderClima();
   traerClima();
 
@@ -639,6 +651,7 @@ function renderHoy() {
     cont.innerHTML = sugerir(3, modelo).map((s, i) => fichaSugerencia(s, i)).join('');
   }
   renderAprendizaje(modelo);
+  avisoEmpate(S.perfumes.length ? sugerir(3, modelo) : []);
 
   // lo que ya te pusiste hoy
   const hoy = S.usos.filter(u => u.fecha === today());
@@ -673,6 +686,32 @@ function renderClima() {
     (c.humedad >= 70 ? `<div class="hint">Humedad ${c.humedad} %: proyecta más de lo normal, con dos aplicaciones alcanza.</div>` : '') +
     (estaLloviendo(c.codigo) ? `<div class="hint">Llueve: los frescos livianos se van enseguida.</div>` : '') +
     (c.viento >= 25 ? `<div class="hint">Viento de ${Math.round(c.viento)} km/h: la estela se dispersa, podés sumar una aplicación.</div>` : '');
+}
+
+/* Tres tarjetas con el mismo puntaje y las mismas razones no son una
+   recomendación: son la app diciendo "no sé". Conviene admitirlo y decir qué
+   dato falta para poder diferenciarlos. */
+function avisoEmpate(sugerencias) {
+  const av = $('#avisoEmpate');
+  if (!av) return;
+  if (sugerencias.length < 2) { av.hidden = true; return; }
+
+  const firma = s => s.razones.map(r => r.txt).sort().join('|');
+  const empatados = sugerencias.filter(s =>
+    Math.abs(s.score - sugerencias[0].score) <= 2 && firma(s) === firma(sugerencias[0]));
+
+  if (empatados.length < 2) { av.hidden = true; return; }
+
+  const sinNotas = empatados.filter(s => !notasDe(s.p).length).length;
+  const sinPuntaje = empatados.filter(s => !s.p.rating).length;
+  const falta = [];
+  if (sinNotas) falta.push(`${sinNotas} no ${sinNotas === 1 ? 'tiene' : 'tienen'} las notas cargadas`);
+  if (sinPuntaje) falta.push(`${sinPuntaje} ${sinPuntaje === 1 ? 'está' : 'están'} sin puntuar`);
+
+  av.hidden = false;
+  av.innerHTML = `Estos ${empatados.length} empatan en ${empatados[0].score}: para la app son el mismo perfume.` +
+    (falta.length ? ` ${falta.join(' y ')}.` : '') +
+    ` <b>Puntualos o completá sus notas y voy a poder elegir.</b>`;
 }
 
 function fichaSugerencia(s, i) {

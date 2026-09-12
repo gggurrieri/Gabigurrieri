@@ -57,20 +57,38 @@ tres razones que más pesaron.
 
 | Qué mira | Cómo pesa |
 |---|---|
-| Estación actual | +18 si coincide, −12 si lo marcaste para otra |
+| Estación actual | +18 si coincide, −12 si lo marcaste para otra, **pesado por la temperatura** (ver abajo) |
 | Temperatura contra la familia | hasta −20, según cuánto se aleje del ideal de esa familia (un gourmand a 35° pierde, un cítrico a 5° también) |
 | Momento del día | +12 si coincide, +4 si sirve para ambos, −10 si no |
 | Ocasión | +14 si la tiene marcada, −8 si no |
 | Estela contra el ambiente | −12 si deja mucha estela para la oficina o el gimnasio, +8 si la ocasión pide presencia |
 | Rotación | +10 si hace más de tres semanas que no lo usás |
 | Lluvia | +6 si dura 8 horas o más, −6 si es de los que duran 5 o menos |
-| Tu puntaje | ±8 según las estrellas que le diste |
+| Tu puntaje | ±8 según las estrellas que le diste; sin puntuar no castiga |
 | Lo que queda en el frasco | −8 si queda 10 % o menos |
 
 Lo que ya te pusiste hoy no se sugiere: es una regla dura, no un castigo de
 puntaje. Cuando era un −30, los bonus del aprendizaje podían taparlo y la app
 terminaba recomendando lo que ya tenías puesto. Solo vuelve a aparecer si sin él
 no llegan a tres sugerencias.
+
+**La temperatura le gana al almanaque.** La estación es una aproximación al
+clima; la temperatura *es* el clima. Si un día de primavera hay 5°, el almanaque
+está mintiendo y no puede seguir valiendo 30 puntos de diferencia (+18 al que
+dice "primavera", −12 al que dice "invierno") mientras el termómetro mueve 10.
+El peso de la estación baja a medida que la temperatura se aleja de lo típico y
+a los 15 grados de diferencia desaparece: ahí decide el termómetro solo. La
+pantalla lo dice cuando pasa.
+
+Esto salió de usarla: a 5° en primavera, para salir de noche, recomendaba tres
+aromáticos frescos y dejaba los ámbar once puntos abajo.
+
+**Sin puntuar no es lo mismo que puntuar mal.** Un perfume con 0 estrellas no
+resta: 0 significa "todavía no lo puntuaste".
+
+**Cuando empatan, lo dice.** Si las primeras sugerencias tienen el mismo puntaje
+y las mismas razones, la app avisa que para ella son el mismo perfume y nombra el
+dato que falta (notas sin cargar, sin puntuar) en vez de fingir un orden.
 
 A eso se le suma lo que aprende de vos (se apaga en Ajustes).
 
@@ -270,7 +288,7 @@ mano, que la ciudad se encuentre sin red y que falle sin romper nada) y la
 colección incluida (que entre sola, que no
 resucite después de borrarla y que no se duplique), la corrección de un uso con
 su recálculo de ml, el aprendizaje por temperatura y la descarga de la copia.
-144 comprobaciones, incluidos candados que fallan si alguna nota usada en una
+150 comprobaciones, incluidos candados que fallan si alguna nota usada en una
 ficha quedó sin explicación en el diccionario, o si el ícono de "Agregar a
 pantalla de inicio" vuelve a quedar liso (ya pasó una vez: salía negro).
 
