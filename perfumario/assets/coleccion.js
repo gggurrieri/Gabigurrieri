@@ -490,21 +490,27 @@ window.PERFUMARIO_COLECCION = {
       "nombre": "Layton",
       "casa": "Parfums de Marly",
       "conc": "EDP",
-      "familia": "aromatica",
+      "familia": "ambar",
       "salida": [
         "Manzana verde",
         "Lavanda",
-        "Bergamota"
+        "Bergamota",
+        "Mandarina"
       ],
       "corazon": [
-        "Jazmín",
+        "Geranio",
         "Violeta",
-        "Pimienta rosa"
+        "Jazmín"
       ],
       "fondo": [
         "Vainilla",
+        "Cardamomo",
         "Sándalo",
-        "Haba tonka"
+        "Pimienta negra",
+        "Guayaco",
+        "Pachulí",
+        "Ambermax",
+        "Cumarina"
       ],
       "ml": 125,
       "mlRestante": 125,
@@ -513,17 +519,19 @@ window.PERFUMARIO_COLECCION = {
       "longevidad": 9,
       "estela": 5,
       "estaciones": [
+        "invierno",
         "otoño",
-        "invierno"
+        "primavera"
       ],
       "ocasiones": [
         "salida",
         "cita",
-        "evento"
+        "evento",
+        "trabajo"
       ],
-      "momento": "noche",
+      "momento": "ambos",
       "rating": 0,
-      "nota": "Tester. El catálogo lo trae como gourmand; lo dejé en aromáticos como vos lo clasificás."
+      "nota": "Tester. La ficha lo declara Oriental Floral, no aromático: por eso pasa a ámbar. Pirámide completa cargada de la fuente que me pasaste. Estacionalidad según sus votos: invierno y otoño primero, primavera cerca, verano poco; día y noche casi empatados."
     },
     {
       "id": "col00e",

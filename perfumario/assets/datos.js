@@ -177,6 +177,8 @@ const NOTAS = [
   { n:'Mango', f:'gourmand', d:'Fruta tropical, dulce y carnosa, con un fondo casi lácteo.' },
   { n:'Abrótano', f:'aromatica', d:'Hierba de la familia del ajenjo, amarga y alcanforada, con aire de farmacia antigua.' },
   { n:'Ajenjo', f:'aromatica', d:'La hierba de la absenta: amarga, anisada y medicinal. Prima directa de la artemisia.' },
+  { n:'Cumarina', f:'gourmand', d:'La molécula del haba tonka: heno dulce, almendra y vainilla. Es la base del fougère desde 1882.' },
+  { n:'Ambermax', f:'ambar', d:'Ámbar sintético de alta potencia, seco y persistente. Nombre comercial, no un material natural.' },
   { n:'Vetiver de Haití', f:'amaderada', d:'Versión más limpia y ahumada de la raíz.' }
 ];
 
@@ -232,9 +234,11 @@ const CATALOGO = [
   { casa:'Maison Francis Kurkdjian', nombre:'Baccarat Rouge 540', conc:'EDP', familia:'ambar',
     salida:['Azafrán','Jazmín'], corazon:['Ámbar gris','Cedro'], fondo:['Haba tonka','Almizcle blanco'],
     estaciones:['invierno','otoño'], ocasiones:['evento','cita','salida'], momento:'noche', longevidad:10, estela:5 },
-  { casa:'Parfums de Marly', nombre:'Layton', conc:'EDP', familia:'gourmand',
-    salida:['Manzana verde','Lavanda','Bergamota'], corazon:['Jazmín','Violeta','Pimienta rosa'], fondo:['Vainilla','Sándalo','Haba tonka'],
-    estaciones:['otoño','invierno'], ocasiones:['salida','cita','evento'], momento:'noche', longevidad:9, estela:5 },
+  { casa:'Parfums de Marly', nombre:'Layton', conc:'EDP', familia:'ambar',
+    salida:['Manzana verde','Lavanda','Bergamota','Mandarina'],
+    corazon:['Geranio','Violeta','Jazmín'],
+    fondo:['Vainilla','Cardamomo','Sándalo','Pimienta negra','Guayaco','Pachulí','Ambermax','Cumarina'],
+    estaciones:['invierno','otoño','primavera'], ocasiones:['salida','cita','evento','trabajo'], momento:'ambos', longevidad:9, estela:5 },
   { casa:'Tom Ford', nombre:'Tobacco Vanille', conc:'EDP', familia:'gourmand',
     salida:['Tabaco','Especias'], corazon:['Vainilla','Cacao','Haba tonka'], fondo:['Frutos secos','Madera'],
     estaciones:['invierno'], ocasiones:['evento','cita'], momento:'noche', longevidad:10, estela:5 },

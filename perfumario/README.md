@@ -61,7 +61,7 @@ tres razones que más pesaron.
 | Temperatura contra la familia | hasta −20, según cuánto se aleje del ideal de esa familia (un gourmand a 35° pierde, un cítrico a 5° también). Es la **sensación térmica**, no la del termómetro al sol |
 | Humedad | con 75 % o más: −6 a los de mucha estela, +4 a los discretos. Con 30 % o menos: +5 a los que duran, −4 a los que se evaporan |
 | Viento | desde 25 km/h: +5 a los de estela fuerte, −5 a los discretos |
-| Momento del día | +12 si coincide, +4 si sirve para ambos, −10 si no |
+| Momento del día | +12 si coincide, +8 si sirve para ambos (también coincide), −10 si no |
 | Ocasión | +14 si la tiene marcada, −8 si no |
 | Estela contra el ambiente | −12 si deja mucha estela para la oficina o el gimnasio, +8 si la ocasión pide presencia |
 | Rotación | +10 si hace más de tres semanas que no lo usás |

@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-09-12.10';
+const VERSION = '2026-09-12.11';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -520,7 +520,11 @@ function puntuar(p, m, c) {
   const mom = p.momento || 'ambos';
   if (!c.sinMomento) {
   if (mom === c.momento) { score += 12; razones.push({ txt: `Lo tenés anotado para ${MOMENTOS[mom].toLowerCase()}`, bien: true }); }
-  else if (mom === 'ambos') score += 4;
+  /* "Día y noche" TAMBIÉN coincide con el momento: antes sumaba 4 contra 12 y
+     un perfume versátil perdía ocho puntos contra uno especializado por ser
+     más flexible, que es al revés de lo que uno quiere. Se queda algo abajo
+     del especialista, no ocho puntos abajo. */
+  else if (mom === 'ambos') { score += 8; razones.push({ txt: 'Sirve de día y de noche', bien: true }); }
   else { score -= 10; razones.push({ txt: `Lo anotaste para ${MOMENTOS[mom].toLowerCase()}`, bien: false }); }
   }
 
