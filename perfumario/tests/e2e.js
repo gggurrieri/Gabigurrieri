@@ -546,6 +546,11 @@ const check = (n, c, d = '') => {
   await p.evaluate(() => document.querySelector('#setMoneda').dispatchEvent(new Event('change', { bubbles: true })));
   await p.waitForTimeout(250);
   check('guarda la moneda', (await db()).ajustes.moneda === 'US$');
+  // sin versión a la vista no se puede distinguir "no llegó el cambio" de
+  // "el cambio no anda"
+  check('muestra qué versión está corriendo',
+    /Versión \d{4}-\d{2}-\d{2}/.test(await p.textContent('#versionApp')),
+    await p.textContent('#versionApp'));
 
   await p.tap('#btnBorrar'); await p.waitForTimeout(300);
   await p.tap('#btnConfirmarBorrado'); await p.waitForTimeout(400);

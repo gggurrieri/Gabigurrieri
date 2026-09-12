@@ -8,6 +8,11 @@
 
 const D = window.PERFUMARIO_DATOS;
 
+/* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
+   Sin esto, "no me aparece el cambio" es imposible de distinguir de
+   "el cambio no funciona". Se actualiza junto con la del service worker. */
+const VERSION = '2026-09-12.4';
+
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
@@ -1487,6 +1492,8 @@ function renderAjustes() {
   $('#setHemisferio').value = S.ajustes.hemisferio;
   $('#setAprender').checked = S.ajustes.aprender !== false;
   $('#setClima').checked = !!S.ajustes.clima;
+  const ver = $('#versionApp');
+  if (ver) ver.textContent = 'Versión ' + VERSION;
   const c = S.meta.clima;
   $('#lugarActual').textContent = S.meta.lugar
     ? `${S.meta.lugar.nombre}${c ? ` · ${Math.round(c.temp)}° hace ${minutosDesde(c.ts)} min` : ' · todavía sin datos'}`

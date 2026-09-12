@@ -106,6 +106,19 @@ Reglas que sigue:
 - **El service worker no lo cachea.** Solo guarda los archivos propios; si
   cachearan el clima, la temperatura quedaría congelada en la primera consulta.
 
+## Cómo se actualiza
+
+El service worker va **primero a la red** y usa la caché solo como respaldo
+cuando no hay señal. Es a propósito: la primera versión hacía lo contrario
+—caché primero, que es más rápido— y el efecto fue que un teléfono que ya había
+abierto la app **no volvía a pedir los archivos nunca más**. Las correcciones se
+publicaban y no llegaban.
+
+Cada versión lleva un sello (`VERSION`, en `sw.js` y en `assets/app.js`) que se
+ve en **Ajustes → Sobre la app**. Sirve para distinguir dos cosas que se
+confunden todo el tiempo: "el cambio no llegó" y "el cambio no funciona". Al
+publicar, hay que subir ese sello en los dos archivos.
+
 > **En la vista previa embebida (Artifact) el clima no puede funcionar**: esa
 > página corre dentro de un iframe que bloquea tanto los pedidos a otros dominios
 > como el permiso de ubicación del navegador. La app lo detecta (`window.self !==
@@ -184,7 +197,7 @@ HTML, CSS y JavaScript a mano, sin dependencias ni compilación. Cinco archivos:
 perfumario/
 ├── index.html          la estructura de las pantallas
 ├── manifest.json       datos para instalarla en el teléfono (nombre, íconos, color)
-├── sw.js               service worker: guarda la app en caché para que abra sin internet
+├── sw.js               service worker: primero la red, caché de respaldo sin internet
 ├── assets/
 │   ├── app.js          toda la lógica: estado, recomendador, vistas
 │   ├── datos.js        familias, notas y catálogo de fragancias (solo lectura)
@@ -226,7 +239,7 @@ mano, que la ciudad se encuentre sin red y que falle sin romper nada) y la
 colección incluida (que entre sola, que no
 resucite después de borrarla y que no se duplique), la corrección de un uso con
 su recálculo de ml, el aprendizaje por temperatura y la descarga de la copia.
-123 comprobaciones, incluidos candados que fallan si alguna nota usada en una
+126 comprobaciones, incluidos candados que fallan si alguna nota usada en una
 ficha quedó sin explicación en el diccionario, o si el ícono de "Agregar a
 pantalla de inicio" vuelve a quedar liso (ya pasó una vez: salía negro).
 
