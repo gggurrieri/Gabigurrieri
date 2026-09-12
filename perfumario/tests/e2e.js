@@ -212,6 +212,39 @@ const check = (n, c, d = '') => {
   check('completa el nombre', (await p.inputValue('#fNombre')) === 'Sauvage');
   check('completa las notas', (await p.inputValue('#fFondo')).includes('Ambroxan'));
   check('marca las estaciones', await cuantos('#gEstaciones .chip.on') === 3);
+
+  // pegar la pirámide tal como se lee en cualquier ficha
+  await p.tap('#btnPegarPiramide'); await p.waitForTimeout(250);
+  await p.fill('#textoPiramide',
+    'Notas de Salida: bergamota, PIMIENTA ROSA\nCorazón: lavanda y geranio\nBase: ambroxan, cedro, labdanum');
+  await p.tap('#btnAplicarPiramide'); await p.waitForTimeout(350);
+  check('reparte la pirámide pegada en los tres campos',
+    (await p.inputValue('#fSalida')) === 'Bergamota, Pimienta rosa' &&
+    (await p.inputValue('#fCorazon')) === 'Lavanda, Geranio' &&
+    (await p.inputValue('#fFondo')) === 'Ambroxan, Cedro, Labdanum',
+    [await p.inputValue('#fSalida'), await p.inputValue('#fCorazon'), await p.inputValue('#fFondo')].join(' / '));
+  check('y normaliza los nombres contra el diccionario',
+    (await p.inputValue('#fSalida')).includes('Pimienta rosa'));
+
+  // en inglés y sin encabezados
+  await p.tap('#btnPegarPiramide'); await p.waitForTimeout(200);
+  await p.fill('#textoPiramide', 'Top Notes: lemon\nMiddle Notes: jasmine\nBase Notes: vetiver');
+  await p.tap('#btnAplicarPiramide'); await p.waitForTimeout(300);
+  check('entiende también top / middle / base',
+    (await p.inputValue('#fCorazon')) === 'Jasmine' && (await p.inputValue('#fFondo')) === 'Vetiver',
+    [await p.inputValue('#fCorazon'), await p.inputValue('#fFondo')].join(' / '));
+
+  await p.tap('#btnPegarPiramide'); await p.waitForTimeout(200);
+  await p.fill('#textoPiramide', 'vainilla, haba tonka, sándalo');
+  await p.tap('#btnAplicarPiramide'); await p.waitForTimeout(300);
+  check('sin encabezados manda todo al corazón',
+    (await p.inputValue('#fCorazon')) === 'Vainilla, Haba tonka, Sándalo',
+    await p.inputValue('#fCorazon'));
+
+  // dejar la ficha como la esperaba el resto de la sección
+  await p.fill('#fSalida', 'Bergamota, Pimienta rosa');
+  await p.fill('#fCorazon', 'Pimienta negra, Lavanda, Geranio');
+  await p.fill('#fFondo', 'Ambroxan, Cedro, Labdanum');
   await p.fill('#fMl', '100'); await p.fill('#fMlRest', '100'); await p.fill('#fPrecio', '120000');
   await p.tap('#gEstaciones .chip[data-val="verano"]'); await p.waitForTimeout(120);
   check('los chips se pueden tocar', await cuantos('#gEstaciones .chip.on') === 4);

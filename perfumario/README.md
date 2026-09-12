@@ -224,6 +224,22 @@ Tres decisiones de producto detrás de esto:
 - **Se apaga.** Un interruptor en Ajustes lo desactiva y vuelve a las reglas
   fijas.
 
+## Cargar las notas de un perfume
+
+En el formulario, **📋 Pegar la pirámide** acepta el texto de las notas como
+venga y lo reparte en salida, corazón y fondo. Entiende encabezados en español
+("Notas de salida", "Corazón", "Fondo", "Base") y en inglés ("Top / Middle /
+Base"), separa por comas, puntos, "y" o "and", y normaliza los nombres contra el
+diccionario de la app, para que "vainilla" y "Vainilla" no queden como dos notas
+distintas. Sin encabezados no adivina: manda todo al corazón y lo acomodás vos.
+
+> **Por qué no se consume Fragrantica.** No tiene API pública, responde 403 a
+> cualquier pedido automático y su `robots.txt` prohíbe explícitamente a los
+> rastreadores de IA, con una reserva expresa de derechos bajo el artículo 4 de
+> la directiva europea de copyright: las pirámides son su contenido editorial.
+> Además, una app estática sin servidor propio no podría pedírselo igual (CORS).
+> Pegar a mano lo que uno mismo consultó es otra cosa, y para eso está el botón.
+
 ## Cargar muchos perfumes de una vez
 
 **Colección → ⚡ Carga rápida**: pegás un nombre por línea y busca cada uno
@@ -288,7 +304,7 @@ mano, que la ciudad se encuentre sin red y que falle sin romper nada) y la
 colección incluida (que entre sola, que no
 resucite después de borrarla y que no se duplique), la corrección de un uso con
 su recálculo de ml, el aprendizaje por temperatura y la descarga de la copia.
-150 comprobaciones, incluidos candados que fallan si alguna nota usada en una
+154 comprobaciones, incluidos candados que fallan si alguna nota usada en una
 ficha quedó sin explicación en el diccionario, o si el ícono de "Agregar a
 pantalla de inicio" vuelve a quedar liso (ya pasó una vez: salía negro).
 

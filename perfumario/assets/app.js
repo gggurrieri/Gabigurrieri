@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-09-12.8';
+const VERSION = '2026-09-12.9';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -1240,6 +1240,18 @@ function abrirFormulario(id) {
         <input id="fFondo" list="dlNotas" value="${esc((v.fondo || []).join(', '))}"></label>
       <datalist id="dlNotas">${D.NOTAS.map(n => `<option value="${esc(n.n)}"></option>`).join('')}</datalist>
 
+      <div class="btn-row" style="margin:-4px 0 12px">
+        <button type="button" class="btn mini" id="btnPegarPiramide">📋 Pegar la pirámide</button>
+      </div>
+      <div id="zonaPiramide" hidden>
+        <label class="field"><span>Pegá las notas como vengan</span>
+          <textarea id="textoPiramide" style="min-height:110px" placeholder="Notas de salida: bergamota, pimienta rosa&#10;Corazón: lavanda, geranio&#10;Fondo: ambroxan, cedro"></textarea></label>
+        <div class="btn-row" style="margin-top:-4px">
+          <button type="button" class="btn btn-accent" id="btnAplicarPiramide">Repartir en los tres campos</button>
+        </div>
+        <p class="hint">Entiende "salida / corazón / fondo" y "top / middle / base". Sin encabezados, pone todo en corazón y lo acomodás vos.</p>
+      </div>
+
       <div class="field-row">
         <label class="field"><span>Tamaño (ml)</span><input type="number" id="fMl" min="0" step="1" value="${v.ml}"></label>
         <label class="field"><span>Queda (ml)</span><input type="number" id="fMlRest" min="0" step="1" value="${Math.round(v.mlRestante)}"></label>
@@ -1288,6 +1300,25 @@ function abrirFormulario(id) {
       $$('#gMomento .chip').forEach(x => x.classList.remove('on'));
       c.classList.add('on');
     } else c.classList.toggle('on');
+  });
+
+  $('#btnPegarPiramide').addEventListener('click', () => {
+    const z = $('#zonaPiramide');
+    z.hidden = !z.hidden;
+    if (!z.hidden) $('#textoPiramide').focus();
+  });
+
+  $('#btnAplicarPiramide').addEventListener('click', () => {
+    const r = parsearPiramide($('#textoPiramide').value);
+    const total = r.salida.length + r.corazon.length + r.fondo.length;
+    if (!total) { toast('No encontré notas en ese texto'); return; }
+    if (r.salida.length) $('#fSalida').value = r.salida.join(', ');
+    if (r.corazon.length) $('#fCorazon').value = r.corazon.join(', ');
+    if (r.fondo.length) $('#fFondo').value = r.fondo.join(', ');
+    $('#zonaPiramide').hidden = true;
+    toast(r.sinEncabezados
+      ? `${total} notas al corazón: movelas a salida o fondo si hace falta`
+      : `${total} notas repartidas`);
   });
 
   const cat = $('#fCatalogo');
@@ -1340,6 +1371,66 @@ function abrirFormulario(id) {
     guardar(); cerrarModal(); render();
     toast(p ? 'Cambios guardados' : `${datos.nombre} entró a la colección`);
   });
+}
+
+/* --------------------- pegar una pirámide -------------------------
+   Las fichas de notas se leen en cualquier lado, pero copiarlas a mano en
+   tres campos es tedioso. Esto acepta el texto pegado tal cual venga —en
+   español o inglés, con o sin encabezados— y lo reparte en salida, corazón
+   y fondo. Los nombres se normalizan contra el diccionario de la app para
+   que "vainilla" y "Vainilla" no queden como dos notas distintas.       */
+const ENCABEZADOS = [
+  { k: 'salida',  re: /(notas?\s+(de\s+)?)?(salida|cabeza|top|head)\b/i },
+  { k: 'corazon', re: /(notas?\s+(de\s+)?)?(coraz[oó]n|medias?|middle|heart)\b/i },
+  { k: 'fondo',   re: /(notas?\s+(de\s+)?)?(fondo|base|bottom|dry\s*down)\b/i }
+];
+
+function separarNotas(t) {
+  return String(t)
+    .replace(/[•·;]/g, ',')
+    .replace(/\s+y\s+/gi, ',')
+    .replace(/\s+and\s+/gi, ',')
+    .split(',')
+    .map(x => x.replace(/^[\s\-–—*]+|[\s.]+$/g, '').trim())
+    .filter(x => x && x.length <= 40);
+}
+
+function canonizarNota(n) {
+  const k = normaliza(n);
+  const hit = D.NOTAS.find(x => normaliza(x.n) === k);
+  if (hit) return hit.n;
+  return n.charAt(0).toUpperCase() + n.slice(1);
+}
+
+function parsearPiramide(texto) {
+  const res = { salida: [], corazon: [], fondo: [] };
+  let actual = null, sueltas = [];
+
+  String(texto).replace(/\r/g, '').split('\n').forEach(linea => {
+    const t = linea.trim();
+    if (!t) return;
+    const enc = ENCABEZADOS.find(e => e.re.test(t));
+    if (enc) {
+      actual = enc.k;
+      const resto = t.split(/[:：]/).slice(1).join(':');
+      if (resto.trim()) res[actual] = res[actual].concat(separarNotas(resto));
+      return;
+    }
+    if (actual) res[actual] = res[actual].concat(separarNotas(t));
+    else sueltas = sueltas.concat(separarNotas(t));
+  });
+
+  // sin encabezados no se puede adivinar el nivel: va todo al corazón
+  const vacio = !res.salida.length && !res.corazon.length && !res.fondo.length;
+  if (vacio && sueltas.length) res.corazon = sueltas;
+
+  ['salida', 'corazon', 'fondo'].forEach(k => {
+    res[k] = res[k].map(canonizarNota)
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .slice(0, 12);
+  });
+  res.sinEncabezados = vacio && sueltas.length > 0;
+  return res;
 }
 
 /* -------------------------- carga rápida --------------------------- */
