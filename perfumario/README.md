@@ -40,11 +40,29 @@ inicio". Queda como una app nativa y funciona sin señal.
 
 | Pestaña | Para qué sirve |
 |---|---|
-| **Hoy** | Botón **✈️ Me voy de viaje** para armar la valija. La temperatura la trae sola del clima de tu ciudad; elegís momento del día y ocasión, y te propone tres perfumes con un puntaje y las razones de cada uno. Un toque para registrar que te lo pusiste. |
+| **Hoy** | **Una** respuesta: un perfume, una razón, un botón para registrarlo. Lo único que se pregunta es qué vas a hacer; la temperatura, el momento y la estación se deducen y se muestran en una línea de texto. Las otras opciones quedan plegadas, y los controles finos detrás de "ajustar". Desde acá también se arma la valija de un viaje. |
 | **Colección** | Alta, edición y borrado de perfumes con casa, concentración, familia, pirámide de notas, ml, precio, estaciones, ocasiones, duración, estela y puntaje. Buscador por nombre, casa o **nota**, filtro por familia y siete criterios de orden. **Carga rápida** para pegar una lista entera de una vez. |
 | **Notas** | Diccionario de 112 notas y 11 familias explicadas, tu perfil olfativo (qué tenés contra qué usás), comparación de dos perfumes lado a lado y buscador de parecidos. |
 | **Uso** | Usos del mes, ml gastados, el más puesto, costo por uso, rotación de los últimos 90 días, los que juntan polvo, los que se están por acabar e historial. Tocando un uso se corrige (fecha, perfume, aplicaciones, ocasión) y los ml del frasco se recalculan solos. |
 | **Ajustes** | ml por aplicación, moneda, hemisferio, exportar/importar/borrar y seis perfumes de ejemplo para mirar la app con contenido. |
+
+## Una pregunta, una respuesta
+
+La pantalla de uso diario pasó de **22 controles y 1.342 px** (dos pantallas de
+scroll) a **una pantalla sin scroll**. El cambio fue de criterio, no de estética:
+la app venía explicando su modelo en la pantalla principal —termómetro, momento,
+tres tarjetas con tres razones cada una, nueve frases para elegir— cuando lo que
+hace falta a las nueve de la noche es una respuesta.
+
+- **Se pregunta solo lo que no se puede deducir**: qué vas a hacer. La
+  temperatura viene del clima, el momento de la hora y la estación del
+  calendario: van en una línea de texto, no en controles.
+- **La ocasión se recuerda**: la próxima vez arranca donde la dejaste.
+- **Una respuesta, una razón.** Las otras dos opciones están plegadas en "ver
+  otras opciones", y el resto de los porqués, en la ficha.
+- **Nada se eliminó.** Los controles finos se despliegan con "ajustar" y lo que
+  la app aprendió se mudó a la pestaña Uso, que es donde se miran las
+  estadísticas.
 
 ## Cómo decide qué recomendarte
 
@@ -317,7 +335,7 @@ mano, que la ciudad se encuentre sin red y que falle sin romper nada) y la
 colección incluida (que entre sola, que no
 resucite después de borrarla y que no se duplique), la corrección de un uso con
 su recálculo de ml, el aprendizaje por temperatura y la descarga de la copia.
-161 comprobaciones, incluidos candados que fallan si alguna nota usada en una
+162 comprobaciones, incluidos candados que fallan si alguna nota usada en una
 ficha quedó sin explicación en el diccionario, o si el ícono de "Agregar a
 pantalla de inicio" vuelve a quedar liso (ya pasó una vez: salía negro).
 

@@ -36,10 +36,20 @@ const check = (n, c, d = '') => {
   const visible = async s => p.evaluate(x => { const e = document.querySelector(x); return !!e && !e.hidden; }, s);
   // razones de la tarjeta de un perfume concreto: '' si no entró en el podio
   const razonesDe = async nombre => p.evaluate(n => {
+    const hero = document.querySelector('#respuesta .hero');
+    if (hero && hero.querySelector('.hero-name').textContent.includes(n))
+      return (hero.querySelector('.hero-razon') || { textContent: '' }).textContent.replace(/\s+/g, ' ').trim();
     const card = Array.from(document.querySelectorAll('#sugerencias .pf'))
       .find(e => e.querySelector('.pf-name').textContent.includes(n));
     return card ? card.querySelector('.razones').textContent.replace(/\s+/g, ' ').trim() : '';
   }, nombre);
+  // el termómetro y el momento viven plegados detrás de "ajustar"
+  const abrirContexto = async () => {
+    if (await p.evaluate(() => document.querySelector('#cardContexto').hidden)) {
+      await p.tap('#btnAjustarContexto');
+      await p.waitForTimeout(250);
+    }
+  };
   const termometro = async grados => {
     await p.evaluate(g => {
       const s = document.querySelector('#ctxTemp');
@@ -60,7 +70,8 @@ const check = (n, c, d = '') => {
   check('la carga sola en el primer arranque',
     enElBuild > 0 && (await db()).perfumes.length === enElBuild,
     `${(await db()).perfumes.length} guardados vs ${enElBuild} en el build`);
-  check('y sugiere sin que cargues nada', await cuantos('#sugerencias article.card') === 3);
+  check('y sugiere sin que cargues nada',
+    await cuantos('#respuesta .hero') === 1 && await cuantos('#sugerencias .pf') === 2);
   check('no le inventa usos', (await db()).usos.length === 0);
 
   // candado: una nota que aparece en una ficha y no está en el diccionario es
@@ -120,7 +131,7 @@ const check = (n, c, d = '') => {
 
   console.log('\nB · Primer arranque');
   check('abre en Hoy', await visible('#view-hoy') && (await p.getAttribute('#view-hoy', 'class')).includes('active'));
-  check('avisa que la colección está vacía', /Todav[íi]a no cargaste/.test(await p.textContent('#sugerencias')));
+  check('avisa que la colección está vacía', /Todav[íi]a no cargaste/.test(await p.textContent('#respuesta')));
   check('sin datos no molesta con la copia', !(await visible('#avisoCopia')));
   check('el subtítulo lo dice', /vac[íi]a/i.test(await p.textContent('#topbarSub')));
 
@@ -137,22 +148,30 @@ const check = (n, c, d = '') => {
 
   console.log('\nD · Sugerencias');
   await ir('hoy');
-  check('sugiere tres', await cuantos('#sugerencias article.card') === 3);
-  check('muestra un puntaje', /^\d+$/.test((await p.textContent('#sugerencias .pf-score')).trim()));
-  check('y dice que es un puntaje',
-    (await p.textContent('#sugerencias .pf-score-cap')).trim() === 'puntaje');
-  check('explica por qué', await cuantos('#sugerencias .razones li') >= 3);
-  check('dice en qué estación estamos', /(verano|otoño|invierno|primavera)/.test(await p.textContent('#contextoResumen')));
+  check('da una respuesta y guarda las otras', await cuantos('#respuesta .hero') === 1 &&
+    await cuantos('#sugerencias .pf') === 2);
+  check('la respuesta principal trae una sola razón', await cuantos('#respuesta .hero-razon') <= 1);
+  check('muestra un puntaje', /^\d+$/.test((await p.textContent('#respuesta .hero-dato b')).trim()));
+  check('y dice de qué es', /de puntaje/.test(await p.textContent('#respuesta .hero-dato')));
+  check('explica por qué', await cuantos('#respuesta .hero-razon') + await cuantos('#sugerencias .razones li') >= 3);
+  check('dice en qué estación estamos', /(verano|otoño|invierno|primavera)/.test(await p.textContent('#contextoLinea')));
   check('ahora avisa de la copia', await visible('#avisoCopia'));
 
   // fijar el momento: si no, la prueba depende de la hora a la que se corra
+  await abrirContexto();
   await p.tap('#ctxMomento .chip[data-val="dia"]'); await p.waitForTimeout(250);
-  const ranking = () => p.evaluate(() => Array.from(document.querySelectorAll('#sugerencias .pf'))
-    .map(e => e.querySelector('.pf-name').textContent.replace('★', '').trim() + ':' +
-              e.querySelector('.pf-score').textContent.trim()).join(' | '));
+  const ranking = () => p.evaluate(() => {
+    const h = document.querySelector('#respuesta .hero');
+    const primero = h ? [h.querySelector('.hero-name').textContent.trim() + ':' +
+                         h.querySelector('.hero-dato b').textContent.trim()] : [];
+    return primero.concat(Array.from(document.querySelectorAll('#sugerencias .pf'))
+      .map(e => e.querySelector('.pf-name').textContent.replace('★', '').trim() + ':' +
+                e.querySelector('.pf-score').textContent.trim())).join(' | ');
+  });
   const casual = await ranking();
   await p.tap('#ctxOcasion .chip[data-val="deporte"]'); await p.waitForTimeout(300);
-  check('la ocasión cambia el contexto', /Deporte/.test(await p.textContent('#contextoResumen')));
+  check('la ocasión queda marcada',
+    await p.evaluate(() => document.querySelector('#ctxOcasion .chip[data-val="deporte"]').classList.contains('on')));
   const deporte = await ranking();
   check('y cambia lo que sugiere', deporte !== casual, `${casual} → ${deporte}`);
 
@@ -166,18 +185,19 @@ const check = (n, c, d = '') => {
   await p.waitForTimeout(300);
   check('el termómetro se mueve', (await p.textContent('#ctxTempOut')) === '35°', temp0);
   check('con calor no sugiere un gourmand denso',
-    !/Khamrah|Baccarat/.test(await p.textContent('#sugerencias')),
+    !/Khamrah|Baccarat/.test(await p.textContent('#view-hoy')),
     (await p.textContent('#sugerencias .pf-name')).trim());
 
   console.log('\nE · Registrar un uso');
   await p.tap('#ctxOcasion .chip[data-val="salida"]'); await p.waitForTimeout(250);
+  await abrirContexto();
   await p.tap('#ctxMomento .chip[data-val="noche"]'); await p.waitForTimeout(250);
-  const elegido = (await p.textContent('#sugerencias .pf-name')).replace('★', '').trim();
+  const elegido = (await p.textContent('#respuesta .hero-name')).trim();
   const mlAntes = await p.evaluate(n => {
     const d = JSON.parse(localStorage.getItem('perfumario_v1'));
     return d.perfumes.find(x => x.nombre === n).mlRestante;
   }, elegido);
-  await p.tap('#sugerencias [data-usar]'); await p.waitForTimeout(300);
+  await p.tap('#respuesta [data-usar]'); await p.waitForTimeout(300);
   check('abre el formulario de uso', await visible('#modal') && !!(await p.$('#formUso')));
   await p.fill('#uSprays', '4');
   await p.tap('#uOcasion .chip[data-val="cita"]');
@@ -191,7 +211,7 @@ const check = (n, c, d = '') => {
   check('lo muestra en "Hoy te pusiste"', await visible('#cardHoyUsos') &&
     (await p.textContent('#hoyUsos')).includes(elegido));
   check('deja de recomendar lo que ya usaste hoy',
-    (await p.textContent('#sugerencias .pf-name')).replace('★', '').trim() !== elegido);
+    (await p.textContent('#respuesta .hero-name')).trim() !== elegido);
 
   console.log('\nF · Colección');
   await ir('coleccion');
@@ -327,22 +347,29 @@ const check = (n, c, d = '') => {
   console.log('\nK · Aprende de las elecciones');
   await ir('hoy');
   await p.tap('#ctxOcasion .chip[data-val="evento"]'); await p.waitForTimeout(250);
+  await abrirContexto();
   await p.tap('#ctxMomento .chip[data-val="noche"]'); await p.waitForTimeout(250);
   await termometro(21);   // la temperatura de esos usos, para comparar peras con peras
   const razonesBaccarat = await razonesDe('Baccarat');
-  check('usa el historial para esa ocasión', /elección habitual para evento/.test(razonesBaccarat),
+  check('usa el historial para esa ocasión',
+    /elección habitual para evento|solés elegir/.test(razonesBaccarat),
     razonesBaccarat.slice(0, 90) || 'no entró al podio');
-  check('reconoce la familia que elegís para esa ocasión', /solés elegir/.test(razonesBaccarat));
-  check('muestra lo que aprendió', await visible('#cardAprendizaje'));
+  check('y la razón que muestra sale de tu historial, no de una regla fija',
+    /solés elegir|elección habitual|de lo que más te ponés/.test(razonesBaccarat));
+  await ir('uso');
+  check('muestra lo que aprendió en la pestaña Uso', await visible('#cardAprendizaje'));
   check('y sobre cuántos usos lo calculó', /Sobre tus \d+ usos/.test(await p.textContent('#aprendizajeSub')));
   check('lo explica por ocasión', /Evento/.test(await p.textContent('#aprendizajeReglas')));
+  await ir('hoy');
 
   await p.tap('#btnSettings'); await p.waitForTimeout(200);
   await p.tap('#setAprender'); await p.waitForTimeout(250);
   check('se puede apagar', (await db()).ajustes.aprender === false);
   await ir('hoy'); await p.waitForTimeout(250);
-  check('apagado, vuelve a las reglas fijas', !/elección habitual/.test(await p.textContent('#sugerencias')));
+  check('apagado, vuelve a las reglas fijas', !/elección habitual/.test(await p.textContent('#view-hoy')));
+  await ir('uso');
   check('y esconde lo aprendido', !(await visible('#cardAprendizaje')));
+  await ir('hoy');
   await p.tap('#btnSettings'); await p.waitForTimeout(200);
   await p.tap('#setAprender'); await p.waitForTimeout(250);
   check('y se puede volver a prender', (await db()).ajustes.aprender === true);
@@ -471,8 +498,8 @@ const check = (n, c, d = '') => {
   check('muestra la real al lado', /Real 11°/.test(linea), linea.replace(/\s+/g, ' ').slice(0, 80));
   check('y avisa por la humedad alta', /Humedad alta/.test(linea));
   check('la humedad entra en las razones',
-    /humedad va a proyectar de más|humedad lo va a levantar/.test(await p.textContent('#sugerencias')),
-    (await p.textContent('#sugerencias')).replace(/\s+/g, ' ').slice(0, 90));
+    /humedad va a proyectar de más|humedad lo va a levantar/.test(await p.textContent('#view-hoy')),
+    (await p.textContent('#view-hoy')).replace(/\s+/g, ' ').slice(0, 90));
 
   await p.evaluate(() => {
     const s = document.querySelector('#ctxTemp');
@@ -491,8 +518,8 @@ const check = (n, c, d = '') => {
   await p.tap('#btnRefrescarClima'); await p.waitForTimeout(700);
   check('con aire seco lo dice', /Aire seco/.test(await p.textContent('#climaLinea')));
   check('y lo usa para elegir',
-    /aire seco/i.test(await p.textContent('#sugerencias')),
-    (await p.textContent('#sugerencias')).replace(/\s+/g, ' ').slice(0, 90));
+    /aire seco/i.test(await p.textContent('#view-hoy')),
+    (await p.textContent('#view-hoy')).replace(/\s+/g, ' ').slice(0, 90));
   climaHumedad = 80;
   await p.tap('#btnRefrescarClima'); await p.waitForTimeout(600);
 
@@ -504,18 +531,19 @@ const check = (n, c, d = '') => {
   check('y que hay viento', /viento 30 km\/h/i.test(conLluvia) && /Viento fuerte/.test(conLluvia),
     conLluvia.replace(/\s+/g, ' ').slice(0, 110));
   check('el viento entra en las razones de las sugerencias',
-    /viento de 30 km\/h/i.test(await p.textContent('#sugerencias')),
-    (await p.textContent('#sugerencias')).replace(/\s+/g, ' ').slice(0, 90));
+    /viento de 30 km\/h/i.test(await p.textContent('#view-hoy')),
+    (await p.textContent('#view-hoy')).replace(/\s+/g, ' ').slice(0, 90));
   check('la lluvia entra en las razones de las sugerencias',
-    /Llueve y este aguanta|se va enseguida/.test(await p.textContent('#sugerencias')),
-    (await p.textContent('#sugerencias')).replace(/\s+/g, ' ').slice(0, 90));
+    /Llueve y este aguanta|se va enseguida/.test(await p.textContent('#view-hoy')),
+    (await p.textContent('#view-hoy')).replace(/\s+/g, ' ').slice(0, 90));
   climaCodigo = 3; climaViento = 8;
   await p.tap('#btnRefrescarClima'); await p.waitForTimeout(600);
 
   climaFalla = true;
   await p.tap('#btnRefrescarClima'); await p.waitForTimeout(700);
   check('si la API falla, lo dice sin romperse', /No pude traer el clima/.test(await p.textContent('#climaLinea')));
-  check('y las sugerencias siguen ahí', await cuantos('#sugerencias article.card') === 3);
+  check('y las sugerencias siguen ahí',
+    await cuantos('#respuesta .hero') === 1 && await cuantos('#sugerencias .pf') === 2);
   climaFalla = false;
 
   console.log('\nM2 · Valija para un viaje');
@@ -614,8 +642,10 @@ const check = (n, c, d = '') => {
   const conFrio = await razonesDe(protagonistas.gour);
   check('con frío reconoce que es su temperatura',
     /Es la temperatura a la que solés usarlo/.test(conFrio), conFrio.slice(0, 90) || 'no entró al podio');
+  await ir('uso');
   check('y lo explica en la tarjeta', /lo usás con 9°/.test(await p.textContent('#aprendizajeReglas')),
     (await p.textContent('#aprendizajeReglas')).replace(/\s+/g, ' ').slice(0, 120));
+  await ir('hoy');
 
   await termometro(30);
   const conCalor = await razonesDe(protagonistas.gour);
@@ -653,16 +683,16 @@ const check = (n, c, d = '') => {
 
   await termometro(duelo.tipica);
   check('con la temperatura normal de la estación, manda el almanaque',
-    (await p.textContent('#sugerencias .pf-name')).includes('Liviano'),
-    await p.textContent('#sugerencias .pf-name'));
+    (await p.textContent('#respuesta .hero-name')).includes('Liviano'),
+    await p.textContent('#respuesta .hero-name'));
 
   await termometro(Math.max(-5, duelo.tipica - 16));
   check('con 16 grados menos, manda el termómetro',
-    (await p.textContent('#sugerencias .pf-name')).includes('Abrigado'),
-    await p.textContent('#sugerencias .pf-name'));
+    (await p.textContent('#respuesta .hero-name')).includes('Abrigado'),
+    await p.textContent('#respuesta .hero-name'));
   check('y el contexto avisa que la temperatura no es la de la estación',
-    /mando por la temperatura/.test(await p.textContent('#contextoResumen')),
-    await p.textContent('#contextoResumen'));
+    /mando por la temperatura/.test(await p.textContent('#contextoLinea')),
+    await p.textContent('#contextoLinea'));
 
   console.log('\nO3 · Empates y datos faltantes');
   await p.evaluate(() => {
@@ -685,8 +715,10 @@ const check = (n, c, d = '') => {
     return true;
   });
   await p.reload(); await p.waitForTimeout(500);
-  const puntajes = await p.evaluate(() => Array.from(document.querySelectorAll('#sugerencias .pf-score'))
-    .map(e => Number(e.textContent.trim())));
+  const puntajes = await p.evaluate(() => [
+    Number(document.querySelector('#respuesta .hero-dato b').textContent.trim())
+  ].concat(Array.from(document.querySelectorAll('#sugerencias .pf-score'))
+    .map(e => Number(e.textContent.trim()))));
   check('un perfume sin puntuar no arranca castigado', sinYcon && puntajes[0] === puntajes[1],
     puntajes.join(' vs '));
 
@@ -787,7 +819,7 @@ const check = (n, c, d = '') => {
   await p.tap('#btnConfirmarBorrado'); await p.waitForTimeout(400);
   d = await db();
   check('borra todo', d.perfumes.length === 0 && d.usos.length === 0);
-  check('y vuelve al estado inicial', /Todav[íi]a no cargaste/.test(await p.textContent('#sugerencias')));
+  check('y vuelve al estado inicial', /Todav[íi]a no cargaste/.test(await p.textContent('#respuesta')));
 
   console.log('\nS · Sin errores');
   check('la consola quedó limpia', errs.length === 0, errs.slice(0, 3).join(' | '));

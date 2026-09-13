@@ -44,66 +44,60 @@
   <main>
 
     <!-- ============================ HOY ============================ -->
+    <!-- Una sola pregunta arriba (qué vas a hacer) y una sola respuesta abajo.
+         Todo lo que la app puede deducir sola —temperatura, momento, estación—
+         se muestra como texto, no como controles. -->
     <section class="view" id="view-hoy">
 
-      <button class="aviso" id="avisoCopia" hidden></button>
+      <p class="contexto-linea" id="contextoLinea">—
+        <button class="link" id="btnAjustarContexto">ajustar</button></p>
 
-      <section class="card" id="cardContexto">
-        <h2>¿Qué me pongo?</h2>
-        <p class="sub" id="contextoResumen">—</p>
+      <div class="chips scroll-x" id="ctxOcasion" role="group" aria-label="Qué vas a hacer">
+        <button class="chip" data-val="trabajo">💼 Trabajo</button>
+        <button class="chip" data-val="casual">👕 Diario</button>
+        <button class="chip" data-val="salida">🍸 Salida</button>
+        <button class="chip" data-val="cita">❤️ Cita</button>
+        <button class="chip" data-val="evento">✨ Evento</button>
+        <button class="chip" data-val="deporte">🏃 Deporte</button>
+      </div>
 
+      <!-- los controles finos, para el día que quieras corregir a mano -->
+      <section class="card" id="cardContexto" hidden>
         <p class="clima" id="climaLinea">—</p>
-
-        <div class="field-row">
-          <label class="field">
-            <span>Temperatura</span>
-            <div class="temp-row">
-              <input type="range" id="ctxTemp" min="-5" max="42" step="1">
-              <output id="ctxTempOut">20°</output>
-            </div>
-          </label>
-        </div>
-
         <div class="field">
+          <span>Temperatura</span>
+          <div class="temp-row">
+            <input type="range" id="ctxTemp" min="-5" max="42" step="1">
+            <output id="ctxTempOut">20°</output>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0">
           <span>Momento</span>
           <div class="chips" id="ctxMomento" role="group" aria-label="Momento del día">
             <button class="chip" data-val="dia">☀️ Día</button>
             <button class="chip" data-val="noche">🌙 Noche</button>
           </div>
         </div>
-
-        <div class="field">
-          <span>Ocasión</span>
-          <div class="chips" id="ctxOcasion" role="group" aria-label="Ocasión">
-            <button class="chip" data-val="trabajo">💼 Trabajo</button>
-            <button class="chip" data-val="casual">👕 Diario</button>
-            <button class="chip" data-val="salida">🍸 Salida</button>
-            <button class="chip" data-val="cita">❤️ Cita</button>
-            <button class="chip" data-val="evento">✨ Evento</button>
-            <button class="chip" data-val="deporte">🏃 Deporte</button>
-          </div>
-        </div>
       </section>
 
-      <div class="btn-row" style="margin:-4px 0 4px">
+      <div id="respuesta"></div>
+      <p class="empate" id="avisoEmpate" hidden></p>
+
+      <details id="otras">
+        <summary>Ver otras opciones</summary>
+        <div id="sugerencias" class="stack"></div>
+      </details>
+
+      <div class="btn-row">
         <button class="btn" id="btnViaje">✈️ Me voy de viaje</button>
       </div>
-
-      <h2 class="section-title">Sugerencias de hoy</h2>
-      <div id="sugerencias" class="stack"></div>
-
-      <button class="aviso" id="avisoEmpate" hidden></button>
-
-      <section class="card" id="cardAprendizaje" hidden>
-        <h2>Lo que aprendí de vos</h2>
-        <p class="sub" id="aprendizajeSub">—</p>
-        <div id="aprendizajeReglas"></div>
-      </section>
 
       <section class="card" id="cardHoyUsos" hidden>
         <h2>Hoy te pusiste</h2>
         <div id="hoyUsos" class="stack-sm"></div>
       </section>
+
+      <button class="aviso" id="avisoCopia" hidden></button>
     </section>
 
     <!-- ========================= COLECCIÓN ========================= -->
@@ -175,6 +169,12 @@
     <!-- ============================ USO ============================ -->
     <section class="view" id="view-uso">
       <div class="kpis" id="kpisUso"></div>
+
+      <section class="card" id="cardAprendizaje" hidden>
+        <h2>Lo que aprendí de vos</h2>
+        <p class="sub" id="aprendizajeSub">—</p>
+        <div id="aprendizajeReglas"></div>
+      </section>
 
       <section class="card">
         <h2>Rotación</h2>

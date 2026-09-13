@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-09-12.11';
+const VERSION = '2026-09-13.1';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -55,7 +55,7 @@ const DEFAULTS = {
   perfumes: [],  // {id,nombre,casa,conc,familia,salida[],corazon[],fondo[],ml,mlRestante,
                  //  precio,comprado,longevidad,estela,estaciones[],ocasiones[],momento,rating,nota,creado}
   usos: [],      // {id,fecha,perfumeId,sprays,ocasion,momento,temp,nota}
-  ajustes: { mlSpray: 0.1, moneda: '$', hemisferio: 'sur', aprender: true, clima: false },
+  ajustes: { mlSpray: 0.1, moneda: '$', hemisferio: 'sur', aprender: true, clima: false, ocasion: 'casual' },
   meta: { version: 1, ultimaCopia: null,
           lugar: null,   // {nombre, lat, lon} elegido una vez en Ajustes
           clima: null }  // último dato traído: {temp, humedad, codigo, lugar, ts}
@@ -409,6 +409,7 @@ function momentoPorHora() {
 function ctxInicial() {
   if (ctx.temp === null) ctx.temp = ESTACIONES[estacionHoy()].temp;
   if (ctx.momento === null) ctx.momento = momentoPorHora();
+  if (!ctx.elegida && S.ajustes.ocasion) { ctx.ocasion = S.ajustes.ocasion; ctx.elegida = true; }
   aplicarTempDelClima();
 }
 
@@ -668,25 +669,37 @@ function renderHoy() {
   $('#ctxTempOut').textContent = Math.round(ctx.temp) + '°';
   $$('#ctxMomento .chip').forEach(c => c.classList.toggle('on', c.dataset.val === ctx.momento));
   $$('#ctxOcasion .chip').forEach(c => c.classList.toggle('on', c.dataset.val === ctx.ocasion));
+
+  /* Todo lo que la app puede deducir sola va en una línea de texto: no son
+     decisiones que haya que tomar antes de que te conteste. */
+  const c = climaParaPuntaje();
+  const [cielo, emo] = c ? describirClima(c.codigo) : ['', ''];
   const desvío = Math.abs(ctx.temp - ESTACIONES[est].temp);
-  $('#contextoResumen').textContent =
-    `${ESTACIONES[est].emoji} Estamos en ${nombreEstacion(est)} · ${MOMENTOS[ctx.momento]} · ${OCASIONES[ctx.ocasion]}` +
-    (desvío >= 10 ? ` · ${Math.round(ctx.temp)}° es mucho ${ctx.temp < ESTACIONES[est].temp ? 'menos' : 'más'} de lo normal, así que mando por la temperatura` : '');
-  renderClima();
-  traerClima();
+  $('#contextoLinea').innerHTML =
+    `${c ? emo : ESTACIONES[est].emoji} <b>${Math.round(ctx.temp)}°</b>` +
+    (c ? ` ${esc(cielo.toLowerCase())} en ${esc(c.lugar)}` : '') +
+    ` · ${MOMENTOS[ctx.momento].toLowerCase()} de ${nombreEstacion(est)}` +
+    (desvío >= 10 ? ' · mando por la temperatura, no por la estación' : '') +
+    ` <button class="link" id="btnAjustarContexto">ajustar</button>`;
 
   const modelo = modeloAprendido();
-  const cont = $('#sugerencias');
-  if (!S.perfumes.length) {
-    cont.innerHTML = `<div class="vacio">Todavía no cargaste ningún perfume.<br>
-      Andá a <b>Colección → Agregar</b>, o cargá seis de ejemplo desde Ajustes.</div>`;
-  } else {
-    cont.innerHTML = sugerir(3, modelo).map((s, i) => fichaSugerencia(s, i)).join('');
-  }
-  renderAprendizaje(modelo);
-  avisoEmpate(S.perfumes.length ? sugerir(3, modelo) : []);
+  const lista = S.perfumes.length ? sugerir(3, modelo) : [];
 
-  // lo que ya te pusiste hoy
+  if (!lista.length) {
+    $('#respuesta').innerHTML = `<div class="vacio">Todavía no cargaste ningún perfume.<br>
+      Andá a <b>Colección → Agregar</b>, o cargá los de ejemplo desde Ajustes.</div>`;
+    $('#sugerencias').innerHTML = '';
+    $('#otras').hidden = true;
+  } else {
+    $('#respuesta').innerHTML = fichaPrincipal(lista[0]);
+    $('#sugerencias').innerHTML = lista.slice(1).map(x => fichaSugerencia(x)).join('');
+    $('#otras').hidden = lista.length < 2;
+    const otras = $('#otras summary');
+    if (otras) otras.textContent = `Ver otras ${lista.length - 1} opciones`;
+  }
+
+  avisoEmpate(lista);
+
   const hoy = S.usos.filter(u => u.fecha === today());
   $('#cardHoyUsos').hidden = !hoy.length;
   $('#hoyUsos').innerHTML = hoy.map(u => {
@@ -698,7 +711,34 @@ function renderHoy() {
       <div class="it-act"><button data-borrar-uso="${u.id}" aria-label="Borrar uso">🗑</button></div></div>`;
   }).join('');
 
+  renderClima();
+  traerClima();
   avisoCopia();
+}
+
+/* La respuesta: un perfume, una razón, un botón. El resto de los porqués
+   está en la ficha, para quien los quiera. */
+function fichaPrincipal(s) {
+  const p = s.p, f = familia(p.familia);
+  const peso = r => (r.aprendido ? 2 : (r.clima ? 1 : 0));
+  const mejor = s.razones.filter(r => r.bien).sort((a, b) => peso(b) - peso(a))[0];
+  const pct = porcRestante(p);
+  return `<article class="hero">
+    <div class="hero-eyebrow">${f.emoji} ${esc(f.nombre)}${p.conc ? ' · ' + esc(p.conc) : ''}</div>
+    <h2 class="hero-name">${esc(p.nombre)}</h2>
+    <div class="hero-house">${esc(p.casa)}</div>
+    ${mejor ? `<p class="hero-razon"><i>✓</i> ${esc(mejor.txt)}</p>` : ''}
+    <div class="hero-pie">
+      <button class="btn btn-accent" data-usar="${p.id}">Me lo pongo</button>
+      <div class="hero-dato">
+        <div><b style="color:var(--accent)">${s.score}</b> de puntaje</div>
+        ${p.ml > 0 ? `<div>${pct} % del frasco</div>` : ''}
+      </div>
+    </div>
+    <div class="hero-pie" style="margin-top:8px">
+      <button class="btn" data-ficha="${p.id}">Ver por qué, y la ficha</button>
+    </div>
+  </article>`;
 }
 
 function renderClima() {
@@ -748,9 +788,9 @@ function avisoEmpate(sugerencias) {
   if (sinPuntaje) falta.push(`${sinPuntaje} ${sinPuntaje === 1 ? 'está' : 'están'} sin puntuar`);
 
   av.hidden = false;
-  av.innerHTML = `Estos ${empatados.length} empatan en ${empatados[0].score}: para la app son el mismo perfume.` +
-    (falta.length ? ` ${falta.join(' y ')}.` : '') +
-    ` <b>Puntualos o completá sus notas y voy a poder elegir.</b>`;
+  av.innerHTML = `Empata en ${empatados[0].score} con ${empatados.length - 1} más` +
+    (falta.length ? `: ${falta.join(' y ')}` : '') +
+    `. Puntualos y los voy a poder separar.`;
 }
 
 function fichaSugerencia(s, i) {
@@ -1899,6 +1939,7 @@ function renderParecidos() {
 
 /* =============================== USO ================================ */
 function renderUso() {
+  renderAprendizaje(modeloAprendido());
   const hoyISO = today();
   const desdeMes = hoyISO.slice(0, 7);
   const delMes = S.usos.filter(u => u.fecha.slice(0, 7) === desdeMes);
@@ -2150,9 +2191,19 @@ function conectar() {
   });
   $('#ctxOcasion').addEventListener('click', e => {
     const c = e.target.closest('.chip'); if (!c) return;
-    ctx.ocasion = c.dataset.val; renderHoy();
+    ctx.ocasion = c.dataset.val;
+    ctx.elegida = true;
+    S.ajustes.ocasion = c.dataset.val;   // la próxima vez arranca donde la dejaste
+    guardar();
+    renderHoy();
   });
   $('#avisoCopia').addEventListener('click', () => { ir('ajustes'); exportar(); });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#btnAjustarContexto')) return;
+    const card = $('#cardContexto');
+    card.hidden = !card.hidden;
+    if (!card.hidden) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
   $('#btnViaje').addEventListener('click', abrirViaje);
 
   // colección
