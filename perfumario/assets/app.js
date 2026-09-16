@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-09-13.1';
+const VERSION = '2026-09-16.1';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -159,6 +159,12 @@ const OCASIONES = {
   cita: 'Cita', evento: 'Evento', deporte: 'Deporte'
 };
 const MOMENTOS = { dia: 'Día', noche: 'Noche', ambos: 'Día y noche' };
+/* Cómo se nombra cada ocasión dentro de una frase: "en trabajo" no lo dice
+   nadie. */
+const EN_OCASION = {
+  trabajo: 'en la oficina', casual: 'para el día a día', salida: 'para una salida',
+  cita: 'para una cita', evento: 'para un evento', deporte: 'para entrenar'
+};
 
 /* ------------------------------ clima ------------------------------
    Open-Meteo: gratis, sin clave y con CORS abierto, así que la app lo
@@ -223,8 +229,12 @@ function traerClima(forzar) {
 
   climaPidiendo = true;
   climaEstado('Consultando el clima…');
+  /* Se pide el arco del día además del instante: un perfume se aplica una vez
+     y acompaña ocho horas, así que la pregunta real no es qué temperatura hace
+     ahora sino entre qué temperaturas vas a estar. */
   const url = `${CLIMA_API}?latitude=${encodeURIComponent(lugar.lat)}&longitude=${encodeURIComponent(lugar.lon)}` +
-    '&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m&timezone=auto';
+    '&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m' +
+    '&daily=apparent_temperature_max,apparent_temperature_min&timezone=auto&forecast_days=1';
 
   return pedirJSON(url).then(d => {
     const c = d && d.current;
@@ -236,7 +246,9 @@ function traerClima(forzar) {
       sensacion: (typeof c.apparent_temperature === 'number') ? c.apparent_temperature : c.temperature_2m,
       humedad: c.relative_humidity_2m,
       codigo: c.weather_code, viento: c.wind_speed_10m,
-      lugar: lugar.nombre, ts: new Date().toISOString()
+      lugar: lugar.nombre, ts: new Date().toISOString(),
+      maxDia: (d.daily && d.daily.apparent_temperature_max) ? d.daily.apparent_temperature_max[0] : null,
+      minDia: (d.daily && d.daily.apparent_temperature_min) ? d.daily.apparent_temperature_min[0] : null
     };
     guardar();
     aplicarTempDelClima();
@@ -471,13 +483,20 @@ function modeloAprendido() {
    una recomendación que no se explica no se usa. */
 function contextoActual() {
   const cl = climaParaPuntaje();
-  return {
+  const c = {
     temp: ctx.temp, momento: ctx.momento, ocasion: ctx.ocasion,
     estacion: estacionHoy(),
     lluvia: !!(cl && estaLloviendo(cl.codigo)),
     humedad: cl ? cl.humedad : null,
     viento: cl ? cl.viento : null
   };
+  /* De día, lo que viene por delante es el arco hasta la máxima; de noche, la
+     temperatura ya no sube. Si tocaste el termómetro a mano, manda tu número. */
+  if (cl && !ctx.manual && ctx.momento === 'dia' &&
+      typeof cl.maxDia === 'number' && cl.maxDia > ctx.temp + 2) {
+    c.arco = [ctx.temp, cl.maxDia];
+  }
+  return c;
 }
 
 function puntuar(p, m, c) {
@@ -508,13 +527,24 @@ function puntuar(p, m, c) {
     }
   }
 
-  // temperatura
+  /* Temperatura. Con arco, se mide contra los dos extremos del día: así gana
+     el que cubre todo el trayecto y no el que brilla en un solo momento.
+     El castigo llega hasta 30 (antes 20): con tope bajo, "algo fuera de rango"
+     y "completamente fuera" terminaban pareciéndose. */
   const ideal = TEMP_IDEAL[p.familia] != null ? TEMP_IDEAL[p.familia] : 18;
-  const dif = Math.abs(c.temp - ideal);
-  score -= Math.min(20, dif * 1.2);
-  if (dif <= 4) razones.push({ txt: `${familia(p.familia).nombre} rinde bien con ${Math.round(c.temp)}°`, bien: true });
+  const puntos = (c.arco && c.arco.length) ? c.arco : [c.temp];
+  const difs = puntos.map(t => Math.abs(t - ideal));
+  const dif = difs.reduce((a, b) => a + b, 0) / difs.length;
+  score -= Math.min(30, dif * 1.2);
+
+  const rango = c.arco
+    ? `${Math.round(Math.min.apply(null, c.arco))}° a ${Math.round(Math.max.apply(null, c.arco))}°`
+    : `${Math.round(c.temp)}°`;
+  if (dif <= 4) razones.push({
+    txt: c.arco ? `${familia(p.familia).nombre} cubre el arco del día, de ${rango}`
+                : `${familia(p.familia).nombre} rinde bien con ${rango}`, bien: true });
   else if (dif >= 12) razones.push({
-    txt: c.temp > ideal ? `Con ${Math.round(c.temp)}° se puede volver pesado` : `Con ${Math.round(c.temp)}° se va a sentir poco`,
+    txt: (puntos[0] > ideal ? `Con ${rango} se puede volver pesado` : `Con ${rango} se va a sentir poco`),
     bien: false });
 
   // momento del día (un viaje tiene mañanas y noches: ahí no se evalúa)
@@ -656,9 +686,16 @@ function sugerir(n, m) {
   const frescos = disponibles.filter(p => !usadosHoy[p.id]);
   const base = frescos.length >= cuantos ? frescos : disponibles;
 
+  /* Con puntajes iguales no se sortea: primero lo que vos puntuaste mejor, y
+     después aquello de lo que la app sabe más (notas cargadas). Recomendar un
+     perfume del que no conoce ni las notas es recomendar a ciegas. */
+  const info = x => (notasDe(x).length ? 1 : 0);
   return base
     .map(p => Object.assign({ p }, puntuar(p, m)))
-    .sort((a, b) => b.score - a.score || a.p.nombre.localeCompare(b.p.nombre))
+    .sort((a, b) => b.score - a.score
+      || (b.p.rating || 0) - (a.p.rating || 0)
+      || info(b.p) - info(a.p)
+      || a.p.nombre.localeCompare(b.p.nombre))
     .slice(0, cuantos);
 }
 
@@ -691,7 +728,7 @@ function renderHoy() {
     $('#sugerencias').innerHTML = '';
     $('#otras').hidden = true;
   } else {
-    $('#respuesta').innerHTML = fichaPrincipal(lista[0]);
+    $('#respuesta').innerHTML = fichaPrincipal(lista[0], lista[1], contextoActual());
     $('#sugerencias').innerHTML = lista.slice(1).map(x => fichaSugerencia(x)).join('');
     $('#otras').hidden = lista.length < 2;
     const otras = $('#otras summary');
@@ -716,18 +753,86 @@ function renderHoy() {
   avisoCopia();
 }
 
-/* La respuesta: un perfume, una razón, un botón. El resto de los porqués
-   está en la ficha, para quien los quiera. */
-function fichaPrincipal(s) {
+/* Cuántas aplicaciones y dónde. El frío frena la proyección y pide una más;
+   la humedad alta la multiplica y pide una menos; un espacio cerrado —oficina,
+   gimnasio— también. */
+function dosis(p, c) {
+  const estela = p.estela || 3;
+  let n = 3;
+  if (estela >= 4) n -= 1;
+  if (estela <= 2) n += 1;
+  if (typeof c.temp === 'number' && c.temp <= 10) n += 1;
+  if (typeof c.humedad === 'number' && c.humedad >= 75) n -= 1;
+  if (c.ocasion === 'trabajo' || c.ocasion === 'deporte') n -= 1;
+  n = clamp(n, 2, 5);
+
+  const frio = typeof c.temp === 'number' && c.temp <= 10;
+  const donde = (c.ocasion === 'trabajo' || c.ocasion === 'deporte')
+    ? 'en el cuello, sobre la piel'
+    : (frio ? 'en cuello y pecho, sobre la piel y no sobre el abrigo'
+            : 'en cuello y muñecas');
+  return `${n} aplicacion${n === 1 ? '' : 'es'} ${donde}.`;
+}
+
+/* La respuesta contada en dos o tres frases, como se la explicarías a alguien,
+   en vez de una lista de reglas que se cumplieron. Sale de los mismos datos:
+   no hay nada acá que el puntaje no haya usado. */
+function redactar(s, c) {
   const p = s.p, f = familia(p.familia);
-  const peso = r => (r.aprendido ? 2 : (r.clima ? 1 : 0));
-  const mejor = s.razones.filter(r => r.bien).sort((a, b) => peso(b) - peso(a))[0];
+  const fam = f.nombre.toLowerCase();
+  const arco = c.arco
+    ? `${Math.round(Math.min.apply(null, c.arco))}° a ${Math.round(Math.max.apply(null, c.arco))}° a lo largo del día`
+    : null;
+  const frases = [];
+
+  const ideal = TEMP_IDEAL[p.familia] != null ? TEMP_IDEAL[p.familia] : 18;
+  const puntos = c.arco || [c.temp];
+  const dif = puntos.reduce((a, t) => a + Math.abs(t - ideal), 0) / puntos.length;
+  const clima = arco ? `De ${arco}` : `Con ${Math.round(c.temp)}°`;
+  if (dif <= 5) {
+    frases.push(arco
+      ? `${clima}: su perfil ${fam} cubre todo el arco sin quedarse corto ni pesar.`
+      : `${clima}, un ${fam} está justo en su punto.`);
+  } else if (dif <= 11) {
+    frases.push(`${clima}: no es su temperatura ideal, pero aguanta.`);
+  } else {
+    frases.push(`${clima}: le queda lejos su punto justo, y aun así es lo mejor que tenés hoy.`);
+  }
+
+  const estela = p.estela || 3;
+  const donde = EN_OCASION[c.ocasion] || `para ${OCASIONES[c.ocasion].toLowerCase()}`;
+  if (c.ocasion === 'trabajo' || c.ocasion === 'deporte') {
+    frases.push(estela >= 4
+      ? `Ojo ${donde}: proyecta fuerte para un espacio cerrado, aplicá poco.`
+      : `${donde.charAt(0).toUpperCase() + donde.slice(1)} no invade el espacio cerrado.`);
+  } else if (c.ocasion === 'evento' || c.ocasion === 'cita') {
+    frases.push(estela >= 4
+      ? `${donde.charAt(0).toUpperCase() + donde.slice(1)} tiene la presencia que la ocasión pide.`
+      : `${donde.charAt(0).toUpperCase() + donde.slice(1)} es discreto: se siente de cerca, no a distancia.`);
+  } else if ((p.ocasiones || []).includes(c.ocasion)) {
+    frases.push(`Lo tenés anotado justo ${donde}.`);
+  }
+
+  const aprendida = s.razones.find(r => r.aprendido && r.bien);
+  if (aprendida) frases.push(esc(aprendida.txt) + '.');
+
+  const razonClima = s.razones.find(r => r.clima);
+  if (razonClima && frases.length < 3) frases.push(esc(razonClima.txt) + '.');
+
+  return frases.slice(0, 3).join(' ');
+}
+
+function fichaPrincipal(s, alternativa, c) {
+  const p = s.p, f = familia(p.familia);
   const pct = porcRestante(p);
   return `<article class="hero">
     <div class="hero-eyebrow">${f.emoji} ${esc(f.nombre)}${p.conc ? ' · ' + esc(p.conc) : ''}</div>
     <h2 class="hero-name">${esc(p.nombre)}</h2>
     <div class="hero-house">${esc(p.casa)}</div>
-    ${mejor ? `<p class="hero-razon"><i>✓</i> ${esc(mejor.txt)}</p>` : ''}
+    <p class="hero-texto">${redactar(s, c)}</p>
+    ${alternativa ? `<p class="hero-alt"><b>Alternativa:</b> ${esc(alternativa.p.nombre)},
+      ${esc(contraste(alternativa, s))}.</p>` : ''}
+    <p class="hero-alt"><b>Aplicación:</b> ${esc(dosis(p, c))}</p>
     <div class="hero-pie">
       <button class="btn btn-accent" data-usar="${p.id}">Me lo pongo</button>
       <div class="hero-dato">
@@ -770,6 +875,25 @@ function renderClima() {
 /* Tres tarjetas con el mismo puntaje y las mismas razones no son una
    recomendación: son la app diciendo "no sé". Conviene admitirlo y decir qué
    dato falta para poder diferenciarlos. */
+/* Qué gana uno si elige la alternativa: la diferencia concreta contra la
+   principal, no un "también está bueno". */
+function contraste(alt, principal) {
+  const a = alt.p, b = principal.p;
+  const ea = a.estela || 3, eb = b.estela || 3;
+  if (a.familia && b.familia && a.familia !== b.familia)
+    return `si preferís un ${familia(a.familia).nombre.toLowerCase()} en vez de un ${familia(b.familia).nombre.toLowerCase()}`;
+  if (ea < eb) return 'si lo querés más discreto';
+  if (ea > eb) return 'si querés más presencia';
+  if ((a.longevidad || 0) - (b.longevidad || 0) >= 2) return 'si necesitás que dure más';
+
+  /* Misma familia y misma presencia: lo que los separa son las notas. */
+  const otras = new Set(notasDe(b).map(n => n.toLowerCase()));
+  const propias = notasDe(a).filter(n => !otras.has(n.toLowerCase()));
+  if (propias.length) return `si preferís el lado de ${propias.slice(0, 2).join(' y ').toLowerCase()}`;
+  if (!notasDe(a).length) return 'otro del mismo palo, aunque todavía sin notas cargadas';
+  return `otro ${familia(a.familia).nombre.toLowerCase()} para variar`;
+}
+
 function avisoEmpate(sugerencias) {
   const av = $('#avisoEmpate');
   if (!av) return;

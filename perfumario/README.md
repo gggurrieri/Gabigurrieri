@@ -58,8 +58,12 @@ hace falta a las nueve de la noche es una respuesta.
   temperatura viene del clima, el momento de la hora y la estación del
   calendario: van en una línea de texto, no en controles.
 - **La ocasión se recuerda**: la próxima vez arranca donde la dejaste.
-- **Una respuesta, una razón.** Las otras dos opciones están plegadas en "ver
-  otras opciones", y el resto de los porqués, en la ficha.
+- **Una respuesta, redactada.** Dos o tres frases explicando por qué ese y no
+  otro, una alternativa con la diferencia concreta ("si preferís el lado de
+  naranja y pomelo") y cuántas aplicaciones y dónde. No hay nada en ese texto
+  que el puntaje no haya usado: sale de los mismos datos, escrito como se lo
+  contarías a alguien en vez de una lista de reglas cumplidas.
+- Las otras opciones quedan plegadas, y el resto de los porqués, en la ficha.
 - **Nada se eliminó.** Los controles finos se despliegan con "ajustar" y lo que
   la app aprendió se mudó a la pestaña Uso, que es donde se miran las
   estadísticas.
@@ -91,6 +95,18 @@ Lo que ya te pusiste hoy no se sugiere: es una regla dura, no un castigo de
 puntaje. Cuando era un −30, los bonus del aprendizaje podían taparlo y la app
 terminaba recomendando lo que ya tenías puesto. Solo vuelve a aparecer si sin él
 no llegan a tres sugerencias.
+
+**Se puntúa el día, no el instante.** Un perfume se aplica una vez y acompaña
+ocho horas, así que de día la temperatura que importa no es la de ahora sino el
+arco hasta la máxima. La app pide ese arco junto con el clima actual y mide
+contra los dos extremos: gana el que cubre el trayecto, no el que brilla a las
+ocho de la mañana. Esto salió de comparar la app con una recomendación hecha a
+mano: con 4° a las 8:30 y 10° a la tarde, la app ponía cuarto a un amaderado que
+era la mejor opción del día, porque lo juzgaba solo por el frío de la mañana.
+
+El castigo por temperatura llega hasta 30 puntos (antes 20). Con el tope bajo,
+"algo fuera de rango" y "completamente fuera" terminaban pareciéndose, y un
+cítrico a 5° quedaba a un punto de un amaderado.
 
 **La temperatura le gana al almanaque.** La estación es una aproximación al
 clima; la temperatura *es* el clima. Si un día de primavera hay 5°, el almanaque
@@ -335,7 +351,7 @@ mano, que la ciudad se encuentre sin red y que falle sin romper nada) y la
 colección incluida (que entre sola, que no
 resucite después de borrarla y que no se duplique), la corrección de un uso con
 su recálculo de ml, el aprendizaje por temperatura y la descarga de la copia.
-162 comprobaciones, incluidos candados que fallan si alguna nota usada en una
+163 comprobaciones, incluidos candados que fallan si alguna nota usada en una
 ficha quedó sin explicación en el diccionario, o si el ícono de "Agregar a
 pantalla de inicio" vuelve a quedar liso (ya pasó una vez: salía negro).
 

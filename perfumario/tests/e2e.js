@@ -38,7 +38,7 @@ const check = (n, c, d = '') => {
   const razonesDe = async nombre => p.evaluate(n => {
     const hero = document.querySelector('#respuesta .hero');
     if (hero && hero.querySelector('.hero-name').textContent.includes(n))
-      return (hero.querySelector('.hero-razon') || { textContent: '' }).textContent.replace(/\s+/g, ' ').trim();
+      return (hero.querySelector('.hero-texto') || { textContent: '' }).textContent.replace(/\s+/g, ' ').trim();
     const card = Array.from(document.querySelectorAll('#sugerencias .pf'))
       .find(e => e.querySelector('.pf-name').textContent.includes(n));
     return card ? card.querySelector('.razones').textContent.replace(/\s+/g, ' ').trim() : '';
@@ -150,10 +150,15 @@ const check = (n, c, d = '') => {
   await ir('hoy');
   check('da una respuesta y guarda las otras', await cuantos('#respuesta .hero') === 1 &&
     await cuantos('#sugerencias .pf') === 2);
-  check('la respuesta principal trae una sola razón', await cuantos('#respuesta .hero-razon') <= 1);
+  check('la respuesta viene redactada, no como lista de reglas',
+    (await p.textContent('#respuesta .hero-texto')).trim().split('.').length >= 2,
+    (await p.textContent('#respuesta .hero-texto')).slice(0, 80));
+  check('y dice cuánto aplicarte y dónde',
+    /aplicacion(es)? .*(cuello|muñecas)/.test(await p.textContent('#respuesta')),
+    (await p.textContent('#respuesta')).replace(/\s+/g, ' ').slice(-90));
   check('muestra un puntaje', /^\d+$/.test((await p.textContent('#respuesta .hero-dato b')).trim()));
   check('y dice de qué es', /de puntaje/.test(await p.textContent('#respuesta .hero-dato')));
-  check('explica por qué', await cuantos('#respuesta .hero-razon') + await cuantos('#sugerencias .razones li') >= 3);
+  check('explica por qué', await cuantos('#respuesta .hero-texto') + await cuantos('#sugerencias .razones li') >= 3);
   check('dice en qué estación estamos', /(verano|otoño|invierno|primavera)/.test(await p.textContent('#contextoLinea')));
   check('ahora avisa de la copia', await visible('#avisoCopia'));
 
@@ -414,8 +419,8 @@ const check = (n, c, d = '') => {
   });
   await p.route('**/api.open-meteo.com/v1/forecast**', r => {
     if (climaFalla) return r.abort();
-    // el pedido del viaje trae daily y un rango de fechas; el de hoy, current
-    if (/daily=/.test(r.request().url())) {
+    // el viaje pide un rango de fechas; el de hoy pide current (y el arco del día)
+    if (/start_date=/.test(r.request().url())) {
       if (viajeFalla) return r.abort();
       const u = new URL(r.request().url());
       const desde = u.searchParams.get('start_date'), hasta = u.searchParams.get('end_date');
@@ -434,8 +439,11 @@ const check = (n, c, d = '') => {
         weather_code: dias.map((_, i) => (i === 1 ? 63 : 1))
       } }));
     }
-    return r.fulfill(respuesta({ current: { temperature_2m: 11.3, apparent_temperature: 8.2,
-      relative_humidity_2m: climaHumedad, weather_code: climaCodigo, wind_speed_10m: climaViento } }));
+    return r.fulfill(respuesta({
+      current: { temperature_2m: 11.3, apparent_temperature: 8.2,
+                 relative_humidity_2m: climaHumedad, weather_code: climaCodigo, wind_speed_10m: climaViento },
+      daily: { time: [new Date().toISOString().slice(0, 10)],
+               apparent_temperature_max: [9.0], apparent_temperature_min: [4.0] } }));
   });
 
   await p.tap('#btnSettings'); await p.waitForTimeout(250);
