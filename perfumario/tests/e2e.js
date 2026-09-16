@@ -74,6 +74,17 @@ const check = (n, c, d = '') => {
     await cuantos('#respuesta .hero') === 1 && await cuantos('#sugerencias .pf') === 2);
   check('no le inventa usos', (await db()).usos.length === 0);
 
+  // la apertura no puede quedar tapando la app: se va sola y nunca intercepta
+  const apertura = await p.evaluate(() => {
+    const sp = document.getElementById('splash');
+    if (!sp) return { presente: false, bloquea: false };
+    return { presente: true, bloquea: getComputedStyle(sp).pointerEvents !== 'none' };
+  });
+  check('la apertura nunca intercepta los toques', !apertura.bloquea);
+  await p.reload(); await p.waitForTimeout(1700);
+  check('y se saca sola del DOM al terminar',
+    await p.evaluate(() => !document.getElementById('splash')));
+
   // candado: una nota que aparece en una ficha y no está en el diccionario es
   // una nota que no se puede tocar para leer qué es
   const notasHuerfanas = await p.evaluate(() => {

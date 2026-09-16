@@ -169,6 +169,20 @@ Reglas que sigue:
 - **El service worker no lo cachea.** Solo guarda los archivos propios; si
   cachearan el clima, la temperatura quedaría congelada en la primera consulta.
 
+## La apertura
+
+Al abrirla se dibuja el frasco, sube un vapor y entra la app: menos de un
+segundo en total. Dos reglas que la hacen inofensiva:
+
+- **No intercepta nada** (`pointer-events: none`): podés tocar la app mientras
+  corre, no es una pantalla que haya que esperar.
+- **Se saca sola del DOM** cuando termina, con un plazo de respaldo por si el
+  navegador no dispara el evento de fin de animación. Un overlay invisible que
+  queda puesto es una app que no responde.
+
+Con `prefers-reduced-motion` activado no aparece, igual que el resto de las
+animaciones.
+
 ## Cómo se actualiza
 
 El service worker va **primero a la red** y usa la caché solo como respaldo
@@ -351,7 +365,7 @@ mano, que la ciudad se encuentre sin red y que falle sin romper nada) y la
 colección incluida (que entre sola, que no
 resucite después de borrarla y que no se duplique), la corrección de un uso con
 su recálculo de ml, el aprendizaje por temperatura y la descarga de la copia.
-163 comprobaciones, incluidos candados que fallan si alguna nota usada en una
+165 comprobaciones, incluidos candados que fallan si alguna nota usada en una
 ficha quedó sin explicación en el diccionario, o si el ícono de "Agregar a
 pantalla de inicio" vuelve a quedar liso (ya pasó una vez: salía negro).
 

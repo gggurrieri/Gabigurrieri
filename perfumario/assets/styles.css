@@ -36,6 +36,60 @@ button,input,select,textarea{font:inherit;color:inherit}
 h1,h2,h3{margin:0}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em;color:var(--accent)}
 
+/* ----------------------------- apertura ----------------------------- */
+#splash{
+  position:fixed;inset:0;z-index:80;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  background:var(--bg);
+  pointer-events:none;                 /* nunca se interpone entre vos y la app */
+  animation:splashSale .45s ease .62s forwards;
+}
+.splash-frasco{width:130px;height:154px;overflow:visible}
+.splash-frasco .cuerpo{
+  stroke-dasharray:420;stroke-dashoffset:420;
+  animation:dibujar .55s cubic-bezier(.4,0,.2,1) forwards;
+}
+.splash-frasco .tapa,.splash-frasco .cuello{
+  opacity:0;animation:caer .35s ease .12s forwards;
+}
+.splash-frasco .gota{
+  opacity:0;transform-origin:110px 152px;
+  animation:latir .45s cubic-bezier(.3,1.4,.5,1) .34s forwards;
+}
+.splash-frasco .vapor circle{
+  fill:var(--accent);opacity:0;
+  animation:vaporSube .7s ease-out .3s forwards;
+}
+.splash-frasco .vapor circle:nth-child(2){animation-delay:.36s}
+.splash-frasco .vapor circle:nth-child(3){animation-delay:.42s}
+.splash-frasco .vapor circle:nth-child(4){animation-delay:.48s}
+.splash-frasco .vapor circle:nth-child(5){animation-delay:.52s}
+.splash-nombre{
+  margin:0;font-family:var(--display);font-size:20px;letter-spacing:.4px;color:var(--txt);
+  opacity:0;animation:aparecer .4s ease .38s forwards;
+}
+@keyframes dibujar{to{stroke-dashoffset:0}}
+@keyframes caer{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+@keyframes latir{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:scale(1)}}
+@keyframes aparecer{to{opacity:1}}
+@keyframes vaporSube{
+  0%{opacity:0;transform:translateY(6px) scale(.6)}
+  35%{opacity:.85}
+  100%{opacity:0;transform:translateY(-26px) scale(1.15)}
+}
+@keyframes splashSale{to{opacity:0;visibility:hidden}}
+
+/* la respuesta entra apenas, para que se note que cambió */
+#respuesta .hero{animation:entra .28s ease}
+@keyframes entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* quien pide menos movimiento no ve nada de esto */
+@media (prefers-reduced-motion:reduce){
+  #splash{display:none}
+  #respuesta .hero{animation:none}
+  .view.active{animation:none}
+}
+
 /* ------------------------------ layout ----------------------------- */
 #app{min-height:100dvh;display:flex;flex-direction:column}
 

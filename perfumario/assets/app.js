@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-09-16.1';
+const VERSION = '2026-09-16.2';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -2509,6 +2509,16 @@ function confirmarBorrado(id) {
 }
 
 /* =============================== init =============================== */
+/* La apertura se saca del DOM cuando termina: si queda, es un elemento
+   invisible tapando la pantalla para siempre. */
+(function cerrarApertura() {
+  const sp = document.getElementById('splash');
+  if (!sp) return;
+  const chau = () => { if (sp.parentNode) sp.parentNode.removeChild(sp); };
+  sp.addEventListener('animationend', e => { if (e.animationName === 'splashSale') chau(); });
+  setTimeout(chau, 2000);   // por si el navegador no dispara el evento
+})();
+
 cargar();
 conectar();
 ir('hoy');

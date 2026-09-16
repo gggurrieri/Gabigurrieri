@@ -16,6 +16,29 @@
 <link rel="stylesheet" href="assets/styles.css">
 </head>
 <body>
+<!-- Apertura: dura menos de un segundo, no intercepta toques (pointer-events
+     en none) y desaparece sola. Si el sistema pide movimiento reducido, no
+     aparece. -->
+<div id="splash" aria-hidden="true">
+  <svg viewBox="0 0 220 260" class="splash-frasco">
+    <defs>
+      <linearGradient id="spGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#8A5A2B"/><stop offset="100%" stop-color="#F2D9A0"/>
+      </linearGradient>
+    </defs>
+    <g class="vapor">
+      <circle cx="110" cy="46" r="4"/><circle cx="88" cy="40" r="3"/><circle cx="132" cy="38" r="3"/>
+      <circle cx="98" cy="28" r="2.5"/><circle cx="122" cy="26" r="2.5"/>
+    </g>
+    <rect class="tapa" x="94" y="34" width="32" height="26" rx="6" fill="url(#spGrad)"/>
+    <rect class="cuello" x="82" y="58" width="56" height="18" rx="7" fill="#F2D9A0"/>
+    <path class="cuerpo" d="M62 92 q48 -20 96 0 v96 q0 34 -35 34 h-26 q-35 0 -35 -34 z"
+          fill="none" stroke="url(#spGrad)" stroke-width="13" stroke-linejoin="round"/>
+    <circle class="gota" cx="110" cy="152" r="11" fill="#F2D9A0"/>
+  </svg>
+  <p class="splash-nombre">Perfumario</p>
+</div>
+
 <div id="app">
 
   <header class="topbar">
