@@ -162,7 +162,44 @@ de confirmar, y descarta lo que ya tenías cargado.
 El tipo se deduce del deporte declarado en el archivo y, si no viene, de la velocidad media. Las
 actividades repetidas se detectan comparando fecha, tipo y duración.
 
-Los saltos de soga no vienen en ningún formato: se estiman a partir del tiempo.
+Los saltos de soga no vienen en GPX ni en TCX: se estiman a partir del tiempo.
+
+### Desde una captura de pantalla
+
+Sirve cuando no querés exportar nada: sacás la captura de la pantalla de datos de Zepp y cargás la
+sesión desde ahí.
+
+**El OCR lo hace el teléfono, no la app.** En iOS, *Texto en vivo* reconoce el texto de cualquier
+captura: mantené el dedo sobre los números en **Fotos** → **Seleccionar todo** → **Copiar**. Después,
+en Registro → *Traer entrenamientos* → **Pegar una captura**.
+
+Una página estática no puede leer la imagen —eso necesita un modelo de visión, o sea un servidor y
+una API—, pero sí puede entender el texto. Además el lector del sistema es más fiel que cualquiera
+que pudiéramos embeber, funciona sin conexión y la captura nunca sale del teléfono.
+
+Se leen duración, distancia, calorías, pulso medio y máximo, saltos y velocidad media. Lo que
+interpreta:
+
+- **Cualquiera de los tres órdenes** en que puede venir el texto copiado: etiqueta y valor en la
+  misma línea, la etiqueta partida en dos renglones con el valor aparte, o —en las tarjetas de
+  resumen— el número arriba y la etiqueta debajo. Se prueban las cuatro combinaciones de corte y
+  emparejado, y gana la que reconoce más campos, así que también entiende un pegado sin saltos de
+  línea.
+- **Coma decimal y punto de miles** (`10,59` · `1.480`), millas, y `mm:ss` o `h:mm:ss`.
+- **Prioridades entre etiquetas parecidas**: el *tiempo de entrenamiento* le gana al *tiempo total*,
+  que incluye las pausas.
+- **La unidad y un rango plausible filtran cada valor.** Sin ese control, «Altitud máx. −63 m» o el
+  reloj de la barra de estado terminarían de duración o de pulso. Por eso el ritmo por kilómetro
+  (`3'01"/km`) se reconoce y se descarta, en vez de colarse como 3 ppm.
+- **La fecha**, si la captura la trae, exigiendo el año escrito. Sin esa condición, el cartel
+  «Estación 3 de Febrero» del mapa de fondo —que el OCR copia junto con los datos— se leería como la
+  fecha del entrenamiento. Cuando no hay, queda hoy y el campo se edita en la previsualización.
+
+Los saltos sí vienen en las capturas de soga: cuando están, se usa el conteo del reloj en lugar de la
+estimación por tiempo.
+
+Nada se guarda solo: la sesión aparece en la previsualización con todo lo leído, para corregir el
+tipo y la fecha antes de confirmar.
 
 ### Actividad diaria
 
@@ -267,12 +304,15 @@ node tests/comida.js               # 20 comprobaciones sobre nutrición
 node tests/pasos.js tmp            # 11 comprobaciones sobre pasos y pulso en reposo
 node tests/manual.js               # 18 comprobaciones sobre carga manual y corrección
 node tests/avisos.js               # 20 comprobaciones sobre avisos y foto de la comida
+node tests/captura.js              # 50 comprobaciones sobre la lectura de capturas
 ```
 
 `tests/e2e.js` recorre la app como un usuario, en viewport de iPhone y con eventos táctiles reales.
 Los fixtures reproducen lo que entregan Salud y Zepp de verdad: exportación en español
 (`exportación.xml`) y en inglés, un export sin entrenamientos, un `.zip` que no es de Salud, y
-actividades sueltas en TCX. Requiere Playwright.
+actividades sueltas en TCX. `tests/captura.js` usa los distintos textos que devuelve *Texto en vivo*
+sobre una misma pantalla, incluida la captura real con los carteles del mapa mezclados entre los
+datos. Requiere Playwright.
 
 ## Estructura
 

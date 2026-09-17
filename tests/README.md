@@ -20,3 +20,9 @@ exportación en español (`exportación.xml`) y en inglés, un export sin
 entrenamientos, un `.zip` que no es de Salud, y actividades sueltas en GPX y
 TCX. `caso-usuario.zip` reproduce el caso del primer uso, con la fecha de
 inicio en hoy y el historial hacia atrás.
+
+`captura.js` prueba la lectura de una captura de pantalla de Zepp. El OCR lo hace el
+teléfono («Texto en vivo»); acá se comprueba que la app entienda ese texto en los
+tres órdenes en que puede venir, sin saltos de línea, en inglés y en millas, y que
+no confunda la altitud, el ritmo por kilómetro ni el reloj de la barra de estado con
+los datos del entrenamiento. 50 comprobaciones.

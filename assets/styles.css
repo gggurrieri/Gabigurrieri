@@ -275,6 +275,10 @@ main{max-width:720px;margin:0 auto;padding:0 var(--sp)}
 .entry.is-dup{opacity:.5}
 .imp-type{background:var(--bg-soft);border:1px solid var(--line);border-radius:9px;
   padding:8px 10px;color:var(--txt);font-size:16px;min-height:44px;align-self:flex-start}
+.imp-campos{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.imp-campos .imp-type{flex:1 1 130px}
+.imp-date{flex:1 1 140px;background:var(--bg-soft);border:1px solid var(--line);
+  border-radius:9px;padding:8px 10px;color:var(--txt);font-size:16px;min-height:44px}
 
 /* ---------- zonas de pulso ---------- */
 .zone-bar{display:flex;height:13px;border-radius:7px;overflow:hidden;background:var(--bg-soft);gap:1px}
@@ -342,15 +346,17 @@ main{max-width:720px;margin:0 auto;padding:0 var(--sp)}
    respetar la caja: queda más alto que el resto, se puede desbordar del
    módulo, y el valor sale centrado mientras los demás campos alinean a la
    izquierda. Se normaliza el control y su pseudo-elemento interno. */
-.form input[type=date]{
+.form input[type=date],.imp-date{
   -webkit-appearance:none;appearance:none;
   height:44px;min-height:44px;line-height:22px;
   text-align:left;min-width:0;max-width:100%;
 }
-.form input[type=date]::-webkit-date-and-time-value{
+.form input[type=date]::-webkit-date-and-time-value,
+.imp-date::-webkit-date-and-time-value{
   text-align:left;margin:0;line-height:22px;
 }
-.form input[type=date]::-webkit-calendar-picker-indicator{opacity:.55}
+.form input[type=date]::-webkit-calendar-picker-indicator,
+.imp-date::-webkit-calendar-picker-indicator{opacity:.55}
 /* Sin min-width:0 un control con ancho intrínseco grande revienta la grilla. */
 .form input,.form select,.form textarea{min-width:0;max-width:100%}
 .form label,.grid-2>*,.row-2>*,.row-3>*{min-width:0}

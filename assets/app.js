@@ -536,6 +536,262 @@ function parseTrackFile(fileName, text) {
   return null;
 }
 
+/* ---------------- leer una captura de pantalla del reloj ----------------
+   El reconocimiento de la imagen lo hace el teléfono, no la app. En iOS,
+   «Texto en vivo» copia el texto de cualquier captura manteniendo el dedo
+   sobre los números. Una página estática no puede leer la imagen —eso
+   necesita un modelo de visión, o sea un servidor—, pero sí puede entender
+   ese texto. Encima el OCR del sistema es más fiel que cualquiera que
+   pudiéramos embeber, anda sin conexión y la captura no sale del teléfono.
+
+   La pantalla de Zepp es una tabla de etiqueta + valor. El texto copiado
+   puede traer los dos en la misma línea, en líneas separadas, con la
+   etiqueta partida en dos renglones, o —en las tarjetas de resumen— con el
+   número arriba y la etiqueta abajo. Por eso se arma la secuencia de piezas
+   y se prueban los dos emparejamientos, quedándose con el que reconoce más
+   campos. Qué campo es cada valor lo decide la etiqueta; la unidad y un
+   rango plausible son el filtro que evita meter una altitud donde va un
+   pulso. */
+
+/* Cualquier valor suelto: un tiempo, un ritmo por kilómetro, o un número
+   con unidad. Las unidades largas van antes que las cortas: si 'm' se
+   probara antes que 'min', «31 min» se leería como 31 metros. */
+const RE_TOKEN = new RegExp(
+    '\\d{1,2}:[0-5]\\d(?::[0-5]\\d)?'
+  + "|\\d{1,3}\\s*['´’]\\s*[0-5]\\d\\s*[\"”]?\\s*\\/\\s*\\w+"
+  + '|-?\\d[\\d.,]*\\s*(?:km\\/h|kcal|cal|lpm|bpm|ppm|spm|rpm|km|min(?:utos?)?|mi|m|%|h)?',
+  'gi');
+
+/* Coma decimal y punto de miles, como los escribe el teléfono en español. */
+function aNumero(s) {
+  s = String(s).replace(/\s/g, '');
+  if (s.indexOf(',') >= 0) s = s.replace(/\./g, '').replace(',', '.');
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+  return parseFloat(s);
+}
+
+function leerValor(t) {
+  t = String(t).trim();
+  let m = t.match(/^(\d{1,2}):([0-5]\d)(?::([0-5]\d))?/);
+  if (m) return { u: 'tiempo', n: m[3] ? (+m[1]) * 60 + (+m[2]) + (+m[3]) / 60 : (+m[1]) + (+m[2]) / 60 };
+  if (/['´’]\s*[0-5]\d/.test(t) && t.indexOf('/') >= 0) return { u: 'ritmo', n: 0 };
+  m = t.match(/^(-?\d[\d.,]*?)\s*(km\/h|kcal|cal|lpm|bpm|ppm|spm|rpm|km|min(?:utos?)?|mi|m|%|h)?\s*$/i);
+  if (!m) return null;
+  const n = aNumero(m[1]);
+  return isFinite(n) ? { u: (m[2] || '').toLowerCase(), n } : null;
+}
+
+/* Secuencia de piezas: corridas de texto y valores, en el orden en que
+   aparecen. Las líneas de texto seguidas se juntan en una sola pieza porque
+   una etiqueta puede venir partida en dos renglones. */
+function piezasDeCaptura(texto, todos) {
+  const out = [];
+  const empujar = s => {
+    s = String(s).trim();
+    if (!s) return;
+    if (out.length && out[out.length - 1].t === 'txt') out[out.length - 1].s += ' ' + s;
+    else out.push({ t: 'txt', s });
+  };
+  String(texto || '').split(/\r?\n/).forEach(linea => {
+    const l = linea.replace(/[   ]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!l) return;
+    let m, hallados = [];
+    RE_TOKEN.lastIndex = 0;
+    while ((m = RE_TOKEN.exec(l))) {
+      if (m[0].trim()) hallados.push(m);
+      if (RE_TOKEN.lastIndex === m.index) RE_TOKEN.lastIndex++;
+    }
+    if (!todos && hallados.length) hallados = [hallados[hallados.length - 1]];
+    let corte = 0, puestos = 0;
+    hallados.forEach(h => {
+      const v = leerValor(h[0]);
+      if (!v) return;
+      empujar(l.slice(corte, h.index));
+      corte = h.index + h[0].length;
+      out.push({ t: 'val', v });
+      puestos++;
+    });
+    if (!puestos) { empujar(l); return; }
+    empujar(l.slice(corte));
+  });
+  return out;
+}
+
+/* Cada valor toma una corrida de texto, y ninguna se usa dos veces: sin eso
+   una etiqueta se pegaría a varios números seguidos. */
+function emparejar(piezas, atras) {
+  const usadas = new Set();
+  const pares = [];
+  piezas.forEach((p, i) => {
+    if (p.t !== 'val') return;
+    const j = atras ? i - 1 : i + 1;
+    const vecina = piezas[j];
+    if (vecina && vecina.t === 'txt' && !usadas.has(j)) {
+      usadas.add(j);
+      pares.push({ e: normalizar(vecina.s), v: p.v });
+    } else {
+      pares.push({ e: '', v: p.v });
+    }
+  });
+  return pares;
+}
+
+/* campo · prioridad · etiqueta. Las etiquetas van sin acentos porque
+   normalizar() ya se los saca. Prioridad resuelve los empates: el tiempo de
+   entrenamiento le gana al tiempo total, que incluye las pausas. */
+const CAMPOS_CAPTURA = [
+  ['minutes',   3, /tiempo (de (entrenamiento|ejercicio|actividad)|en movimiento|activo)|moving time|active time/],
+  ['minutes',   2, /duracion|duration/],
+  ['minutes',   1, /tiempo (total|transcurrido)|total time|elapsed/],
+  ['distance',  2, /distancia|distance|recorrido/],
+  ['watchKcal', 3, /quemad|calorias|calories|energia|consumo/],
+  ['hrAvg',     3, /(ritmo|frecuencia|pulso) ?(cardiac[oa])? ?(promedio|medi[oa])|(promedio|medi[oa]) ?(cardiac[oa]|de pulso)|avg ?(heart|hr)/],
+  ['hrMax',     3, /(ritmo|frecuencia|pulso) ?(cardiac[oa])? ?maxim|max ?(heart|hr)/],
+  ['jumps',     2, /salto/],
+  ['speed',     2, /velocidad (promedio|media)|avg speed/]
+];
+
+/* La unidad y el rango son el control de calidad: un número que no puede
+   ser lo que dice la etiqueta se descarta en vez de ensuciar la sesión. */
+const REGLAS = {
+  minutes:   { u: ['tiempo', 'min', 'minuto', 'minutos', 'h', ''], min: 1,  max: 600 },
+  distance:  { u: ['km', 'mi', 'm'],                               min: 0.05, max: 500 },
+  watchKcal: { u: ['kcal', 'cal', ''],                             min: 10, max: 5000 },
+  hrAvg:     { u: ['lpm', 'bpm', 'ppm', ''],                       min: 30, max: 230 },
+  hrMax:     { u: ['lpm', 'bpm', 'ppm', ''],                       min: 30, max: 230 },
+  jumps:     { u: [''],                                            min: 10, max: 100000 },
+  speed:     { u: ['km/h'],                                        min: 1,  max: 90 }
+};
+
+/* En las tarjetas de resumen la unidad viaja como palabra suelta debajo del
+   número («10,59 / km / Distancia»), no pegada al valor: si el número vino
+   pelado, se busca la unidad en la etiqueta. */
+const UNIDADES = ['km/h', 'kcal', 'lpm', 'bpm', 'ppm', 'spm', 'km', 'min', 'cal'];
+function unidadDeEtiqueta(e) {
+  for (let i = 0; i < UNIDADES.length; i++) {
+    if (new RegExp('(^| )' + UNIDADES[i].replace('/', '\\/') + '( |$)').test(e)) return UNIDADES[i];
+  }
+  return '';
+}
+
+function convertir(campo, v, etiqueta) {
+  const r = REGLAS[campo];
+  const u = v.u || unidadDeEtiqueta(etiqueta);
+  if (!r || r.u.indexOf(u) < 0) return null;
+  if (campo === 'jumps' && /\/ ?min|por minuto|spm|frecuencia/.test(etiqueta)) return null;
+  let n = v.n;
+  if (campo === 'minutes' && u === 'h') n *= 60;
+  if (campo === 'distance' && u === 'mi') n *= 1.609344;
+  if (campo === 'distance' && u === 'm') n /= 1000;
+  return n >= r.min && n <= r.max ? n : null;
+}
+
+function camposDe(pares) {
+  const got = {};
+  pares.forEach(({ e, v }) => {
+    if (!e) return;
+    for (let i = 0; i < CAMPOS_CAPTURA.length; i++) {
+      const [campo, prio, re] = CAMPOS_CAPTURA[i];
+      if (!re.test(e)) continue;
+      const n = convertir(campo, v, e);
+      if (n === null) continue;            // la etiqueta encaja pero el número no: sigue buscando
+      if (!got[campo] || prio > got[campo].prio) got[campo] = { n, prio };
+      break;
+    }
+  });
+  return got;
+}
+
+/* Muchas pantallas de Zepp llevan la fecha en el encabezado. Si está, se usa;
+   si no, queda hoy. En cualquier caso el campo se muestra editable, porque
+   una fecha equivocada ensucia el plan entero. */
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun',
+               'jul', 'ago', 'sep|set', 'oct', 'nov', 'dic'];
+
+function armarFecha(a, m, d) {
+  if (!(m >= 1 && m <= 12) || !(d >= 1 && d <= 31)) return null;
+  const iso = a + '-' + pad(m) + '-' + pad(d);
+  const t = fromISO(iso);
+  if (isNaN(t) || t.getMonth() + 1 !== m || t.getDate() !== d) return null;
+  return iso;
+}
+
+function fechaDeCaptura(texto) {
+  const t = String(texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const tope = addDays(today(), 1);
+  const bueno = f => (f && f >= '2015-01-01' && f <= tope) ? f : null;
+  let m, f;
+
+  m = t.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
+  if (m) { f = bueno(armarFecha(+m[1], +m[2], +m[3])); if (f) return f; }
+
+  m = t.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);   // dd/mm/aaaa, como se escribe acá
+  if (m) {
+    f = bueno(armarFecha(+m[3] < 100 ? 2000 + (+m[3]) : +m[3], +m[2], +m[1]));
+    if (f) return f;
+  }
+
+  /* Con el mes escrito se exige el año. Sin esa condición, «Estación 3 de
+     Febrero» —un cartel del mapa que el OCR copia junto con los datos— se
+     leería como la fecha del entrenamiento. */
+  m = t.match(new RegExp('\\b(\\d{1,2})\\s*(?:de\\s+)?(' + MESES.join('|') + ')[a-z]*\\.?,?\\s*(?:de\\s+)?(\\d{4})\\b', 'i'));
+  if (m) {
+    const nm = MESES.findIndex(x => new RegExp('^(' + x + ')$').test(m[2])) + 1;
+    f = bueno(armarFecha(+m[3], nm, +m[1]));
+    if (f) return f;
+  }
+  return null;
+}
+
+/* Devuelve una sesión lista para la previsualización, o { error }. */
+function interpretarCaptura(texto) {
+  const piezas = piezasDeCaptura(texto, false);
+  if (!piezas.some(p => p.t === 'val')) {
+    return { error: 'No encontré ningún número en ese texto. ¿Copiaste la parte de la captura con los datos?' };
+  }
+  /* Dos formas de cortar el texto —un valor por línea o todos— y dos de
+     emparejar —la etiqueta antes o después—. Se prueban las cuatro y gana la
+     que reconoce más campos; la primera es el caso normal y desempata. */
+  const sueltas = piezasDeCaptura(texto, true);
+  let got = null;
+  [[piezas, true], [piezas, false], [sueltas, true], [sueltas, false]].forEach(([pz, atras]) => {
+    const c = camposDe(emparejar(pz, atras));
+    if (!got || Object.keys(c).length > Object.keys(got).length) got = c;
+  });
+
+  if (!got.minutes) {
+    return { error: 'Encontré números pero ninguna duración. Copiá también la línea del tiempo '
+      + '(«Tiempo de entrenamiento» o «Duración») — sin eso no puedo armar la sesión.' };
+  }
+  const minutes = Math.max(1, Math.round(got.minutes.n));
+  const km = got.distance ? Math.round(got.distance.n * 100) / 100 : 0;
+  const jumps = got.jumps ? Math.round(got.jumps.n) : 0;
+
+  const cabecera = piezas.filter(p => p.t === 'txt').slice(0, 2).map(p => p.s).join(' ');
+  let tipo = jumps ? 'soga' : guessType(cabecera, km, minutes);
+  if (tipo === 'otro' && got.speed && got.speed.n >= 9 && got.speed.n <= 50) tipo = 'bici';
+
+  const leidos = [fmtMin(minutes)];
+  if (km) leidos.push(km + ' km');
+  if (jumps) leidos.push(jumps.toLocaleString('es-AR') + ' saltos');
+  if (got.watchKcal) leidos.push(Math.round(got.watchKcal.n) + ' kcal');
+  if (got.hrAvg) leidos.push(Math.round(got.hrAvg.n) + ' ppm de pulso medio');
+  if (got.hrMax) leidos.push('máximo ' + Math.round(got.hrMax.n));
+
+  const fecha = fechaDeCaptura(texto);
+  if (fecha) leidos.push('fecha ' + fmtDate(fecha));
+
+  return {
+    date: fecha || today(), fechaLeida: !!fecha, minutes, distance: km, jumps,
+    hrAvg: got.hrAvg ? Math.round(got.hrAvg.n) : 0,
+    hrMax: got.hrMax ? Math.round(got.hrMax.n) : 0,
+    watchKcal: got.watchKcal ? Math.round(got.watchKcal.n) : 0,
+    zones: null, type: tipo,
+    label: 'De una captura', origin: 'captura', file: '',
+    fechaAMano: true, leidos
+  };
+}
+
 /* ---------------- exportación de Salud (Apple Health) ----------------
    Salud entrega un .zip con un export.xml que puede pesar cientos de MB:
    todo lo que registró el teléfono desde siempre. Por eso no se carga
@@ -1679,6 +1935,7 @@ function filaImportada(c, i) {
   const dup = isDuplicate(c);
   const bits = [fmtMin(c.minutes)];
   if (c.distance) bits.push(c.distance + ' km');
+  if (c.jumps) bits.push(c.jumps.toLocaleString('es-AR') + ' saltos');
   if (c.hrAvg) bits.push(c.hrAvg + ' ppm medio');
   if (c.hrMax) bits.push('máx ' + c.hrMax);
   bits.push(sessionKcal(c) + ' kcal' + (kcalSource(c) ? ' ' + kcalSource(c) : ''));
@@ -1686,10 +1943,13 @@ function filaImportada(c, i) {
     <div class="entry-ico">${ICON[c.type] || '•'}</div>
     <div class="entry-body">
       <div class="entry-title">${fmtDate(c.date)} · ${esc(bits.join(' · '))}</div>
-      <div class="entry-sub">${esc(c.label)}${dup ? ' · ya la tenías cargada' : ''}</div>
-      <select class="imp-type" data-i="${i}">
-        ${opts.map(o => `<option value="${o[0]}"${o[0] === c.type ? ' selected' : ''}>${o[1]}</option>`).join('')}
-      </select>
+      <div class="entry-sub">${esc(c.label)}${c.fechaAMano ? (c.fechaLeida ? ' · confirmá la fecha' : ' · la captura no trae la fecha, ponela vos') : ''}${dup ? ' · ya la tenías cargada' : ''}</div>
+      <div class="imp-campos">
+        <select class="imp-type" data-i="${i}">
+          ${opts.map(o => `<option value="${o[0]}"${o[0] === c.type ? ' selected' : ''}>${o[1]}</option>`).join('')}
+        </select>
+        ${c.fechaAMano ? `<input type="date" class="imp-date" data-i="${i}" value="${c.date}" aria-label="Fecha del entrenamiento">` : ''}
+      </div>
     </div>
     <button class="entry-del" data-drop="${i}" aria-label="Descartar">×</button>
   </article>`;
@@ -1749,7 +2009,7 @@ function renderLog() {
       <div class="entry-ico">${ICON[s.type] || '•'}</div>
       <div class="entry-body">
         <div class="entry-title">${fmtDate(s.date)} · ${esc(bits.join(' · '))}</div>
-        <div class="entry-sub">${esc(s.notes || (s.intensity ? 'Intensidad ' + s.intensity : ''))}${s.source === 'reloj' ? ' · ⌚ del reloj' : s.source === 'salud' ? ' · ❤️ de Salud' : ''}</div>
+        <div class="entry-sub">${esc(s.notes || (s.intensity ? 'Intensidad ' + s.intensity : ''))}${s.source === 'reloj' ? ' · ⌚ del reloj' : s.source === 'salud' ? ' · ❤️ de Salud' : s.source === 'captura' ? ' · 📸 de una captura' : ''}</div>
       </div>
       <button class="entry-del" data-del="${s.id}" aria-label="Borrar">×</button>
     </article>`;
@@ -2442,6 +2702,33 @@ function bind() {
     else if (pending.length) toast(`${pending.length} actividad${pending.length > 1 ? 'es' : ''} lista${pending.length > 1 ? 's' : ''}`);
   });
 
+  /* Pegar una captura. Se intenta leer el portapapeles solo/a para ahorrarle
+     el pegado a mano; si el navegador no deja (iOS pide permiso), queda el
+     cuadro vacío y se pega igual. */
+  $('#btnPegarCaptura').addEventListener('click', async () => {
+    let texto = '';
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) texto = await navigator.clipboard.readText();
+    } catch (err) { texto = ''; }
+    openModal('Pegar una captura', texto || '',
+      'Pegá el texto que copiaste de la captura con Texto en vivo. La app no lee la imagen: '
+      + 'el reconocimiento lo hace el iPhone, acá se interpretan las líneas.',
+      txt => {
+        const c = interpretarCaptura(txt);
+        if (c.error) { toast(c.error); return; }
+        pending.push(c);
+        pending.sort((a, b) => a.date < b.date ? -1 : 1);
+        lastScan = null; headFor = null; pendingDiarios = {};
+        importNote = 'De la captura leí: ' + c.leidos.join(' · ')
+          + '. Revisá que coincida con la pantalla del reloj'
+          + (c.fechaLeida ? ' y confirmá la fecha antes de agregarla.'
+                          : ', y poné la fecha —la captura no la trae— antes de agregarla.');
+        renderImport();
+        const prev = $('#importPreview');
+        if (prev) prev.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+  });
+
   const alCambiar = e => {
     const ap = e.target.closest('[data-aplicar]');
     if (ap) {
@@ -2451,6 +2738,12 @@ function bind() {
     }
     const rango = e.target.closest('#impRango');
     if (rango) { if (rango.value !== importRango) aplicarRango(rango.value); return; }
+    const fecha = e.target.closest('.imp-date');
+    if (fecha) {
+      const c = pending[Number(fecha.dataset.i)];
+      if (c && /^\d{4}-\d{2}-\d{2}$/.test(fecha.value)) c.date = fecha.value;
+      return;
+    }
     const sel = e.target.closest('.imp-type');
     if (!sel) return;
     pending[Number(sel.dataset.i)].type = sel.value;
@@ -2472,7 +2765,7 @@ function bind() {
           date: c.date, type: c.type, minutes: c.minutes,
           intensity: c.hrAvg ? (zoneOf(c.hrAvg) >= 4 ? 'fuerte' : zoneOf(c.hrAvg) <= 2 ? 'suave' : 'moderado') : 'moderado',
           distance: c.distance || 0,
-          jumps: c.type === 'soga' ? Math.round(c.minutes * 0.6 * 110) : 0,
+          jumps: c.jumps || (c.type === 'soga' ? Math.round(c.minutes * 0.6 * 110) : 0),
           hrAvg: c.hrAvg || 0, hrMax: c.hrMax || 0, watchKcal: c.watchKcal || 0,
           zones: c.zones && c.zones.some(Boolean) ? c.zones : null,
           rpe: c.hrAvg ? clamp(Math.round(zoneOf(c.hrAvg) * 2), 1, 10) : 6,

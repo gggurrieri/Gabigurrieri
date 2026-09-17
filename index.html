@@ -97,7 +97,14 @@
           <input type="file" id="fileTrack" accept=".gpx,.tcx,.xml,application/gpx+xml" multiple hidden>
         </div>
 
-        <p class="muted small import-foot">Los saltos de soga no vienen en ningún formato: se estiman a partir del tiempo.</p>
+        <div class="source">
+          <div class="source-head"><b>Desde una captura de pantalla</b><span class="pill">texto en vivo</span></div>
+          <p class="muted small">Abrí la captura en <b>Fotos</b> y mantené el dedo apretado sobre los números hasta que aparezca el menú → <b>Seleccionar todo</b> → <b>Copiar</b>. Eso es <b>Texto en vivo</b>, el lector de texto del propio iPhone. Después tocá el botón y pegá. Sirve para cualquier pantalla de Zepp con los datos de la actividad.</p>
+          <p class="muted small"><b>La app no mira la imagen</b>: lee el texto que copiaste. El reconocimiento lo hace el teléfono, así que la captura no sale de ahí. Revisá siempre los números antes de agregar la sesión, y poné la fecha —la captura no la trae.</p>
+          <button class="btn" id="btnPegarCaptura" type="button">Pegar una captura</button>
+        </div>
+
+        <p class="muted small import-foot">Los saltos de soga no vienen en GPX ni en TCX: se estiman a partir del tiempo, salvo que la captura traiga el conteo del reloj.</p>
         <div id="importPreview" class="stack" style="margin-top:12px"></div>
       </div>
 
