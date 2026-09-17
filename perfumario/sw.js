@@ -8,7 +8,7 @@
    Ahora es al revés: primero la red, y la caché queda como respaldo para
    cuando no hay señal. Se pierde algo de velocidad en el arranque y se gana
    que lo que ves sea siempre lo último publicado.                          */
-const VERSION = '2026-09-12.5';
+const VERSION = '2026-09-17.1';
 const CACHE = 'perfumario-' + VERSION;
 const ASSETS = ['./', './index.html', './assets/styles.css', './assets/app.js',
   './assets/datos.js', './assets/coleccion.js', './assets/icon.svg',

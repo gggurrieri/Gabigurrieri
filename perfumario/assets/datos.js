@@ -179,7 +179,10 @@ const NOTAS = [
   { n:'Ajenjo', f:'aromatica', d:'La hierba de la absenta: amarga, anisada y medicinal. Prima directa de la artemisia.' },
   { n:'Cumarina', f:'gourmand', d:'La molécula del haba tonka: heno dulce, almendra y vainilla. Es la base del fougère desde 1882.' },
   { n:'Ambermax', f:'ambar', d:'Ámbar sintético de alta potencia, seco y persistente. Nombre comercial, no un material natural.' },
-  { n:'Vetiver de Haití', f:'amaderada', d:'Versión más limpia y ahumada de la raíz.' }
+  { n:'Vetiver de Haití', f:'amaderada', d:'Versión más limpia y ahumada de la raíz.' },
+  { n:'Manzanilla', f:'aromatica', d:'Flor de infusión: herbácea, un poco dulce y con un fondo de manzana verde. De ahí le viene el nombre.' },
+  { n:'Hoja de violeta', f:'verde', d:'La hoja, no la flor: verde, húmeda y metálica, como pepino recién cortado. Nada que ver con la violeta en polvo.' },
+  { n:'Abeto', f:'verde', d:'Resina de conífera: fresca, balsámica y fría, con olor a bosque después de la lluvia.' }
 ];
 
 /* -------------------- catálogo para autocompletar -------------------

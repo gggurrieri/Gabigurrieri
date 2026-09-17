@@ -24,6 +24,27 @@ lo que tengas guardado.
 > Ojo con dónde la publicás: ese archivo viaja con la app. Si servís el repo por
 > GitHub Pages, cualquiera que entre a la URL ve esa colección.
 
+### Cómo se traduce una planilla de afuera
+
+Los últimos ocho perfumes entraron desde una lista escrita con otros nombres de
+campo. La traducción quedó anotada acá para que la próxima no haya que
+adivinarla:
+
+| Campo de afuera | Campo de la app | Regla |
+|---|---|---|
+| `fam: "acuatico"` | `familia: "acuatica"` | misma familia, en femenino |
+| `min` / `max` (°C) | `estaciones` | entra la estación cuya temperatura típica cae dentro del rango: verano 28°, primavera 21°, otoño 18°, invierno 11° |
+| `proy` 1–3 | `estela` 1–5 | 1→2, 2→3, 3→4; los extremos quedan libres para lo que de verdad no se siente o no se puede esconder |
+| `ocasiones: ["diario","oficina","social"]` | `ocasiones: ["casual","trabajo","evento"]` | las seis de la app |
+| `ocasiones: [… "noche" …]` | `momento: "noche"` | "noche" no es una ocasión, es un momento del día: iba en el campo equivocado |
+| `muestra` / `mini` | `ml: 2` / `ml: 5` | estimados, corregilos desde la ficha |
+| `nota` (prosa) | `salida` / `corazon` / `fondo` | las pirámides salen de esa misma frase, nota por nota; no se agregó ninguna que no estuviera escrita |
+
+Los campos que la app todavía no usa (`juice`, el color del líquido, y
+`tempMin` / `tempMax`) viajan igual dentro de cada ficha. La app ignora lo que no
+conoce y el formulario de edición conserva esos campos, así que el dato no se
+pierde por editar un perfume.
+
 ## Cómo usarla
 
 **En la compu:** abrí `perfumario/index.html` con doble clic.
@@ -382,6 +403,15 @@ Ideas anotadas para las próximas vueltas:
 
 - Un campo de devolución después del uso ("me lo elogiaron", "no duró nada") que
   alimente el puntaje; hoy eso queda en una nota libre que el modelo no lee.
+
+- Usar `tempMin` / `tempMax` en el puntaje. Hoy la temperatura ideal sale de la
+  familia (un cítrico luce a 27°, un ámbar a 10°), igual para todos los cítricos.
+  Ocho fichas ya traen su propio rango: el día que el motor lo lea, el puntaje
+  deja de ser por familia y pasa a ser por frasco.
+
+- Duración en horas de los últimos ocho y de Punto, Candombe y Maahir Legacy:
+  están en 0, que la app lee como "no lo sé" y no castiga, pero tampoco puede
+  usar para decidir con lluvia o con aire seco.
 
 - Foto del frasco en cada ficha.
 - Lista de deseados con precio objetivo.

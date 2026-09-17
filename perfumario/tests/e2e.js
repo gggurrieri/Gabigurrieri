@@ -74,6 +74,16 @@ const check = (n, c, d = '') => {
     await cuantos('#respuesta .hero') === 1 && await cuantos('#sugerencias .pf') === 2);
   check('no le inventa usos', (await db()).usos.length === 0);
 
+  /* candado: un perfume sin familia, sin estaciones o sin ocasiones no se puede
+     puntuar bien —queda "sin clasificar" y compite con la temperatura por
+     defecto—. Ya pasó con el Bird of Paradise, cargado a las apuradas. */
+  const incompletos = await p.evaluate(() =>
+    ((window.PERFUMARIO_COLECCION || { perfumes: [] }).perfumes || [])
+      .filter(x => !x.familia || !(x.estaciones || []).length || !(x.ocasiones || []).length)
+      .map(x => x.nombre));
+  check('ninguno entra sin familia, estaciones y ocasiones',
+    incompletos.length === 0, incompletos.join(', '));
+
   // la apertura no puede quedar tapando la app: se va sola y nunca intercepta
   const apertura = await p.evaluate(() => {
     const sp = document.getElementById('splash');

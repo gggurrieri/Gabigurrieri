@@ -833,26 +833,44 @@ window.PERFUMARIO_COLECCION = {
       "nota": "Tester."
     },
     {
+      "id": "col023",
+      "creado": "2026-09-14",
+      "nombre": "CH Men Birds of Paradise",
+      "casa": "Carolina Herrera",
+      "conc": "EDT",
+      "familia": "aromatica",
+      "salida": [
+        "Manzanilla",
+        "Hoja de violeta"
+      ],
+      "corazon": [
+        "Abeto"
+      ],
+      "fondo": [
+        "Madera"
+      ],
       "ml": 100,
       "mlRestante": 100,
       "precio": 0,
       "comprado": null,
       "longevidad": 0,
-      "estela": 3,
-      "rating": 0,
-      "salida": [],
-      "corazon": [],
-      "fondo": [],
-      "creado": "2026-09-12",
-      "id": "col023",
-      "nombre": "Bird of Paradise",
-      "casa": "Carolina Herrera",
-      "conc": "EDP",
-      "familia": null,
-      "estaciones": [],
-      "ocasiones": [],
+      "estela": 4,
+      "estaciones": [
+        "primavera",
+        "otoño",
+        "invierno"
+      ],
+      "ocasiones": [
+        "casual",
+        "evento",
+        "salida"
+      ],
       "momento": "ambos",
-      "nota": "Recién agregado. Falta familia, notas y tamaño: cargalos y entra en todo lo demás."
+      "rating": 0,
+      "nota": "Manzanilla y hoja de violeta sobre driftwood, abeto y maderas cálidas. Tropical-verde, buena proyección. Edición limitada.",
+      "juice": "#A68A3C",
+      "tempMin": 8,
+      "tempMax": 24
     },
     {
       "ml": 100,
@@ -882,6 +900,286 @@ window.PERFUMARIO_COLECCION = {
       ],
       "momento": "dia",
       "nota": "Recién agregado. Familia tomada del propio nombre; notas y tamaño sin confirmar."
+    },
+    {
+      "id": "col025",
+      "creado": "2026-09-17",
+      "nombre": "Nautica Voyage",
+      "casa": "Nautica",
+      "conc": "EDT",
+      "familia": "acuatica",
+      "salida": [
+        "Manzana verde",
+        "Notas ozónicas"
+      ],
+      "corazon": [
+        "Sal marina"
+      ],
+      "fondo": [
+        "Cedro"
+      ],
+      "ml": 100,
+      "mlRestante": 100,
+      "precio": 0,
+      "comprado": null,
+      "longevidad": 0,
+      "estela": 2,
+      "estaciones": [
+        "verano",
+        "primavera",
+        "otoño"
+      ],
+      "ocasiones": [
+        "casual",
+        "trabajo"
+      ],
+      "momento": "ambos",
+      "rating": 0,
+      "nota": "Manzana, agua y notas marinas sobre madera clara. Acuático liviano, clásico de entretiempo cálido.",
+      "juice": "#7FA0B5",
+      "tempMin": 16,
+      "tempMax": 32
+    },
+    {
+      "id": "col026",
+      "creado": "2026-09-17",
+      "nombre": "Oud Wood (tipo)",
+      "casa": "Inspirado en Tom Ford — muestra",
+      "conc": "",
+      "familia": "amaderada",
+      "salida": [
+        "Cardamomo"
+      ],
+      "corazon": [
+        "Oud / Agarwood",
+        "Sándalo"
+      ],
+      "fondo": [
+        "Vainilla"
+      ],
+      "ml": 2,
+      "mlRestante": 2,
+      "precio": 0,
+      "comprado": null,
+      "longevidad": 0,
+      "estela": 4,
+      "estaciones": [
+        "otoño",
+        "invierno"
+      ],
+      "ocasiones": [
+        "salida"
+      ],
+      "momento": "noche",
+      "rating": 0,
+      "nota": "Oud, cardamomo y sándalo sobre vainilla. Denso y envolvente, solo para frío.",
+      "juice": "#C9A25A",
+      "tempMin": 4,
+      "tempMax": 18,
+      "muestra": true
+    },
+    {
+      "id": "col027",
+      "creado": "2026-09-17",
+      "nombre": "Toujours Fidèle",
+      "casa": "Fragonard",
+      "conc": "EDT",
+      "familia": "aromatica",
+      "salida": [
+        "Manzana verde",
+        "Neroli"
+      ],
+      "corazon": [
+        "Romero"
+      ],
+      "fondo": [
+        "Haba tonka"
+      ],
+      "ml": 5,
+      "mlRestante": 5,
+      "precio": 0,
+      "comprado": null,
+      "longevidad": 0,
+      "estela": 3,
+      "estaciones": [
+        "primavera",
+        "otoño",
+        "invierno"
+      ],
+      "ocasiones": [
+        "casual",
+        "trabajo"
+      ],
+      "momento": "ambos",
+      "rating": 0,
+      "nota": "Manzana verde y neroli sobre romero y tonka. Fougère fresco, clásico francés de Grasse.",
+      "juice": "#B8C98A",
+      "tempMin": 10,
+      "tempMax": 26,
+      "mini": true
+    },
+    {
+      "id": "col028",
+      "creado": "2026-09-17",
+      "nombre": "Eau de Hongrie",
+      "casa": "Fragonard",
+      "conc": "EDT",
+      "familia": "amaderada",
+      "salida": [
+        "Bergamota",
+        "Lavanda"
+      ],
+      "corazon": [
+        "Jazmín"
+      ],
+      "fondo": [
+        "Cedro",
+        "Ámbar"
+      ],
+      "ml": 5,
+      "mlRestante": 5,
+      "precio": 0,
+      "comprado": null,
+      "longevidad": 0,
+      "estela": 2,
+      "estaciones": [
+        "verano",
+        "primavera",
+        "otoño"
+      ],
+      "ocasiones": [
+        "casual",
+        "trabajo"
+      ],
+      "momento": "ambos",
+      "rating": 0,
+      "nota": "Bergamota y lavanda sobre jazmín y cedro ambarino. Colonia histórica reinterpretada, discreta.",
+      "juice": "#B7ADC4",
+      "tempMin": 12,
+      "tempMax": 28,
+      "mini": true
+    },
+    {
+      "id": "col029",
+      "creado": "2026-09-17",
+      "nombre": "Beau Gosse",
+      "casa": "Fragonard",
+      "conc": "EDT",
+      "familia": "aromatica",
+      "salida": [
+        "Bergamota",
+        "Limón"
+      ],
+      "corazon": [
+        "Cardamomo"
+      ],
+      "fondo": [
+        "Cedro de Virginia",
+        "Pachulí"
+      ],
+      "ml": 5,
+      "mlRestante": 5,
+      "precio": 0,
+      "comprado": null,
+      "longevidad": 0,
+      "estela": 3,
+      "estaciones": [
+        "verano",
+        "primavera",
+        "otoño"
+      ],
+      "ocasiones": [
+        "casual",
+        "evento"
+      ],
+      "momento": "ambos",
+      "rating": 0,
+      "nota": "Cítricos y cardamomo sobre cedro de Virginia y pachulí. Amaderado aromático, cómodo a diario.",
+      "juice": "#C7C48A",
+      "tempMin": 12,
+      "tempMax": 28,
+      "mini": true
+    },
+    {
+      "id": "col030",
+      "creado": "2026-09-17",
+      "nombre": "Concerto",
+      "casa": "Fragonard",
+      "conc": "EDT",
+      "familia": "citrica",
+      "salida": [
+        "Mandarina",
+        "Bergamota"
+      ],
+      "corazon": [
+        "Té verde",
+        "Jazmín"
+      ],
+      "fondo": [
+        "Ámbar"
+      ],
+      "ml": 5,
+      "mlRestante": 5,
+      "precio": 0,
+      "comprado": null,
+      "longevidad": 0,
+      "estela": 2,
+      "estaciones": [
+        "verano",
+        "primavera",
+        "otoño"
+      ],
+      "ocasiones": [
+        "casual",
+        "trabajo"
+      ],
+      "momento": "ambos",
+      "rating": 0,
+      "nota": "Mandarina y bergamota sobre té, ámbar y jazmín. Fresco frutal liviano y simple.",
+      "juice": "#E0B36E",
+      "tempMin": 16,
+      "tempMax": 32,
+      "mini": true
+    },
+    {
+      "id": "col031",
+      "creado": "2026-09-17",
+      "nombre": "Désert",
+      "casa": "Fragonard",
+      "conc": "EDT",
+      "familia": "ambar",
+      "salida": [
+        "Mandarina",
+        "Azafrán"
+      ],
+      "corazon": [
+        "Tabaco",
+        "Oud / Agarwood"
+      ],
+      "fondo": [
+        "Haba tonka"
+      ],
+      "ml": 5,
+      "mlRestante": 5,
+      "precio": 0,
+      "comprado": null,
+      "longevidad": 0,
+      "estela": 3,
+      "estaciones": [
+        "otoño",
+        "invierno"
+      ],
+      "ocasiones": [
+        "evento",
+        "casual"
+      ],
+      "momento": "noche",
+      "rating": 0,
+      "nota": "Mandarina y azafrán sobre tabaco, oud y haba tonka. Dulce y envolvente, de noche o para una cita.",
+      "juice": "#B8823E",
+      "tempMin": 6,
+      "tempMax": 20,
+      "mini": true
     }
   ]
 };
