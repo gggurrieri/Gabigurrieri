@@ -461,10 +461,24 @@ window.PERFUMARIO_COLECCION = {
       "nombre": "Punto",
       "casa": "Blind",
       "conc": "EDP",
-      "familia": "aromatica",
-      "salida": [],
-      "corazon": [],
-      "fondo": [],
+      "familia": "amaderada",
+      "salida": [
+        "Violeta",
+        "Lavanda",
+        "Cardamomo"
+      ],
+      "corazon": [
+        "Madera",
+        "Sándalo",
+        "Pachulí",
+        "Vetiver de Haití"
+      ],
+      "fondo": [
+        "Iris / Orris",
+        "Vetiver de Haití",
+        "Ámbar gris",
+        "Rosa"
+      ],
       "ml": 10,
       "mlRestante": 5,
       "precio": 0,
@@ -473,12 +487,14 @@ window.PERFUMARIO_COLECCION = {
       "estela": 3,
       "estaciones": [
         "primavera",
-        "otoño"
+        "otoño",
+        "invierno"
       ],
       "ocasiones": [
         "trabajo",
         "casual",
-        "salida"
+        "salida",
+        "cita"
       ],
       "momento": "ambos",
       "rating": 0,
@@ -579,10 +595,23 @@ window.PERFUMARIO_COLECCION = {
       "nombre": "Candombe",
       "casa": "Blind",
       "conc": "EDP",
-      "familia": "amaderada",
-      "salida": [],
-      "corazon": [],
-      "fondo": [],
+      "familia": "chipre",
+      "salida": [
+        "Rosa",
+        "Frambuesa",
+        "Pomelo"
+      ],
+      "corazon": [
+        "Cedro",
+        "Cashmeran",
+        "Ámbar"
+      ],
+      "fondo": [
+        "Musgo de roble",
+        "Mate",
+        "Almizcle blanco",
+        "Tabaco"
+      ],
       "ml": 10,
       "mlRestante": 6,
       "precio": 0,
@@ -596,6 +625,7 @@ window.PERFUMARIO_COLECCION = {
       "ocasiones": [
         "trabajo",
         "casual",
+        "salida",
         "evento"
       ],
       "momento": "ambos",
@@ -650,10 +680,28 @@ window.PERFUMARIO_COLECCION = {
       "nombre": "Maahir Legacy",
       "casa": "Lattafa",
       "conc": "EDP",
-      "familia": "ambar",
-      "salida": [],
-      "corazon": [],
-      "fondo": [],
+      "familia": "aromatica",
+      "salida": [
+        "Lima",
+        "Menta",
+        "Pomelo",
+        "Lavanda",
+        "Piña"
+      ],
+      "corazon": [
+        "Pimienta negra",
+        "Romero",
+        "Enebro",
+        "Geranio",
+        "Incienso / Olíbano"
+      ],
+      "fondo": [
+        "Ambroxan",
+        "Vetiver",
+        "Musgo de roble",
+        "Cashmeran",
+        "Haba tonka"
+      ],
       "ml": 100,
       "mlRestante": 100,
       "precio": 0,
@@ -661,15 +709,17 @@ window.PERFUMARIO_COLECCION = {
       "longevidad": 0,
       "estela": 4,
       "estaciones": [
-        "invierno",
+        "primavera",
+        "verano",
         "otoño"
       ],
       "ocasiones": [
+        "trabajo",
+        "casual",
         "salida",
-        "cita",
         "evento"
       ],
-      "momento": "noche",
+      "momento": "ambos",
       "rating": 0,
       "nota": "Notas a completar: no las tengo confirmadas. Frasco opaco: el nivel no se ve."
     },

@@ -409,9 +409,16 @@ Ideas anotadas para las próximas vueltas:
   Ocho fichas ya traen su propio rango: el día que el motor lo lea, el puntaje
   deja de ser por familia y pasa a ser por frasco.
 
-- Duración en horas de los últimos ocho y de Punto, Candombe y Maahir Legacy:
-  están en 0, que la app lee como "no lo sé" y no castiga, pero tampoco puede
-  usar para decidir con lluvia o con aire seco.
+- Duración en horas: están en 0 en buena parte de la colección. La app lo lee
+  como "no lo sé" y no castiga, pero tampoco puede usarlo para decidir con
+  lluvia o con aire seco.
+
+- La pirámide de Kenzo Homme Marine, el único que quedó sin notas.
+
+- Una alerta cuando la familia cargada no se condice con las notas. Maahir
+  Legacy estuvo clasificado como ámbar de noche hasta que apareció su ficha:
+  es un fougère de lima, menta y musgo de roble. Dos meses de sugerencias
+  equivocadas que la app tenía cómo detectar y no detectó.
 
 - Foto del frasco en cada ficha.
 - Lista de deseados con precio objetivo.
