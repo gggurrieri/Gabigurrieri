@@ -182,7 +182,9 @@ const NOTAS = [
   { n:'Vetiver de Haití', f:'amaderada', d:'Versión más limpia y ahumada de la raíz.' },
   { n:'Manzanilla', f:'aromatica', d:'Flor de infusión: herbácea, un poco dulce y con un fondo de manzana verde. De ahí le viene el nombre.' },
   { n:'Hoja de violeta', f:'verde', d:'La hoja, no la flor: verde, húmeda y metálica, como pepino recién cortado. Nada que ver con la violeta en polvo.' },
-  { n:'Abeto', f:'verde', d:'Resina de conífera: fresca, balsámica y fría, con olor a bosque después de la lluvia.' }
+  { n:'Abeto', f:'verde', d:'Resina de conífera: fresca, balsámica y fría, con olor a bosque después de la lluvia.' },
+  { n:'Mate', f:'verde', d:'La yerba: verde, amarga y tostada a la vez. En perfumería se usa como un té más seco y terroso.' },
+  { n:'Frambuesa', f:'gourmand', d:'Fruta roja ácida y azucarada, con un filo verde. Levanta las rosas y las vuelve más jugosas.' }
 ];
 
 /* -------------------- catálogo para autocompletar -------------------
