@@ -413,12 +413,18 @@ Ideas anotadas para las próximas vueltas:
   como "no lo sé" y no castiga, pero tampoco puede usarlo para decidir con
   lluvia o con aire seco.
 
-- La pirámide de Kenzo Homme Marine, el único que quedó sin notas.
-
-- Una alerta cuando la familia cargada no se condice con las notas. Maahir
-  Legacy estuvo clasificado como ámbar de noche hasta que apareció su ficha:
-  es un fougère de lima, menta y musgo de roble. Dos meses de sugerencias
-  equivocadas que la app tenía cómo detectar y no detectó.
+- Una alerta cuando una ficha se contradice a sí misma. Maahir Legacy estuvo
+  clasificado como ámbar de noche hasta que apareció su pirámide: es un fougère
+  de lima, menta y musgo de roble. La idea obvia —comparar la familia declarada
+  contra la familia de cada nota— se probó y no sirve: marca 13 de 30 fichas
+  contando notas sueltas, 3 de 30 pesando el fondo por encima de la salida, y
+  en ninguna de las dos versiones habría marcado justamente a Maahir Legacy.
+  La regla que sí lo agarra es más angosta: una salida casi toda fresca
+  (cítrica, verde, acuática o aromática) en un perfume declarado solo para
+  frío. Con esa, la colección entera da un solo falso positivo, Layton, que
+  abre fresco sobre una base cálida a propósito. Sin implementar: una alerta
+  que grita seguido se aprende a ignorar, y todavía no está claro que una sola
+  regla angosta justifique la pantalla.
 
 - Foto del frasco en cada ficha.
 - Lista de deseados con precio objetivo.

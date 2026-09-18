@@ -184,7 +184,8 @@ const NOTAS = [
   { n:'Hoja de violeta', f:'verde', d:'La hoja, no la flor: verde, húmeda y metálica, como pepino recién cortado. Nada que ver con la violeta en polvo.' },
   { n:'Abeto', f:'verde', d:'Resina de conífera: fresca, balsámica y fría, con olor a bosque después de la lluvia.' },
   { n:'Mate', f:'verde', d:'La yerba: verde, amarga y tostada a la vez. En perfumería se usa como un té más seco y terroso.' },
-  { n:'Frambuesa', f:'gourmand', d:'Fruta roja ácida y azucarada, con un filo verde. Levanta las rosas y las vuelve más jugosas.' }
+  { n:'Frambuesa', f:'gourmand', d:'Fruta roja ácida y azucarada, con un filo verde. Levanta las rosas y las vuelve más jugosas.' },
+  { n:'Notas marinas', f:'acuatica', d:'El acorde de mar entero, sin desglosar: sal, aire y agua fría. Muchas fichas lo dan así, como una sola nota.' }
 ];
 
 /* -------------------- catálogo para autocompletar -------------------

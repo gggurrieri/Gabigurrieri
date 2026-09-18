@@ -84,6 +84,15 @@ const check = (n, c, d = '') => {
   check('ninguno entra sin familia, estaciones y ocasiones',
     incompletos.length === 0, incompletos.join(', '));
 
+  /* candado: una ficha sin notas no se puede comparar con otra, no aparece en
+     el perfil olfativo y no deja tocar nada para aprender. La familia sola no
+     alcanza. */
+  const sinNotas = await p.evaluate(() =>
+    ((window.PERFUMARIO_COLECCION || { perfumes: [] }).perfumes || [])
+      .filter(x => ![].concat(x.salida || [], x.corazon || [], x.fondo || []).length)
+      .map(x => x.nombre));
+  check('y ninguno entra sin pirámide', sinNotas.length === 0, sinNotas.join(', '));
+
   // la apertura no puede quedar tapando la app: se va sola y nunca intercepta
   const apertura = await p.evaluate(() => {
     const sp = document.getElementById('splash');

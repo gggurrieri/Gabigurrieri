@@ -930,9 +930,16 @@ window.PERFUMARIO_COLECCION = {
       "longevidad": 6,
       "estela": 3,
       "rating": 0,
-      "salida": [],
-      "corazon": [],
-      "fondo": [],
+      "salida": [
+        "Notas marinas"
+      ],
+      "corazon": [
+        "Ylang-ylang"
+      ],
+      "fondo": [
+        "Sándalo",
+        "Almizcle blanco"
+      ],
       "creado": "2026-09-12",
       "id": "col024",
       "nombre": "Homme Marine",
