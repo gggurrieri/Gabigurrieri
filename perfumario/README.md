@@ -208,6 +208,15 @@ tres datos que la app ya tenía:
 - **El nivel del líquido** es cuánto te queda. No es decoración: la lista dice
   de un vistazo cuáles están por terminarse, sin leer un solo número.
 
+**Diez ya traen la foto real en el build**, cargadas con
+`tools/fotos.js`: se le pasa una carpeta con un archivo por perfume nombrado
+con su id (`col001.jpg`, `col00g.jpg`…) y las mete recortadas y achicadas
+adentro de `assets/coleccion.js`. Usa el mismo tamaño y la misma calidad que la
+app cuando la foto se saca del teléfono, así las dos vías dan el mismo
+resultado. **Las originales no entran al repo**: 6,7 MB de fotos de cámara
+quedaron en 90 KB adentro del build, que es lo único que la app necesita para
+mostrarlas en 44 px.
+
 **La foto de verdad la sacás vos**, desde la ficha. Se recorta cuadrada, se
 achica a 256 px y se guarda como JPEG dentro del mismo `localStorage` que el
 resto. El achique no es cosmético: una foto de cámara pesa unos 3 MB y el cupo
