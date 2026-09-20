@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-09-18.2';
+const VERSION = '2026-09-20.1';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -101,8 +101,8 @@ function cargarMiColeccion() {
   toast(n ? `Agregados ${n} perfumes` : 'Ya los tenías a todos');
 }
 function guardar() {
-  try { localStorage.setItem(KEY, JSON.stringify(S)); }
-  catch (e) { toast('No se pudo guardar: el navegador está sin espacio'); }
+  try { localStorage.setItem(KEY, JSON.stringify(S)); return true; }
+  catch (e) { toast('No se pudo guardar: el navegador está sin espacio'); return false; }
 }
 
 /* --------------------------- dominio -------------------------------- */
@@ -826,9 +826,14 @@ function fichaPrincipal(s, alternativa, c) {
   const p = s.p, f = familia(p.familia);
   const pct = porcRestante(p);
   return `<article class="hero">
-    <div class="hero-eyebrow">${f.emoji} ${esc(f.nombre)}${p.conc ? ' · ' + esc(p.conc) : ''}</div>
-    <h2 class="hero-name">${esc(p.nombre)}</h2>
-    <div class="hero-house">${esc(p.casa)}</div>
+    <div class="hero-cab">
+      ${miniatura(p, 'frasquito-h')}
+      <div class="hero-titulos">
+        <div class="hero-eyebrow">${f.emoji} ${esc(f.nombre)}${p.conc ? ' · ' + esc(p.conc) : ''}</div>
+        <h2 class="hero-name">${esc(p.nombre)}</h2>
+        <div class="hero-house">${esc(p.casa)}</div>
+      </div>
+    </div>
     <p class="hero-texto">${redactar(s, c)}</p>
     ${alternativa ? `<p class="hero-alt"><b>Alternativa:</b> ${esc(alternativa.p.nombre)},
       ${esc(contraste(alternativa, s))}.</p>` : ''}
@@ -928,7 +933,7 @@ function fichaSugerencia(s, i) {
   const pct = porcRestante(p);
   return `<article class="card">
     <div class="pf" data-ficha="${p.id}" role="button" tabindex="0">
-      <div class="pf-mark" style="border-color:${f.color}33">${f.emoji}</div>
+      ${miniatura(p, 'pf-mark')}
       <div class="pf-main">
         <div class="pf-name">${i === 0 ? '★ ' : ''}${esc(p.nombre)}</div>
         <div class="pf-house">${esc(p.casa)}${p.conc ? ' · ' + esc(p.conc) : ''}</div>
@@ -1239,7 +1244,7 @@ function pintarValija(dias, ocasiones, cuantos, opciones) {
       alertas.push(`El frasco es de ${p.ml} ml: en cabina solo entran envases de hasta 100 ml.`);
     const acompania = elegidos.indexOf(e) >= porCobertura;
     return `<div class="pf" data-ficha="${p.id}" role="button" tabindex="0">
-      <div class="pf-mark" style="border-color:${f.color}33">${f.emoji}</div>
+      ${miniatura(p, 'pf-mark')}
       <div class="pf-main">
         <div class="pf-name">${esc(p.nombre)}</div>
         <div class="pf-house">${esc(p.casa)}${p.conc ? ' · ' + esc(p.conc) : ''}</div>
@@ -1329,8 +1334,106 @@ function estrellas(n) {
    parecidos ni de lo que se aprende de las notas: conviene que se vea. */
 function etiquetaFamilia(p, f) {
   if (!p.familia) return '❓ completar familia';
-  if (!notasDe(p).length) return `${esc(f.nombre)} · ❓ completar notas`;
-  return esc(f.nombre);
+  /* el emoji vivía en la marca de la izquierda, que ahora muestra el frasco */
+  if (!notasDe(p).length) return `${f.emoji} ${esc(f.nombre)} · ❓ completar notas`;
+  return `${f.emoji} ${esc(f.nombre)}`;
+}
+
+/* --------------------------- miniatura ------------------------------
+   Cada perfume muestra un frasco. El que viene de fábrica está dibujado acá,
+   no es la foto oficial de la marca: esas tienen derechos y esta app se
+   publica en una URL abierta. La foto de verdad la saca uno, que para eso
+   tiene los frascos en la repisa.
+
+   El dibujo no es puro adorno: se llena hasta donde llega lo que queda,
+   así la lista muestra el nivel de cada frasco sin leer un solo número. */
+
+/* el color del líquido: el que trajo la ficha, si no el de la familia */
+const jugo = p => p.juice || familia(p.familia).color || '#8a8396';
+
+/* Cuatro siluetas. Cuál toca sale del id, así un perfume se dibuja siempre
+   igual y la lista no queda toda igual tampoco. */
+const CUERPOS = [
+  'M12 24 h40 v62 a7 7 0 0 1 -7 7 h-26 a7 7 0 0 1 -7 -7 z',
+  'M13 36 q0 -12 19 -12 q19 0 19 12 v50 a7 7 0 0 1 -7 7 h-24 a7 7 0 0 1 -7 -7 z',
+  'M18 22 h28 v67 a5 5 0 0 1 -5 5 h-18 a5 5 0 0 1 -5 -5 z',
+  'M8 38 h48 v44 a7 7 0 0 1 -7 7 h-34 a7 7 0 0 1 -7 -7 z'
+];
+function cuerpoDe(id) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return CUERPOS[Math.abs(h) % CUERPOS.length];
+}
+
+/* El mismo perfume se dibuja en varias vistas a la vez (la de Hoy y la de
+   Colección viven las dos en el DOM, una escondida), así que el id del
+   recorte no puede salir del id del perfume: quedarían repetidos. */
+let nFrascos = 0;
+
+function frascoSVG(p) {
+  const c = jugo(p);
+  const cuerpo = cuerpoDe(p.id || 'x');
+  /* sin ml cargados no se sabe cuánto queda: se dibuja lleno antes que
+     mentir con un frasco vacío */
+  const pct = p.ml > 0 ? porcRestante(p) : 100;
+  const y = 88 - (58 * pct / 100);   // 88 = vacío, 30 = lleno
+  const cid = 'jugo-' + (++nFrascos);
+  return `<svg class="frasco" viewBox="0 0 64 100" aria-hidden="true">
+    <defs><clipPath id="${cid}"><path d="${cuerpo}"/></clipPath></defs>
+    <rect x="25" y="4" width="14" height="11" rx="3" fill="${c}" opacity=".5"/>
+    <rect x="28.5" y="14" width="7" height="10" fill="${c}" opacity=".3"/>
+    <path d="${cuerpo}" fill="${c}" opacity=".12"/>
+    <rect x="0" y="${y}" width="64" height="100" fill="${c}" opacity=".62" clip-path="url(#${cid})"/>
+    <path d="${cuerpo}" fill="none" stroke="${c}" stroke-opacity=".5" stroke-width="2"/>
+  </svg>`;
+}
+
+function miniatura(p, clase) {
+  return `<div class="frasquito ${clase || ''}">${p.foto
+    ? `<img src="${p.foto}" alt="Frasco de ${esc(p.nombre)}">`
+    : frascoSVG(p)}</div>`;
+}
+
+/* --------------------------- foto del frasco ------------------------
+   Se achica a 256 px antes de guardarla. Una foto de cámara moderna pesa
+   3 MB y el cupo de localStorage ronda los 5: treinta fotos sin achicar no
+   entran ni de casualidad, y el error llega recién al guardar, cuando la
+   foto ya se vio en pantalla. */
+const FOTO_LADO = 256;
+const FOTO_CALIDAD = 0.72;
+
+function achicarFoto(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      try {
+        // recorte cuadrado centrado: el frasco casi siempre está en el medio
+        const lado = Math.min(img.width, img.height);
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = FOTO_LADO;
+        const g = cv.getContext('2d');
+        g.drawImage(img, (img.width - lado) / 2, (img.height - lado) / 2, lado, lado,
+                    0, 0, FOTO_LADO, FOTO_LADO);
+        resolve(cv.toDataURL('image/jpeg', FOTO_CALIDAD));
+      } catch (e) { reject(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('no se pudo leer la imagen')); };
+    img.src = url;
+  });
+}
+
+/* Guarda la foto y, si el navegador dice que no hay lugar, la saca. Dejarla
+   en pantalla sin poder guardarla hace creer que quedó puesta. */
+function ponerFoto(id, dataUrl) {
+  const p = perfume(id);
+  if (!p) return;
+  const antes = p.foto || null;
+  p.foto = dataUrl;
+  if (!guardar()) { p.foto = antes; return; }
+  abrirFicha(id); render();
+  toast(dataUrl ? 'Foto guardada' : 'Foto quitada');
 }
 
 function fichaLista(p) {
@@ -1340,7 +1443,7 @@ function fichaLista(p) {
   const n = usosDe(p.id).length;
   const cpu = costoPorUso(p);
   return `<div class="pf" data-ficha="${p.id}" role="button" tabindex="0">
-    <div class="pf-mark" style="border-color:${f.color}33">${f.emoji}</div>
+    ${miniatura(p, 'pf-mark')}
     <div class="pf-main">
       <div class="pf-name">${esc(p.nombre)}</div>
       <div class="pf-house">${esc(p.casa)}${p.conc ? ' · ' + esc(p.conc) : ''}</div>
@@ -1371,8 +1474,19 @@ function abrirFicha(id) {
     ? `<div class="nivel"><span>${t}</span><div>${arr.map(n => `<span class="tag" data-nota="${esc(n)}">${esc(n)}</span>`).join('')}</div></div>` : '';
 
   abrirModal(p.nombre, `
-    <p class="sub">${esc(p.casa)}${p.conc ? ' · ' + esc(p.conc) : ''} · ${f.emoji} ${esc(f.nombre)}</p>
-    <div class="stars" style="font-size:15px">${estrellas(p.rating)}</div>
+    <div class="ficha-top">
+      ${miniatura(p, 'frasquito-g')}
+      <div>
+        <p class="sub">${esc(p.casa)}${p.conc ? ' · ' + esc(p.conc) : ''} · ${f.emoji} ${esc(f.nombre)}</p>
+        <div class="stars" style="font-size:15px">${estrellas(p.rating)}</div>
+        <div class="foto-acc">
+          <label class="btn btn-chico" for="fFoto">${p.foto ? 'Cambiar foto' : 'Sacar foto'}</label>
+          ${p.foto ? `<button class="btn btn-chico" data-quitar-foto="${p.id}">Quitar</button>` : ''}
+        </div>
+        ${p.foto ? '' : '<p class="hint hint-foto">El frasco dibujado se llena con lo que te queda.</p>'}
+      </div>
+    </div>
+    <input type="file" id="fFoto" accept="image/*" hidden>
 
     <div class="piramide">
       ${nivel('Salida', p.salida)}${nivel('Corazón', p.corazon)}${nivel('Fondo', p.fondo)}
@@ -1410,6 +1524,15 @@ function abrirFicha(id) {
     <div class="btn-row">
       <button class="btn btn-danger" data-borrar="${p.id}">Borrar</button>
     </div>`);
+
+  $('#fFoto').addEventListener('change', e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    toast('Achicando la foto…');
+    achicarFoto(file)
+      .then(url => ponerFoto(id, url))
+      .catch(() => toast('No se pudo leer esa imagen'));
+  });
 }
 
 /* ---------------------------- formulario --------------------------- */
@@ -2149,8 +2272,15 @@ function renderAjustes() {
 
 function exportar() {
   const texto = JSON.stringify(S, null, 2);
+  /* Con fotos adentro la copia pasa de 30 KB a varios cientos y el
+     portapapeles deja de ser un camino razonable: nadie pega medio mega en
+     un mail. El archivo sí las lleva, así que conviene decirlo antes y no
+     después de que el copiar falle. */
+  const conFoto = S.perfumes.filter(x => x.foto).length;
+  const kb = Math.round(texto.length / 1024);
   abrirModal('Copia de seguridad', `
     <p class="sub">Copiá este texto y guardalo donde quieras (mail, notas, Drive). Para restaurarlo, usá “Importar copia”.</p>
+    ${conFoto ? `<p class="hint">Pesa ${kb} KB porque lleva ${conFoto} foto${conFoto === 1 ? '' : 's'} adentro. Para este tamaño, “Descargar archivo” anda mejor que copiar y pegar.</p>` : ''}
     <label class="field"><textarea id="modalText" readonly style="min-height:180px;font-family:ui-monospace,monospace;font-size:11px">${esc(texto)}</textarea></label>
     <div class="btn-row">
       <button class="btn btn-accent" id="btnCopiar">Copiar al portapapeles</button>
@@ -2440,6 +2570,9 @@ function conectar() {
       if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
+
+    const qf = e.target.closest('[data-quitar-foto]');
+    if (qf) { ponerFoto(qf.dataset.quitarFoto, null); return; }
 
     const rellenar = e.target.closest('[data-rellenar]');
     if (rellenar) {

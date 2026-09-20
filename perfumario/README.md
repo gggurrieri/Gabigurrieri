@@ -190,6 +190,44 @@ Reglas que sigue:
 - **El service worker no lo cachea.** Solo guarda los archivos propios; si
   cachearan el clima, la temperatura quedaría congelada en la primera consulta.
 
+## La miniatura de cada frasco
+
+Cada perfume muestra un frasco: en la lista, en la respuesta de Hoy y arriba
+de su ficha.
+
+**El que viene de fábrica está dibujado.** No es la foto oficial de la marca, y
+eso es a propósito: esas fotos tienen derechos y esta app se publica en una URL
+abierta. Bajarlas y subirlas al repo sería redistribuirlas. El dibujo sale de
+tres datos que la app ya tenía:
+
+- **El color** es el del líquido (`juice`) si la ficha lo trae, y si no el de la
+  familia. Un cítrico sale amarillo, un ámbar naranja, un acuático azul.
+- **La silueta** sale del id del perfume, de entre cuatro. Siempre la misma para
+  el mismo frasco, distinta entre vecinos: una lista de treinta siluetas
+  idénticas no ayuda a encontrar nada.
+- **El nivel del líquido** es cuánto te queda. No es decoración: la lista dice
+  de un vistazo cuáles están por terminarse, sin leer un solo número.
+
+**La foto de verdad la sacás vos**, desde la ficha. Se recorta cuadrada, se
+achica a 256 px y se guarda como JPEG dentro del mismo `localStorage` que el
+resto. El achique no es cosmético: una foto de cámara pesa unos 3 MB y el cupo
+del navegador ronda los 5, así que treinta fotos sin achicar no entran ni de
+casualidad. A 256 px entran las treinta con lugar de sobra.
+
+Dos detalles que se resolvieron acá:
+
+- Si el navegador se queda sin espacio al guardar, **la foto se saca**. Dejarla
+  en pantalla cuando no se pudo guardar hace creer que quedó puesta hasta que
+  uno cierra la app y la pierde.
+- La copia de seguridad avisa cuánto pesa cuando lleva fotos. Con treinta
+  adentro deja de ser un texto para pegar en un mail, y conviene decirlo antes
+  de que el copiar falle, no después.
+
+> Nota de implementación: la clase de la miniatura se llama `.frasquito` y no
+> `.mini` porque ese nombre ya estaba tomado por `.btn.mini` y `.field.mini`.
+> Una clase suelta con ese nombre les cambiaba la caja a las dos y rompía el
+> formulario de alta. Lo agarraron las pruebas.
+
 ## La apertura
 
 Al abrirla se dibuja el frasco, sube un vapor y entra la app: menos de un
@@ -426,6 +464,6 @@ Ideas anotadas para las próximas vueltas:
   que grita seguido se aprende a ignorar, y todavía no está claro que una sola
   regla angosta justifique la pantalla.
 
-- Foto del frasco en cada ficha.
+- Una galería: hoy la foto es una sola por perfume y cuadrada.
 - Lista de deseados con precio objetivo.
 - Dividir un frasco en decants y seguirlos por separado.
