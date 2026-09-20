@@ -859,6 +859,83 @@ const check = (n, c, d = '') => {
   check('borra todo', d.perfumes.length === 0 && d.usos.length === 0);
   check('y vuelve al estado inicial', /Todav[íi]a no cargaste/.test(await p.textContent('#respuesta')));
 
+  console.log('\nT · Miniatura y foto del frasco');
+  /* se vuelve a cargar la colección: la sección anterior borra todo */
+  await p.evaluate(() => localStorage.removeItem('perfumario_v1'));
+  await p.reload(); await p.waitForTimeout(1500);
+  await ir('coleccion');
+
+  const filas = await cuantos('#view-coleccion .pf');
+  check('cada perfume de la lista muestra un frasco',
+    await cuantos('#view-coleccion .pf .frasquito svg.frasco') === filas,
+    `${await cuantos('#view-coleccion .pf .frasquito svg.frasco')} de ${filas}`);
+  check('la respuesta de Hoy también',
+    await cuantos('#respuesta .hero .frasquito svg.frasco') === 1);
+
+  /* el dibujo no es decorativo: el líquido sube o baja con lo que queda.
+     Se comparan dos frascos de la misma colección, uno lleno y otro casi
+     vacío, mirando dónde empieza el rectángulo del líquido. */
+  const nivel = await p.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    st.perfumes[0].mlRestante = st.perfumes[0].ml;          // lleno
+    st.perfumes[1].mlRestante = st.perfumes[1].ml * 0.1;    // casi vacío
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+    return [st.perfumes[0].id, st.perfumes[1].id];
+  });
+  await p.reload(); await p.waitForTimeout(1500);
+  await ir('coleccion');
+  const yDe = id => p.evaluate(i => {
+    const fila = document.querySelector(`#view-coleccion [data-ficha="${i}"]`);
+    return parseFloat(fila.querySelector('.frasquito rect[clip-path]').getAttribute('y'));
+  }, id);
+  const yLleno = await yDe(nivel[0]), yVacio = await yDe(nivel[1]);
+  check('el frasco se dibuja lleno hasta donde queda', yVacio > yLleno + 30,
+    `lleno y=${yLleno} · casi vacío y=${yVacio}`);
+
+  /* la foto propia: se sube una imagen, se achica y reemplaza al dibujo */
+  const jpg = Buffer.from(await p.evaluate(async () => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 900;                 // grande, como sale de una cámara
+    const g = c.getContext('2d');
+    g.fillStyle = '#123456'; g.fillRect(0, 0, 900, 900);
+    g.fillStyle = '#ffcc00'; g.fillRect(200, 200, 500, 500);
+    const b64 = c.toDataURL('image/jpeg', 0.95).split(',')[1];
+    return b64;
+  }), 'base64');
+  const tmp = path.join(require('os').tmpdir(), 'frasco-prueba.jpg');
+  require('fs').writeFileSync(tmp, jpg);
+
+  await p.tap(`#view-coleccion [data-ficha="${nivel[0]}"]`);
+  await p.waitForTimeout(300);
+  check('la ficha ofrece sacar la foto', await visible('label[for="fFoto"]'));
+  await p.setInputFiles('#fFoto', tmp);
+  await p.waitForTimeout(900);
+
+  const guardada = await p.evaluate(id => {
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    const x = st.perfumes.find(y => y.id === id);
+    return x && x.foto ? { largo: x.foto.length, tipo: x.foto.slice(0, 22) } : null;
+  }, nivel[0]);
+  check('la foto queda guardada', !!guardada && guardada.tipo.startsWith('data:image/jpeg'));
+  /* el archivo original pesa cientos de KB: si se guardara tal cual, treinta
+     fotos no entran en localStorage */
+  check('y se guarda achicada, no como salió de la cámara',
+    !!guardada && guardada.largo < 60000 && guardada.largo * 3 < jpg.length * 4,
+    guardada ? `${Math.round(guardada.largo / 1024)} KB guardados vs ${Math.round(jpg.length / 1024)} KB del archivo` : 'sin foto');
+  check('y reemplaza al dibujo en la ficha',
+    await cuantos('#modalBody .frasquito img') === 1 &&
+    await cuantos('#modalBody .frasquito svg.frasco') === 0);
+
+  await p.tap('[data-quitar-foto]'); await p.waitForTimeout(400);
+  check('se puede quitar y vuelve el dibujo',
+    await cuantos('#modalBody .frasquito svg.frasco') === 1 &&
+    await p.evaluate(id => {
+      const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+      return !st.perfumes.find(y => y.id === id).foto;
+    }, nivel[0]));
+  await p.tap('#modal [data-close]').catch(() => {});
+  await p.waitForTimeout(200);
+
   console.log('\nS · Sin errores');
   check('la consola quedó limpia', errs.length === 0, errs.slice(0, 3).join(' | '));
 

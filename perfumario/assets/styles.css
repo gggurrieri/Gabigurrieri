@@ -253,11 +253,27 @@ button.item{width:100%;text-align:left;cursor:pointer;font:inherit}
   padding:12px;cursor:pointer;color:var(--txt);
 }
 .pf:active{background:var(--card-2)}
-.pf-mark{
-  width:44px;height:56px;border-radius:9px;flex:none;
-  display:flex;align-items:center;justify-content:center;font-size:20px;
+/* La miniatura: frasco dibujado o foto propia, siempre en el mismo hueco.
+   No se llama .mini porque ese nombre ya estaba tomado por .btn.mini y
+   .field.mini: una clase suelta con ese nombre les cambia la caja a los dos. */
+.frasquito{
+  border-radius:9px;flex:none;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
   background:var(--card-2);border:1px solid var(--line);
 }
+.frasquito img{width:100%;height:100%;object-fit:cover;display:block}
+.frasquito .frasco{width:100%;height:100%;display:block}
+.pf-mark{width:44px;height:56px}
+.frasquito-g{width:78px;height:98px}
+.frasquito-h{width:56px;height:72px}
+.hero-cab{display:flex;gap:13px;align-items:flex-start}
+.hero-titulos{flex:1;min-width:0}
+
+.ficha-top{display:flex;gap:14px;align-items:flex-start}
+.ficha-top .sub{margin:0}
+.foto-acc{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.btn-chico{padding:6px 11px;font-size:12px;border-radius:9px;display:inline-block;text-align:center}
+.hint-foto{margin-top:8px;font-size:11.5px}
 .pf-main{flex:1;min-width:0}
 .pf-name{font-weight:600;font-size:15px;line-height:1.25}
 .pf-house{color:var(--muted);font-size:12.5px}
