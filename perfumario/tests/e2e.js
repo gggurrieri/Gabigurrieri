@@ -93,6 +93,20 @@ const check = (n, c, d = '') => {
       .map(x => x.nombre));
   check('y ninguno entra sin pirámide', sinNotas.length === 0, sinNotas.join(', '));
 
+  /* candado: las fotos que vienen en el build van achicadas a 256 px. Una sola
+     foto de cámara sin achicar (3 MB) llena media cuota de localStorage y deja
+     la colección sin poder guardarse en el teléfono. */
+  const fotos = await p.evaluate(() =>
+    ((window.PERFUMARIO_COLECCION || { perfumes: [] }).perfumes || [])
+      .filter(x => x.foto)
+      .map(x => ({ nombre: x.nombre, kb: Math.round(x.foto.length / 1024) })));
+  const gordas = fotos.filter(x => x.kb > 40);
+  check('ninguna foto del build pesa más de 40 KB',
+    gordas.length === 0, gordas.map(x => `${x.nombre} ${x.kb} KB`).join(', '));
+  const totalKb = fotos.reduce((a, x) => a + x.kb, 0);
+  check('y todas juntas entran holgadas en el navegador',
+    totalKb < 700, `${totalKb} KB en ${fotos.length} fotos`);
+
   // la apertura no puede quedar tapando la app: se va sola y nunca intercepta
   const apertura = await p.evaluate(() => {
     const sp = document.getElementById('splash');
@@ -865,22 +879,25 @@ const check = (n, c, d = '') => {
   await p.reload(); await p.waitForTimeout(1500);
   await ir('coleccion');
 
+  /* cada fila muestra algo: la foto propia si la hay, el dibujo si no. Se
+     cuentan las dos formas, porque parte de la colección ya viene con foto. */
   const filas = await cuantos('#view-coleccion .pf');
-  check('cada perfume de la lista muestra un frasco',
-    await cuantos('#view-coleccion .pf .frasquito svg.frasco') === filas,
-    `${await cuantos('#view-coleccion .pf .frasquito svg.frasco')} de ${filas}`);
+  const conAlgo = await cuantos('#view-coleccion .pf .frasquito > svg.frasco, #view-coleccion .pf .frasquito > img');
+  check('cada perfume de la lista muestra un frasco', conAlgo === filas, `${conAlgo} de ${filas}`);
   check('la respuesta de Hoy también',
-    await cuantos('#respuesta .hero .frasquito svg.frasco') === 1);
+    await cuantos('#respuesta .hero .frasquito > svg.frasco, #respuesta .hero .frasquito > img') === 1);
 
   /* el dibujo no es decorativo: el líquido sube o baja con lo que queda.
      Se comparan dos frascos de la misma colección, uno lleno y otro casi
      vacío, mirando dónde empieza el rectángulo del líquido. */
   const nivel = await p.evaluate(() => {
     const st = JSON.parse(localStorage.getItem('perfumario_v1'));
-    st.perfumes[0].mlRestante = st.perfumes[0].ml;          // lleno
-    st.perfumes[1].mlRestante = st.perfumes[1].ml * 0.1;    // casi vacío
+    // tienen que ser dos SIN foto: los que tienen foto no dibujan el líquido
+    const sinFoto = st.perfumes.filter(x => !x.foto && x.ml > 0);
+    sinFoto[0].mlRestante = sinFoto[0].ml;          // lleno
+    sinFoto[1].mlRestante = sinFoto[1].ml * 0.1;    // casi vacío
     localStorage.setItem('perfumario_v1', JSON.stringify(st));
-    return [st.perfumes[0].id, st.perfumes[1].id];
+    return [sinFoto[0].id, sinFoto[1].id];
   });
   await p.reload(); await p.waitForTimeout(1500);
   await ir('coleccion');
@@ -905,6 +922,7 @@ const check = (n, c, d = '') => {
   const tmp = path.join(require('os').tmpdir(), 'frasco-prueba.jpg');
   require('fs').writeFileSync(tmp, jpg);
 
+  await p.fill('#busca', ''); await p.waitForTimeout(300);
   await p.tap(`#view-coleccion [data-ficha="${nivel[0]}"]`);
   await p.waitForTimeout(300);
   check('la ficha ofrece sacar la foto', await visible('label[for="fFoto"]'));
