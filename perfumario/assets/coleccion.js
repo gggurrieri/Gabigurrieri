@@ -1015,9 +1015,9 @@ window.PERFUMARIO_COLECCION = {
     {
       "id": "col026",
       "creado": "2026-09-17",
-      "nombre": "Oud Wood (tipo)",
-      "casa": "Inspirado en Tom Ford — muestra",
-      "conc": "",
+      "nombre": "Oud Wood",
+      "casa": "Tom Ford",
+      "conc": "EDP",
       "familia": "amaderada",
       "salida": [
         "Cardamomo"
