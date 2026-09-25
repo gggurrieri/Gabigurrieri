@@ -367,30 +367,50 @@ ocasiones, duración y estela.
 
 ### Qué tan bien anda, medido
 
-Sobre diez fotos reales de la colección, con el lector de verdad:
+Sobre diez fotos reales de la colección, con el lector de verdad, contando
+**solo identificaciones correctas** (no cuenta como acierto que no encuentre
+nada):
 
-| | Resultado correcto |
+| | Identifica |
 |---|---|
-| Primera versión | 2 de 10 |
-| Descartando el nombre contenido en otro | **4 de 10** |
-| Además preparando la imagen (gris + contraste + más grande) | 4 de 10 |
+| Una pasada sobre el frasco entero | 2 de 10 |
+| **Dos pasadas: entero y centro agrandado** | **3 de 10** |
 
-Dos cosas que deja ese número:
+Y todo lo que se probó y **no** sirvió, para que no se vuelva a proponer:
 
-- **El cuello de botella es el lector, no la búsqueda.** En seis de las diez
-  fotos Tesseract no sacó ni una palabra útil: está hecho para documentos
-  planos y de alto contraste, y un frasco de vidrio o cromado con letras
-  grabadas no se le parece en nada. La foto del Kenzo Power cromado devolvió
-  `"fad mi | spares BTS SE mete ;"`.
-- **El preprocesado de imagen no sirvió.** Pasar a gris, estirar el contraste y
-  escalar a 1600 px dio exactamente el mismo resultado que no hacer nada, así
-  que no está en el código: complejidad sin ganancia.
+| Idea | Resultado |
+|---|---|
+| Preparar la imagen: gris + contraste estirado | Sin cambio |
+| Subir la resolución de 1100 a 2000 px | Sin cambio |
+| Modos de segmentación 6, 11 y 12 en vez del 3 | Peor: más basura que diluye la búsqueda |
+| Buscar también en la colección propia, no solo en el catálogo | Sin cambio |
+| Recortar al 40 % en vez del 60 % | Sin cambio sobre el 60 % |
 
-El cambio que sí sirvió fue de búsqueda, no de imagen: **si un nombre del
-catálogo está contenido en otro más largo que también pegó, el corto se
-descarta**. Leer "EROS FLAME" hacía pegar a *Eros Flame* y a *Eros* con puntajes
-casi iguales, y la app prefería no decidir. Lo mismo con *L'Eau d'Issey Pour
-Homme*, que contiene a *Pour Homme* y a *Homme*.
+**El cuello de botella es el lector, no la búsqueda.** Tesseract está hecho para
+documentos planos y de alto contraste; un frasco de vidrio o cromado con letras
+grabadas no se le parece en nada. La foto del Kenzo Power devolvió
+`"fad mi | spares BTS SE mete ;"`.
+
+Los dos únicos cambios que movieron algo:
+
+1. **Descartar el nombre contenido en otro.** Leer "EROS FLAME" hacía pegar a
+   *Eros Flame* y a *Eros* con puntajes casi iguales y la app prefería no
+   decidir. Lo mismo con *L'Eau d'Issey Pour Homme*, que contiene a *Pour
+   Homme* y a *Homme*.
+2. **Una segunda pasada con el centro de la foto agrandado**, que es lo mismo
+   que haberla sacado más de cerca. El Insensé Ultramarine entero no devolvía
+   una letra; con el centro al 60 % devuelve `INSENSE ULTRAMARINE` limpio.
+
+Esa segunda observación es la que importa para usarla: **el problema es que el
+nombre ocupa poco del cuadro.** Una foto de cerca de la etiqueta sola anda
+mucho mejor que una del frasco entero sobre la mesa.
+
+Para pasar de 3 sobre 10 a algo parecido a lo que uno espera haría falta un
+lector de imágenes en la nube (Google Vision, Textract, un modelo con visión).
+Leen vidrio curvo sin problema, pero piden una clave de API, y un sitio
+estático no puede guardar una clave: cualquiera la lee del código y la usa. Eso
+significa poner un servidor intermedio y pagar por consulta. Es una decisión de
+arquitectura y de plata, no un ajuste.
 
 ### Cómo está armado para fallar bien
 

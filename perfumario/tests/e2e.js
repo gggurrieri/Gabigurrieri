@@ -1014,6 +1014,45 @@ const check = (n, c, d = '') => {
   await p.tap('#zonaIdent .chip'); await p.waitForTimeout(300);
   check('y completa con la que elijas', (await campos()).nombre.length > 0);
 
+  /* candado: si la primera lectura no decide, tiene que haber una segunda con
+     el centro agrandado. Es lo mismo que sacar la foto más de cerca, y es el
+     único ajuste que movió el acierto medido sobre fotos reales. */
+  await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+  await ir('coleccion');
+  await p.tap('#btnNuevo'); await p.waitForTimeout(300);
+  await p.evaluate(() => {
+    window.__pasadas = 0;
+    window.Tesseract = { recognize: () => {
+      window.__pasadas++;
+      return Promise.resolve({ data: { text: window.__pasadas === 1
+        ? 'ae | gpk ~~ ##'                       // primera: ilegible
+        : 'GIVENCHY INSENSE ULTRAMARINE 100 ml'  // segunda, de cerca: se lee
+      } });
+    } };
+  });
+  await p.setInputFiles('#fFotoIdent', tmp);
+  await p.waitForTimeout(1600);
+  f = await campos();
+  check('si la primera lectura falla, prueba de nuevo más de cerca',
+    (await p.evaluate(() => window.__pasadas)) === 2, 'pasadas: ' + await p.evaluate(() => window.__pasadas));
+  check('y con la segunda lo reconoce', f.nombre === 'Insensé Ultramarine', f.nombre);
+
+  /* y al revés: si la primera decide, no gasta una segunda lectura */
+  await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+  await ir('coleccion');
+  await p.tap('#btnNuevo'); await p.waitForTimeout(300);
+  await p.evaluate(() => {
+    window.__pasadas = 0;
+    window.Tesseract = { recognize: () => {
+      window.__pasadas++;
+      return Promise.resolve({ data: { text: "HERMES TERRE D'HERMES EAU DE TOILETTE 100 ml" } });
+    } };
+  });
+  await p.setInputFiles('#fFotoIdent', tmp);
+  await p.waitForTimeout(1400);
+  check('si la primera alcanza, no hace la segunda',
+    (await p.evaluate(() => window.__pasadas)) === 1, 'pasadas: ' + await p.evaluate(() => window.__pasadas));
+
   /* algo que no está en el catálogo: igual sirve lo que se pueda leer */
   await conEtiqueta('PERFUMERIA ARTESANAL\nLOTE 42\nEAU DE PARFUM\n30 ml');
   f = await campos();
