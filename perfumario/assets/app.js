@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-09-25.1';
+const VERSION = '2026-09-25.2';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -1402,20 +1402,33 @@ function miniatura(p, clase) {
 const FOTO_LADO = 256;
 const FOTO_CALIDAD = 0.72;
 
-function achicarFoto(file) {
+/* Para guardar alcanza un cuadrado de 256. Para LEER la etiqueta no: a 256 px
+   el nombre del perfume son cuatro píxeles de alto y no lo lee nadie. Por eso
+   el lado es un parámetro, y quien lee el texto pide una versión grande y sin
+   recortar, que es otra imagen del mismo archivo. */
+function achicarFoto(file, lado, recuadrar) {
+  const meta = lado || FOTO_LADO;
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
       URL.revokeObjectURL(url);
       try {
-        // recorte cuadrado centrado: el frasco casi siempre está en el medio
-        const lado = Math.min(img.width, img.height);
         const cv = document.createElement('canvas');
-        cv.width = cv.height = FOTO_LADO;
         const g = cv.getContext('2d');
-        g.drawImage(img, (img.width - lado) / 2, (img.height - lado) / 2, lado, lado,
-                    0, 0, FOTO_LADO, FOTO_LADO);
+        if (recuadrar === false) {
+          // entera, solo escalada: recortar acá se come la mitad de la etiqueta
+          const escala = Math.min(1, meta / Math.max(img.width, img.height));
+          cv.width = Math.round(img.width * escala);
+          cv.height = Math.round(img.height * escala);
+          g.drawImage(img, 0, 0, cv.width, cv.height);
+        } else {
+          // recorte cuadrado centrado: el frasco casi siempre está en el medio
+          const corte = Math.min(img.width, img.height);
+          cv.width = cv.height = meta;
+          g.drawImage(img, (img.width - corte) / 2, (img.height - corte) / 2, corte, corte,
+                      0, 0, meta, meta);
+        }
         resolve(cv.toDataURL('image/jpeg', FOTO_CALIDAD));
       } catch (e) { reject(e); }
     };
@@ -1582,8 +1595,12 @@ function abrirFormulario(id) {
       <datalist id="dlNotas">${D.NOTAS.map(n => `<option value="${esc(n.n)}"></option>`).join('')}</datalist>
 
       <div class="btn-row" style="margin:-4px 0 12px">
+        <label class="btn mini" for="fFotoIdent">📷 Leer de una foto</label>
+        <input type="file" id="fFotoIdent" accept="image/*" hidden>
         <button type="button" class="btn mini" id="btnPegarPiramide">📋 Pegar la pirámide</button>
       </div>
+      <p class="hint" style="margin:-8px 0 12px">Leer de una foto funciona con la <b>caja</b> o una etiqueta de papel, de frente y con buena luz. Sobre vidrio o cromado casi nunca puede: ahí cargalo a mano.</p>
+      <div id="zonaIdent" class="ident" hidden></div>
       <div id="zonaPiramide" hidden>
         <label class="field"><span>Pegá las notas como vengan</span>
           <textarea id="textoPiramide" style="min-height:110px" placeholder="Notas de salida: bergamota, pimienta rosa&#10;Corazón: lavanda, geranio&#10;Fondo: ambroxan, cedro"></textarea></label>
@@ -1666,21 +1683,92 @@ function abrirFormulario(id) {
   if (cat) cat.addEventListener('change', () => {
     const elegido = D.CATALOGO.find(c => `${c.casa} · ${c.nombre}` === cat.value);
     if (!elegido) return;
-    $('#fNombre').value = elegido.nombre;
-    $('#fCasa').value = elegido.casa;
-    $('#fConc').value = elegido.conc;
-    $('#fFamilia').value = elegido.familia;
-    $('#fSalida').value = elegido.salida.join(', ');
-    $('#fCorazon').value = elegido.corazon.join(', ');
-    $('#fFondo').value = elegido.fondo.join(', ');
-    $('#fLong').value = elegido.longevidad;
-    $('#fEstela').value = elegido.estela;
-    $$('#gEstaciones .chip').forEach(x =>
-      x.classList.toggle('on', elegido.estaciones.map(claveEstacion).includes(x.dataset.val)));
-    $$('#gOcasiones .chip').forEach(x =>
-      x.classList.toggle('on', elegido.ocasiones.includes(x.dataset.val)));
-    $$('#gMomento .chip').forEach(x => x.classList.toggle('on', x.dataset.val === elegido.momento));
+    completarDesdeCatalogo(elegido);
     toast('Campos completados: revisalos y ajustá lo que quieras');
+  });
+
+  /* ----- leer la etiqueta de una foto -----
+     La foto se guarda igual, reconozca o no: aunque el texto no se lea, tener
+     el frasco en la ficha ya sirve. */
+  let fotoDelAlta = null;
+  const zona = $('#zonaIdent');
+  const pintar = html => { zona.innerHTML = html; zona.hidden = false; };
+
+  $('#fFotoIdent').addEventListener('change', e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    pintar('<p class="hint">Preparando la foto…</p>');
+
+    Promise.all([
+      achicarFoto(file, FOTO_LADO, true),          // la que se guarda
+      achicarFoto(file, OCR_LADO, false)           // la que se lee: entera y grande
+    ]).then(([chica, grande]) => {
+      fotoDelAlta = chica;
+      pintar(`<div class="ident-fila">${miniatura({ foto: chica, nombre: 'nuevo' }, 'frasquito-g')}
+        <p class="hint" id="identPaso">Bajando el lector de texto…<br>La primera vez tarda: son unos megabytes.</p></div>`);
+      return leerEtiqueta(grande, pct => {
+        const el = $('#identPaso');
+        if (el) el.textContent = `Leyendo la etiqueta… ${pct} %`;
+      });
+    }).then(texto => {
+      const r = identificarEtiqueta(texto);
+      mostrarIdent(r, fotoDelAlta);
+    }).catch(err => {
+      const sinRed = /conexión|cargó vacío|Failed to fetch|NetworkError/i.test(err.message || '');
+      pintar(`<p class="hint">${sinRed
+        ? 'No se pudo bajar el lector de texto. Necesita internet la primera vez. La foto quedó guardada igual: completá el resto a mano.'
+        : 'No se pudo leer esa imagen. La foto quedó guardada igual.'}</p>`);
+    });
+  });
+
+  function mostrarIdent(r, foto) {
+    const extra = r.datos;
+    const leido = extra.ml || extra.conc
+      ? `<p class="hint">De la etiqueta saqué también:${extra.ml ? ' <b>' + extra.ml + ' ml</b>' : ''}${extra.conc ? ' <b>' + extra.conc + '</b>' : ''}.</p>` : '';
+
+    if (r.seguro) {
+      const g = r.candidatos[0];
+      completarDesdeCatalogo(g.c, extra);
+      pintar(`<div class="ident-fila">${miniatura({ foto, nombre: g.c.nombre }, 'frasquito-g')}
+        <div><p class="ident-ok">Lo reconocí: <b>${esc(g.c.nombre)}</b>, de ${esc(g.c.casa)}.</p>
+        <p class="hint">Completé familia, notas, estaciones y ocasiones. Revisalo abajo: si no es este, elegí otro o corregí a mano.</p>
+        ${leido}</div></div>
+        <div class="chips">${r.candidatos.slice(1).map((x, i) =>
+          `<button type="button" class="chip" data-ident="${i + 1}">No, es ${esc(x.c.nombre)}</button>`).join('')}</div>
+        ${bloqueTexto(r.texto)}`);
+    } else if (r.candidatos.length) {
+      pintar(`<div class="ident-fila">${miniatura({ foto, nombre: 'nuevo' }, 'frasquito-g')}
+        <div><p class="ident-ok">Leí la etiqueta pero no estoy seguro. ¿Es alguno de estos?</p>${leido}</div></div>
+        <div class="chips">${r.candidatos.map((x, i) =>
+          `<button type="button" class="chip" data-ident="${i}">${esc(x.c.casa)} · ${esc(x.c.nombre)}</button>`).join('')}</div>
+        ${bloqueTexto(r.texto)}`);
+    } else {
+      if (extra.ml) { $('#fMl').value = extra.ml; $('#fMlRest').value = extra.ml; }
+      if (extra.conc) $('#fConc').value = extra.conc;
+      pintar(`<div class="ident-fila">${miniatura({ foto, nombre: 'nuevo' }, 'frasquito-g')}
+        <div><p class="ident-ok">No encontré este perfume en el catálogo.</p>
+        <p class="hint">La foto quedó guardada. Escribí el nombre vos, o pegá la pirámide.</p>${leido}</div></div>
+        ${bloqueTexto(r.texto)}`);
+    }
+    zona.identCandidatos = r.candidatos;
+    zona.identExtra = extra;
+  }
+
+  /* El texto crudo siempre a la vista: si eligió mal, ver qué leyó explica por
+     qué, y si no reconoció nada sirve para copiar el nombre a mano. */
+  const bloqueTexto = txt => txt
+    ? `<details class="ident-crudo"><summary>Ver lo que leyó (${txt.replace(/\s+/g, ' ').trim().length} caracteres)</summary><pre>${esc(txt.trim())}</pre></details>`
+    : '<p class="hint">No llegó a leer ninguna letra. Probá con la caja, o más cerca y con mejor luz.</p>';
+
+  zona.addEventListener('click', e => {
+    const b = e.target.closest('[data-ident]');
+    if (!b) return;
+    const el = (zona.identCandidatos || [])[+b.dataset.ident];
+    if (!el) return;
+    completarDesdeCatalogo(el.c, zona.identExtra || {});
+    toast(`Completado con ${el.c.nombre}`);
+    $$('#zonaIdent .chip').forEach(c => c.classList.remove('on'));
+    b.classList.add('on');
   });
 
   $('#formPf').addEventListener('submit', e => {
@@ -1707,11 +1795,142 @@ function abrirFormulario(id) {
       rating: clamp(num($('#fRating').value, 0), 0, 5),
       nota: $('#fNota').value.trim()
     };
+    /* solo si sacó una foto en este alta: si no, no se toca la que ya tenga */
+    if (fotoDelAlta) datos.foto = fotoDelAlta;
     if (p) Object.assign(p, datos);
     else S.perfumes.push(Object.assign({ id: uid(), creado: today() }, datos));
     guardar(); cerrarModal(); render();
     toast(p ? 'Cambios guardados' : `${datos.nombre} entró a la colección`);
   });
+}
+
+/* Vuelca una ficha del catálogo sobre el formulario abierto. La usan el
+   buscador del catálogo y el reconocimiento por foto: son dos maneras de
+   llegar al mismo perfume, y tienen que dejar los mismos campos. */
+function completarDesdeCatalogo(c, extra) {
+  $('#fNombre').value = c.nombre;
+  $('#fCasa').value = c.casa;
+  $('#fConc').value = (extra && extra.conc) || c.conc;
+  $('#fFamilia').value = c.familia;
+  $('#fSalida').value = c.salida.join(', ');
+  $('#fCorazon').value = c.corazon.join(', ');
+  $('#fFondo').value = c.fondo.join(', ');
+  $('#fLong').value = c.longevidad;
+  $('#fEstela').value = c.estela;
+  if (extra && extra.ml) { $('#fMl').value = extra.ml; $('#fMlRest').value = extra.ml; }
+  $$('#gEstaciones .chip').forEach(x =>
+    x.classList.toggle('on', c.estaciones.map(claveEstacion).includes(x.dataset.val)));
+  $$('#gOcasiones .chip').forEach(x =>
+    x.classList.toggle('on', c.ocasiones.includes(x.dataset.val)));
+  $$('#gMomento .chip').forEach(x => x.classList.toggle('on', x.dataset.val === c.momento));
+}
+
+/* ------------------ reconocer desde una foto -----------------------
+   Lo que NO hace: reconocer el perfume por la forma del frasco. Eso pide un
+   modelo entrenado con fotos de perfumes etiquetadas, que no existe público, y
+   la app no tiene servidor donde correrlo.
+
+   Lo que sí hace: leer el TEXTO de la etiqueta o de la caja y buscarlo en el
+   catálogo. Con una caja de cartón anda bien; con vidrio transparente y letras
+   grabadas, mal. Por eso el resultado siempre se muestra para confirmar, nunca
+   se aplica solo, y el texto leído queda a la vista para corregir a mano.
+
+   El lector de texto (Tesseract) se baja de un CDN la primera vez que se usa y
+   pesa unos megabytes: no entra en el build ni se precarga, porque quien nunca
+   toque este botón no tiene por qué pagar esa descarga. Sin conexión, la
+   función avisa y el alta sigue a mano. */
+const OCR_URL = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js';
+const OCR_LADO = 1100;
+let ocrBajando = null;
+
+function cargarOCR() {
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+  if (ocrBajando) return ocrBajando;
+  ocrBajando = new Promise((ok, mal) => {
+    const sc = document.createElement('script');
+    sc.src = OCR_URL;
+    sc.onload = () => (window.Tesseract ? ok(window.Tesseract) : mal(new Error('cargó vacío')));
+    sc.onerror = () => mal(new Error('sin conexión'));
+    document.head.appendChild(sc);
+  });
+  // si falla se olvida, así el segundo intento vuelve a probar
+  ocrBajando.catch(() => { ocrBajando = null; });
+  return ocrBajando;
+}
+
+function leerEtiqueta(dataUrl, avisar) {
+  return cargarOCR().then(T => T.recognize(dataUrl, 'eng', {
+    logger: m => { if (m.status === 'recognizing text' && avisar) avisar(Math.round(m.progress * 100)); }
+  })).then(r => (r && r.data && r.data.text) || '');
+}
+
+/* Datos que se sacan del texto sin depender de reconocer el perfume: el tamaño
+   y la concentración están impresos con todas las letras en casi toda caja.
+   Van sobre el texto crudo porque normaliza() justamente borra "EDT" y "EDP". */
+function datosDeEtiqueta(crudo) {
+  const t = String(crudo || '');
+  const d = {};
+  const ml = t.match(/(\d{1,3})\s*m\s*l\b/i);
+  if (ml) { const n = +ml[1]; if (n >= 2 && n <= 500) d.ml = n; }
+  if (/eau\s*de\s*parfum|\bedp\b/i.test(t)) d.conc = 'EDP';
+  else if (/eau\s*de\s*toilette|\bedt\b/i.test(t)) d.conc = 'EDT';
+  else if (/eau\s*de\s*cologne|\bedc\b/i.test(t)) d.conc = 'EDC';
+  else if (/\bparfum\b|\bextrait\b/i.test(t)) d.conc = 'Parfum';
+  return d;
+}
+
+/* Puntúa cada perfume del catálogo contra el texto leído.
+
+   La comparación es por palabras enteras, no por "contiene": "Homme" está
+   adentro de "L'Eau d'Issey Pour Homme" y de "Kenzo Homme Night", y un
+   contains suelto los confunde a los tres. */
+const contienePalabras = (texto, frase) => (' ' + texto + ' ').indexOf(' ' + frase + ' ') >= 0;
+
+function identificarEtiqueta(crudo) {
+  const t = normaliza(crudo);
+  const datos = datosDeEtiqueta(crudo);
+  if (!t) return { candidatos: [], datos, texto: String(crudo || '').trim() };
+
+  const sueltas = new Set(t.split(' ').filter(w => w.length >= 3));
+  let candidatos = D.CATALOGO.map(c => {
+    const nom = normaliza(c.nombre), casa = normaliza(c.casa);
+    let score = 0, porQue = '';
+
+    if (nom.length >= 4 && contienePalabras(t, nom)) {
+      // el nombre completo y en orden: la señal más fuerte, y más si es largo
+      score += 62 + Math.min(nom.length, 18);
+      porQue = 'nombre';
+    } else {
+      const partes = nom.split(' ').filter(w => w.length >= 3);
+      const pegan = partes.filter(w => sueltas.has(w)).length;
+      // media palabra suelta no alcanza: se exige más de la mitad del nombre
+      if (partes.length && pegan / partes.length > 0.5) {
+        score += (pegan / partes.length) * 38;
+        porQue = 'parte del nombre';
+      }
+    }
+    if (casa.length >= 3 && contienePalabras(t, casa)) {
+      score += 34;
+      porQue = porQue ? porQue + ' y casa' : 'casa';
+    }
+    return { c, score, porQue, nom };
+  }).filter(x => x.score >= 34).sort((a, b) => b.score - a.score);
+
+  /* Si un nombre está contenido en otro más largo que también pegó, el corto
+     sobra: leer "EROS FLAME" hace pegar a Eros Flame y a Eros, y quedaban
+     empatados lo bastante como para no decidir. Medido sobre fotos reales,
+     descartar el contenido lleva el acierto de 2 a 4 sobre 10. */
+  candidatos = candidatos.filter(x =>
+    !candidatos.some(o => o !== x && o.nom.length > x.nom.length && contienePalabras(o.nom, x.nom)));
+  candidatos = candidatos.slice(0, 4);
+
+  /* Seguro = el primero saca buen puntaje Y le lleva distancia al segundo. Dos
+     perfumes casi empatados son dos perfumes para elegir a mano, no uno para
+     dar por bueno. */
+  const seguro = candidatos.length > 0 && candidatos[0].score >= 70 &&
+    (candidatos.length === 1 || candidatos[0].score - candidatos[1].score >= 20);
+
+  return { candidatos, seguro, datos, texto: String(crudo || '').trim() };
 }
 
 /* --------------------- pegar una pirámide -------------------------

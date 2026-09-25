@@ -266,6 +266,25 @@ button.item{width:100%;text-align:left;cursor:pointer;font:inherit}
 .pf-mark{width:44px;height:56px}
 .frasquito-g{width:78px;height:98px}
 .frasquito-h{width:56px;height:72px}
+
+/* lo que devuelve leer la etiqueta de una foto */
+.ident{
+  background:var(--card-2);border:1px solid var(--line);border-radius:var(--radius);
+  padding:12px;margin:-4px 0 12px;
+}
+.ident-fila{display:flex;gap:12px;align-items:flex-start}
+.ident-fila > div{flex:1;min-width:0}
+.ident-ok{margin:0 0 6px;font-size:13.5px;line-height:1.35}
+.ident .hint{margin:0}
+.ident .chips{margin-top:10px}
+.ident-crudo{margin-top:10px;font-size:12px;color:var(--muted)}
+.ident-crudo summary{cursor:pointer}
+.ident-crudo pre{
+  white-space:pre-wrap;word-break:break-word;margin:8px 0 0;
+  font-family:ui-monospace,monospace;font-size:11px;line-height:1.45;
+  background:var(--card);border:1px solid var(--line);border-radius:9px;padding:8px;
+  max-height:160px;overflow:auto;
+}
 .hero-cab{display:flex;gap:13px;align-items:flex-start}
 .hero-titulos{flex:1;min-width:0}
 

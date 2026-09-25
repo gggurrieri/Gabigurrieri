@@ -954,6 +954,104 @@ const check = (n, c, d = '') => {
   await p.tap('#modal [data-close]').catch(() => {});
   await p.waitForTimeout(200);
 
+  console.log('\nU · Leer la etiqueta de una foto');
+  /* El lector de texto se baja de un CDN y tarda segundos: acá se reemplaza por
+     uno falso que devuelve el texto que uno quiera. Lo que se prueba es lo que
+     escribimos nosotros —cómo se busca ese texto en el catálogo y qué se
+     completa—, no si Tesseract sabe leer. */
+  const conEtiqueta = async texto => {
+    await p.evaluate(() => { const m = document.querySelector('#modal'); if (m && !m.hidden) { m.hidden = true; } });
+    await ir('coleccion');
+    await p.tap('#btnNuevo'); await p.waitForTimeout(300);
+    await p.evaluate(t => {
+      window.Tesseract = { recognize: () => Promise.resolve({ data: { text: t } }) };
+    }, texto);
+    await p.setInputFiles('#fFotoIdent', tmp);
+    await p.waitForTimeout(1200);
+  };
+  const campos = () => p.evaluate(() => ({
+    nombre: document.querySelector('#fNombre').value,
+    casa: document.querySelector('#fCasa').value,
+    conc: document.querySelector('#fConc').value,
+    familia: document.querySelector('#fFamilia').value,
+    salida: document.querySelector('#fSalida').value,
+    ml: document.querySelector('#fMl').value,
+    panel: (document.querySelector('#zonaIdent') || {}).textContent || '',
+    opciones: document.querySelectorAll('#zonaIdent .chip').length
+  }));
+
+  await conEtiqueta("HERMES\nTERRE D'HERMES\nEAU DE TOILETTE\n100 ml");
+  let f = await campos();
+  check('reconoce el perfume y lo completa solo',
+    f.nombre === 'Terre d’Hermès' && f.casa === 'Hermès' && f.familia === 'amaderada',
+    `${f.nombre} / ${f.casa} / ${f.familia}`);
+  check('trae las notas del catálogo, no solo el nombre', f.salida.length > 0, f.salida);
+  check('saca el tamaño y la concentración de la etiqueta',
+    f.ml === '100' && f.conc === 'EDT', `${f.ml} ml · ${f.conc}`);
+  check('y deja ver el texto que leyó', /Ver lo que leyó/.test(f.panel));
+
+  /* candado: "Homme" está adentro de media docena de nombres del catálogo. Con
+     un contains suelto, cualquier foto que diga "homme" caía en Kenzo Homme. */
+  await conEtiqueta("ISSEY MIYAKE\nL'EAU D'ISSEY POUR HOMME\nEAU DE TOILETTE\n125 ml");
+  f = await campos();
+  check('no confunde nombres que se contienen entre sí',
+    f.nombre === 'L’Eau d’Issey Pour Homme' && f.casa === 'Issey Miyake', `${f.casa} · ${f.nombre}`);
+
+  /* candado: "Eros" está adentro de "Eros Flame" y los dos pegan con la misma
+     foto. Descartar el nombre contenido en otro más largo es lo que hace que
+     esto se decida en vez de quedar en empate; medido sobre fotos reales,
+     lleva el acierto de 2 a 4 sobre 10. */
+  await conEtiqueta('VERSACE\nEROS FLAME\nEAU DE PARFUM\n100 ml');
+  f = await campos();
+  check('elige el nombre largo, no el que está contenido en él',
+    f.nombre === 'Eros Flame', f.nombre);
+
+  /* sin nombre legible, solo la casa: eso no alcanza para decidir */
+  await conEtiqueta('KENZO\nEAU DE PARFUM\n60 ML');
+  f = await campos();
+  check('con varios de la misma casa no elige: ofrece las opciones',
+    f.nombre === '' && f.opciones >= 2, `nombre "${f.nombre}", ${f.opciones} opciones`);
+  await p.tap('#zonaIdent .chip'); await p.waitForTimeout(300);
+  check('y completa con la que elijas', (await campos()).nombre.length > 0);
+
+  /* algo que no está en el catálogo: igual sirve lo que se pueda leer */
+  await conEtiqueta('PERFUMERIA ARTESANAL\nLOTE 42\nEAU DE PARFUM\n30 ml');
+  f = await campos();
+  check('si no lo encuentra, lo dice sin inventar nada',
+    f.nombre === '' && /no encontr/i.test(f.panel), f.panel.slice(0, 60));
+  check('pero igual aprovecha tamaño y concentración',
+    f.ml === '30' && f.conc === 'EDP', `${f.ml} ml · ${f.conc}`);
+
+  // la foto se guarda con el perfume aunque no se haya reconocido
+  await p.fill('#fNombre', 'Prueba de foto');
+  await p.tap('#formPf button[type="submit"]'); await p.waitForTimeout(500);
+  const guardado = await p.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    const x = st.perfumes.find(y => y.nombre === 'Prueba de foto');
+    return x ? { hay: !!x.foto, kb: Math.round((x.foto || '').length / 1024) } : null;
+  });
+  check('la foto del alta se guarda con el perfume nuevo',
+    !!guardado && guardado.hay && guardado.kb < 40, JSON.stringify(guardado));
+
+  // sin internet y sin lector: lo dice, y no rompe el alta
+  await p.evaluate(() => { delete window.Tesseract; });
+  await ir('coleccion');
+  await p.tap('#btnNuevo'); await p.waitForTimeout(300);
+  await p.evaluate(() => {
+    const s = document.createElement('script');
+    Object.defineProperty(HTMLScriptElement.prototype, 'src', {
+      set() { setTimeout(() => this.onerror && this.onerror(new Event('error')), 10); },
+      get() { return ''; }, configurable: true
+    });
+    return s;
+  });
+  await p.setInputFiles('#fFotoIdent', tmp);
+  await p.waitForTimeout(1200);
+  const sinRed = await campos();
+  check('sin conexión lo explica y no rompe el alta',
+    /no se pudo bajar el lector/i.test(sinRed.panel) &&
+    await visible('#formPf'), sinRed.panel.slice(0, 70));
+
   console.log('\nS · Sin errores');
   check('la consola quedó limpia', errs.length === 0, errs.slice(0, 3).join(' | '));
 
