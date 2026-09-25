@@ -353,6 +353,62 @@ Tres decisiones de producto detrás de esto:
 - **Se apaga.** Un interruptor en Ajustes lo desactiva y vuelve a las reglas
   fijas.
 
+## Leer la etiqueta de una foto
+
+En el alta hay un botón que saca una foto e intenta completar la ficha sola.
+Conviene saber qué hace y qué no, porque la diferencia es grande.
+
+**No reconoce el frasco.** Identificar un perfume por la forma de la botella
+pide un modelo entrenado con fotos de perfumes etiquetadas, que no existe
+público, y un lugar donde correrlo, que esta app no tiene. Lo que hace es
+**leer el texto** de la etiqueta con Tesseract y buscar ese texto en el
+catálogo de 77 perfumes. Si pega, vuelca familia, notas, estaciones,
+ocasiones, duración y estela.
+
+### Qué tan bien anda, medido
+
+Sobre diez fotos reales de la colección, con el lector de verdad:
+
+| | Resultado correcto |
+|---|---|
+| Primera versión | 2 de 10 |
+| Descartando el nombre contenido en otro | **4 de 10** |
+| Además preparando la imagen (gris + contraste + más grande) | 4 de 10 |
+
+Dos cosas que deja ese número:
+
+- **El cuello de botella es el lector, no la búsqueda.** En seis de las diez
+  fotos Tesseract no sacó ni una palabra útil: está hecho para documentos
+  planos y de alto contraste, y un frasco de vidrio o cromado con letras
+  grabadas no se le parece en nada. La foto del Kenzo Power cromado devolvió
+  `"fad mi | spares BTS SE mete ;"`.
+- **El preprocesado de imagen no sirvió.** Pasar a gris, estirar el contraste y
+  escalar a 1600 px dio exactamente el mismo resultado que no hacer nada, así
+  que no está en el código: complejidad sin ganancia.
+
+El cambio que sí sirvió fue de búsqueda, no de imagen: **si un nombre del
+catálogo está contenido en otro más largo que también pegó, el corto se
+descarta**. Leer "EROS FLAME" hacía pegar a *Eros Flame* y a *Eros* con puntajes
+casi iguales, y la app prefería no decidir. Lo mismo con *L'Eau d'Issey Pour
+Homme*, que contiene a *Pour Homme* y a *Homme*.
+
+### Cómo está armado para fallar bien
+
+Como acierta menos de la mitad de las veces, lo importante es qué pasa cuando no:
+
+- **Nunca aplica nada sin mostrarlo.** Si está seguro completa los campos y lo
+  dice; si duda, ofrece los candidatos como botones; si no encuentra nada, lo
+  dice sin inventar.
+- **El texto leído queda siempre a la vista**, plegado. Si eligió mal, ver qué
+  leyó explica por qué; si no reconoció nada, sirve para copiar el nombre.
+- **Tamaño y concentración se sacan igual**, aunque el perfume no esté en el
+  catálogo: "100 ml" y "EAU DE TOILETTE" están impresos con todas las letras en
+  casi cualquier caja y se leen bastante mejor que un nombre estilizado.
+- **La foto se guarda siempre**, reconozca o no.
+- **Sin internet lo dice y el alta sigue a mano.** El lector se baja de un CDN la
+  primera vez que se toca el botón, no viene en el build: son varios megabytes
+  y quien no use la función no tiene por qué pagarlos.
+
 ## Cargar las notas de un perfume
 
 En el formulario, **📋 Pegar la pirámide** acepta el texto de las notas como
