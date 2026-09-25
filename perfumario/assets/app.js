@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-09-25.2';
+const VERSION = '2026-09-25.3';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -1699,19 +1699,17 @@ function abrirFormulario(id) {
     if (!file) return;
     pintar('<p class="hint">Preparando la foto…</p>');
 
-    Promise.all([
-      achicarFoto(file, FOTO_LADO, true),          // la que se guarda
-      achicarFoto(file, OCR_LADO, false)           // la que se lee: entera y grande
-    ]).then(([chica, grande]) => {
+    achicarFoto(file, FOTO_LADO, true).then(chica => {
       fotoDelAlta = chica;
       pintar(`<div class="ident-fila">${miniatura({ foto: chica, nombre: 'nuevo' }, 'frasquito-g')}
         <p class="hint" id="identPaso">Bajando el lector de texto…<br>La primera vez tarda: son unos megabytes.</p></div>`);
-      return leerEtiqueta(grande, pct => {
+      return reconocerFoto(file, (pasada, pct) => {
         const el = $('#identPaso');
-        if (el) el.textContent = `Leyendo la etiqueta… ${pct} %`;
+        if (!el) return;
+        const cual = pasada === 0 ? 'Leyendo la etiqueta' : 'No se leyó bien; probando más de cerca';
+        el.textContent = pct == null ? cual + '…' : `${cual}… ${pct} %`;
       });
-    }).then(texto => {
-      const r = identificarEtiqueta(texto);
+    }).then(r => {
       mostrarIdent(r, fotoDelAlta);
     }).catch(err => {
       const sinRed = /conexión|cargó vacío|Failed to fetch|NetworkError/i.test(err.message || '');
@@ -1840,7 +1838,7 @@ function completarDesdeCatalogo(c, extra) {
    toque este botón no tiene por qué pagar esa descarga. Sin conexión, la
    función avisa y el alta sigue a mano. */
 const OCR_URL = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js';
-const OCR_LADO = 1100;
+const OCR_LADO = 1600;
 let ocrBajando = null;
 
 function cargarOCR() {
@@ -1862,6 +1860,57 @@ function leerEtiqueta(dataUrl, avisar) {
   return cargarOCR().then(T => T.recognize(dataUrl, 'eng', {
     logger: m => { if (m.status === 'recognizing text' && avisar) avisar(Math.round(m.progress * 100)); }
   })).then(r => (r && r.data && r.data.text) || '');
+}
+
+/* Recorta el centro de la foto y lo agranda: es lo mismo que haber sacado la
+   foto más de cerca.
+
+   Es el único ajuste que movió el acierto medido. El lector falla porque el
+   nombre ocupa una franja chica del cuadro, no porque le falte contraste ni
+   por el modo de segmentación: las dos cosas se probaron y no cambiaron nada.
+   Con el frasco entero el Insensé Ultramarine no devolvía una letra; con el
+   centro al 60 % devuelve "INSENSE ULTRAMARINE" limpio. */
+function recuadrarParaLeer(file, fraccion) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      try {
+        const cw = img.width * fraccion, ch = img.height * fraccion;
+        const escala = Math.min(3, OCR_LADO / Math.max(cw, ch));
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(cw * escala); cv.height = Math.round(ch * escala);
+        cv.getContext('2d').drawImage(img, (img.width - cw) / 2, (img.height - ch) / 2, cw, ch,
+                                      0, 0, cv.width, cv.height);
+        resolve(cv.toDataURL('image/jpeg', 0.9));
+      } catch (e) { reject(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('no se pudo leer la imagen')); };
+    img.src = url;
+  });
+}
+
+/* Dos pasadas: el frasco entero y el centro agrandado. Corta en la primera que
+   decide, así la foto que se lee bien no paga la segunda lectura. */
+const RECORTES = [1, 0.6];
+
+function reconocerFoto(file, avisar) {
+  let mejor = null;
+  const pasada = i => {
+    if (i >= RECORTES.length) return Promise.resolve(mejor);
+    if (avisar) avisar(i, null);
+    return recuadrarParaLeer(file, RECORTES[i])
+      .then(url => leerEtiqueta(url, pct => avisar && avisar(i, pct)))
+      .then(texto => {
+        const r = identificarEtiqueta(texto);
+        // se queda con la mejor: la que decide, o la que al menos leyó algo
+        if (!mejor || r.seguro || (!mejor.candidatos.length && r.candidatos.length) ||
+            (!mejor.texto && r.texto)) mejor = r;
+        return r.seguro ? mejor : pasada(i + 1);
+      });
+  };
+  return pasada(0);
 }
 
 /* Datos que se sacan del texto sin depender de reconocer el perfume: el tamaño
