@@ -151,6 +151,45 @@ A eso se le suma lo que aprende de vos (se apaga en Ajustes).
 
 El hemisferio importa: con la opción "Sur", diciembre es verano.
 
+## Al aire libre o adentro
+
+Debajo de la ocasión hay una segunda fila con dos opciones: **al aire libre** y
+**adentro**. Es el único dato de contexto que la app no puede deducir sola —el
+clima, la estación, la hora y la temperatura los saca del teléfono— y es de los
+que más cambian cómo se comporta un perfume.
+
+- **Al aire libre** el aire se lleva la estela. Lo que adentro alcanzaba, afuera
+  no llega a nadie: suma 8 a los de estela 4-5, resta 8 a los de 1-2, y resta 4
+  más a los que duran poco.
+- **Adentro** es al revés, y el error es el opuesto: un perfume de estela alta
+  en un lugar cerrado deja de ser presencia y pasa a ser invasión. Resta 10 a
+  los de estela 4-5 y suma 6 a los de 3 para abajo.
+- **La dosis cambia en los dos sentidos**: una aplicación más afuera, una menos
+  adentro, y la frase de aplicación dice por qué.
+
+Tres decisiones de diseño que valen más que los números:
+
+**Arranca sin elegir, y sin elegir no cambia nada.** No hay valor por defecto
+porque cualquiera de los dos sería una suposición: la mitad de las veces estaría
+mintiendo. Sin tocar nada, la app se comporta exactamente como antes.
+
+**No se recuerda entre sesiones**, a diferencia de la ocasión. Si se guardara, un
+día que elegiste "al aire libre" te seguiría puntuando al aire libre un mes
+después, sentado en una reunión.
+
+**Premia y castiga en los dos sentidos.** Lo fácil era sumarle puntos a la estela
+alta cuando estás afuera. Pero el caso que más molesta en la vida real es el
+contrario —entrar a un lugar cerrado con algo que proyecta demasiado—, y eso solo
+se corrige si la regla también resta.
+
+**Por qué un chip y no un campo de texto.** La idea original era escribir "tengo
+un almuerzo al aire libre". Un campo de texto sin un modelo de lenguaje detrás es
+una lista de palabras escritas a mano: anda con las frases que alguien anticipó y
+falla en silencio con el resto, sin que se note cuál de las dos cosas pasó. Un
+campo que a veces hace algo y a veces nada, sin decir cuál, es peor que no
+tenerlo. Además lo que escribís no se puede aprender: el modelo que aprende de
+las elecciones trabaja sobre categorías, y cada frase libre es única.
+
 ## El clima, automático
 
 En **Ajustes → Clima** elegís una ciudad (o tocás "Usar mi ubicación") y la

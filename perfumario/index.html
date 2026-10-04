@@ -84,6 +84,14 @@
         <button class="chip" data-val="deporte">🏃 Deporte</button>
       </div>
 
+      <!-- Dónde: el perfume se comporta distinto al aire libre que en un lugar
+           cerrado, y es el único dato de contexto que la app no puede deducir
+           sola. Opcional: si no tocás nada, no cambia nada. -->
+      <div class="chips chips-sec" id="ctxAire" role="group" aria-label="Dónde vas a estar">
+        <button class="chip chip-sec" data-val="libre">🌳 Al aire libre</button>
+        <button class="chip chip-sec" data-val="adentro">🏠 Adentro</button>
+      </div>
+
       <!-- los controles finos, para el día que quieras corregir a mano -->
       <section class="card" id="cardContexto" hidden>
         <p class="clima" id="climaLinea">—</p>

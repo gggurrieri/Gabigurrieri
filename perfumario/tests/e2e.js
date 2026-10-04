@@ -954,6 +954,82 @@ const check = (n, c, d = '') => {
   await p.tap('#modal [data-close]').catch(() => {});
   await p.waitForTimeout(200);
 
+  console.log('\nV · Al aire libre o adentro');
+  await p.evaluate(() => localStorage.removeItem('perfumario_v1'));
+  await p.reload(); await p.waitForTimeout(1500);
+
+  const tocarAire = async v => { await p.tap(`#ctxAire .chip[data-val="${v}"]`); await p.waitForTimeout(450); };
+  const puesto = () => p.evaluate(() =>
+    Array.from(document.querySelectorAll('#ctxAire .chip.on')).map(c => c.dataset.val));
+  const dosisTxt = () => p.evaluate(() => {
+    const e = Array.from(document.querySelectorAll('#respuesta .hero-alt'))
+      .find(x => /Aplicaci/.test(x.textContent));
+    return e ? e.textContent.replace(/\s+/g, ' ').trim() : '';
+  });
+  const sprays = async () => { const m = (await dosisTxt()).match(/(\d+) aplicacion/); return m ? +m[1] : null; };
+
+  check('arranca sin elegir, para no suponer nada', (await puesto()).length === 0);
+
+  await tocarAire('libre');
+  check('se puede elegir al aire libre', (await puesto())[0] === 'libre');
+  await tocarAire('adentro');
+  check('elegir el otro reemplaza al primero',
+    (await puesto()).length === 1 && (await puesto())[0] === 'adentro');
+  await tocarAire('adentro');
+  check('tocar el mismo lo suelta y vuelve a "no dije nada"', (await puesto()).length === 0);
+
+  /* Lo que importa no es el chip: es que cambie a quién recomienda. Se arma una
+     colección de dos perfumes idénticos salvo la estela, así lo único que puede
+     separarlos es esta regla. */
+  const soloDos = async () => {
+    await p.evaluate(() => {
+      const base = {
+        conc: 'EDP', familia: 'aromatica', salida: ['Bergamota'], corazon: ['Lavanda'],
+        fondo: ['Cedro'], ml: 100, mlRestante: 100, precio: 0, comprado: null,
+        longevidad: 8, estaciones: ['primavera', 'verano', 'otoño', 'invierno'],
+        ocasiones: ['trabajo', 'casual', 'salida', 'cita', 'evento', 'deporte'],
+        momento: 'ambos', rating: 0, nota: ''
+      };
+      const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+      st.perfumes = [
+        Object.assign({ id: 'susurro', creado: '2026-01-01', nombre: 'Susurro', casa: 'Prueba', estela: 1 }, base),
+        Object.assign({ id: 'megafono', creado: '2026-01-01', nombre: 'Megafono', casa: 'Prueba', estela: 5 }, base)
+      ];
+      st.usos = [];
+      localStorage.setItem('perfumario_v1', JSON.stringify(st));
+    });
+    await p.reload(); await p.waitForTimeout(1500);
+  };
+  await soloDos();
+
+  const gana = async () => (await ranking()).split(':')[0];
+  await tocarAire('libre');
+  const afuera = await gana();
+  await tocarAire('adentro');
+  const adentro = await gana();
+  check('al aire libre gana el de estela alta', afuera === 'Megafono', afuera);
+  check('y en un lugar cerrado gana el discreto', adentro === 'Susurro', adentro);
+  check('y la respuesta dice por qué', /cerrado/i.test(await p.textContent('#respuesta')));
+
+  /* La dosis, sobre un solo perfume: con dos, el que gana cambia y la cuenta
+     deja de ser comparable. */
+  await p.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    st.perfumes = st.perfumes.filter(x => x.id === 'susurro');
+    st.perfumes[0].estela = 3;
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+  });
+  await p.reload(); await p.waitForTimeout(1500);
+  const base = await sprays();
+  await tocarAire('libre');
+  check('afuera indica una aplicación más', await sprays() === base + 1 && /aire libre/.test(await dosisTxt()),
+    await dosisTxt());
+  await tocarAire('adentro');
+  check('y adentro una menos', await sprays() === base - 1 && /cerrado/.test(await dosisTxt()),
+    await dosisTxt());
+  await tocarAire('adentro');
+  check('sin elegir nada, la dosis es la de siempre', await sprays() === base);
+
   console.log('\nU · Leer la etiqueta de una foto');
   /* El lector de texto se baja de un CDN y tarda segundos: acá se reemplaza por
      uno falso que devuelve el texto que uno quiera. Lo que se prueba es lo que

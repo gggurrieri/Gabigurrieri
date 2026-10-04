@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-09-25.3';
+const VERSION = '2026-10-04.1';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -412,7 +412,11 @@ function toast(msg) {
 
 /* ============================== HOY ================================= */
 /* contexto: lo que la persona elige antes de pedir una sugerencia */
-const ctx = { temp: null, momento: null, ocasion: 'casual', manual: false };
+/* aire: 'libre', 'adentro' o null. Arranca en null a propósito y no se
+   recuerda entre sesiones: si se guardara, un día que elegiste "al aire libre"
+   te seguiría puntuando al aire libre un mes después, adentro de la oficina.
+   Sin elegir, no cambia nada: la app se comporta exactamente como antes. */
+const ctx = { temp: null, momento: null, ocasion: 'casual', aire: null, manual: false };
 
 function momentoPorHora() {
   const h = new Date().getHours();
@@ -484,7 +488,7 @@ function modeloAprendido() {
 function contextoActual() {
   const cl = climaParaPuntaje();
   const c = {
-    temp: ctx.temp, momento: ctx.momento, ocasion: ctx.ocasion,
+    temp: ctx.temp, momento: ctx.momento, ocasion: ctx.ocasion, aire: ctx.aire,
     estacion: estacionHoy(),
     lluvia: !!(cl && estaLloviendo(cl.codigo)),
     humedad: cl ? cl.humedad : null,
@@ -606,6 +610,22 @@ function puntuar(p, m, c) {
   const estelaP = p.estela || 3;
   const duraP = p.longevidad || 0;
 
+  /* Dónde vas a estar. Es el dato de contexto que más cambia cómo se comporta
+     un perfume y el único que la app no puede deducir sola.
+
+     Al aire libre el aire se lleva la estela: lo que adentro era suficiente,
+     afuera no llega a nadie. En un lugar cerrado pasa al revés, y un perfume de
+     estela alta deja de ser presencia para ser invasión. Por eso no es un
+     bonus en una sola dirección: premia y castiga en los dos sentidos. */
+  if (c.aire === 'libre') {
+    if (estelaP >= 4) { score += 8; razones.push({ txt: 'Al aire libre su estela igual llega', bien: true }); }
+    else if (estelaP <= 2) { score -= 8; razones.push({ txt: 'Afuera, uno tan discreto no lo va a notar nadie', bien: false }); }
+    if (duraP && duraP <= 5) { score -= 4; razones.push({ txt: 'Y al aire libre se le va a ir antes', bien: false }); }
+  } else if (c.aire === 'adentro') {
+    if (estelaP >= 4) { score -= 10; razones.push({ txt: 'En un lugar cerrado esa estela es demasiado', bien: false }); }
+    else if (estelaP <= 3) { score += 6; razones.push({ txt: 'Para un lugar cerrado está en la medida justa', bien: true }); }
+  }
+
   if (typeof c.humedad === 'number') {
     if (c.humedad >= 75) {
       if (estelaP >= 4) { score -= 6; razones.push({ txt: `Con ${Math.round(c.humedad)} % de humedad va a proyectar de más`, bien: false, clima: true }); }
@@ -706,6 +726,7 @@ function renderHoy() {
   $('#ctxTempOut').textContent = Math.round(ctx.temp) + '°';
   $$('#ctxMomento .chip').forEach(c => c.classList.toggle('on', c.dataset.val === ctx.momento));
   $$('#ctxOcasion .chip').forEach(c => c.classList.toggle('on', c.dataset.val === ctx.ocasion));
+  $$('#ctxAire .chip').forEach(c => c.classList.toggle('on', c.dataset.val === ctx.aire));
 
   /* Todo lo que la app puede deducir sola va en una línea de texto: no son
      decisiones que haya que tomar antes de que te conteste. */
@@ -764,6 +785,9 @@ function dosis(p, c) {
   if (typeof c.temp === 'number' && c.temp <= 10) n += 1;
   if (typeof c.humedad === 'number' && c.humedad >= 75) n -= 1;
   if (c.ocasion === 'trabajo' || c.ocasion === 'deporte') n -= 1;
+  // afuera el aire se lleva una aplicación; adentro, una de más se siente
+  if (c.aire === 'libre') n += 1;
+  else if (c.aire === 'adentro') n -= 1;
   n = clamp(n, 2, 5);
 
   const frio = typeof c.temp === 'number' && c.temp <= 10;
@@ -771,7 +795,9 @@ function dosis(p, c) {
     ? 'en el cuello, sobre la piel'
     : (frio ? 'en cuello y pecho, sobre la piel y no sobre el abrigo'
             : 'en cuello y muñecas');
-  return `${n} aplicacion${n === 1 ? '' : 'es'} ${donde}.`;
+  const porque = c.aire === 'libre' ? ', una de más porque estás al aire libre'
+               : c.aire === 'adentro' ? ', una menos porque es en un lugar cerrado' : '';
+  return `${n} aplicacion${n === 1 ? '' : 'es'} ${donde}${porque}.`;
 }
 
 /* La respuesta contada en dos o tres frases, como se la explicarías a alguien,
@@ -2717,6 +2743,12 @@ function conectar() {
     ctx.elegida = true;
     S.ajustes.ocasion = c.dataset.val;   // la próxima vez arranca donde la dejaste
     guardar();
+    renderHoy();
+  });
+  $('#ctxAire').addEventListener('click', e => {
+    const c = e.target.closest('.chip'); if (!c) return;
+    // tocar el que ya está puesto lo suelta: así se vuelve a "no dije nada"
+    ctx.aire = (ctx.aire === c.dataset.val) ? null : c.dataset.val;
     renderHoy();
   });
   $('#avisoCopia').addEventListener('click', () => { ir('ajustes'); exportar(); });
