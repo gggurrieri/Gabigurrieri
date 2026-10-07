@@ -507,6 +507,53 @@ rompe justo lo que la hace portable. Lo que sí hace es robarles las ideas.
 
 Todo vive en el bloque `:root` de `assets/styles.css`.
 
+### Qué se sacó, y por qué
+
+El rediseño fue casi todo por resta. Lo que estaba cargando la pantalla,
+contado:
+
+| | Antes | Ahora |
+|---|---|---|
+| Emojis distintos en la interfaz | **56** | **0** |
+| Bordes de 1px | **24** | **0** |
+| Niveles de superficie | 4 | 2 |
+
+**Los emojis.** Son ilustraciones a color, dibujadas por otro, cada una con su
+paleta, sus degradés y sus sombras. Cincuenta y seis de esos en una pantalla
+oscura con un dorado son cincuenta y seis estilos peleando contra el tuyo. En
+su lugar:
+
+- En los chips de ocasión, **nada**: un dibujito al lado de la palabra
+  "Trabajo" no agrega información, solo ruido.
+- Para la familia, **un punto del color de la familia**. Dice lo mismo que 🍋
+  —de qué familia es— sin traer una ilustración ajena, y el color ya estaba en
+  los datos.
+- En la barra de navegación y en los botones de acción, **iconos de un solo
+  trazo** que heredan el color del texto, así siguen al tema sin mantener dos
+  versiones.
+- Los glifos monocromos que **son un control** y no un adorno se quedan: las
+  estrellas del puntaje, las barras de estela.
+
+**Los bordes.** Veinticuatro líneas de 1px alrededor de tarjetas, chips,
+botones y pastillas. Cada una es un trazo que el ojo tiene que procesar para
+entender dónde termina una cosa y empieza otra. En un tema oscuro no hacen
+falta: alcanza con que la superficie sea un tono más clara.
+
+**La fila de datos de cada perfume** eran tres cajitas con borde (familia, usos,
+estrenado). Ahora es una sola línea separada por puntos: la misma información,
+tres objetos menos que mirar, y la fila entra más corta, así se ven más
+perfumes de un vistazo.
+
+**El dorado** quedó para una cosa por pantalla. El chip elegido pasó de tener
+contorno dorado a estar **relleno** de dorado: se ve antes y usa menos tinta.
+El marco dorado del hero se fue: es la única tarjeta grande de la pantalla, no
+necesita que se lo digan.
+
+**La jerarquía la hace la tipografía.** Los títulos de sección pasaron de serif
+grande a mayúsculas chiquitas y apagadas con espaciado entre letras. El serif
+quedó para una sola cosa: el nombre del perfume, más grande y con el
+interletrado apretado.
+
 ### Las escalas
 
 | | Pasos | De dónde venía |
