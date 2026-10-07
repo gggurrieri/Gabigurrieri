@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-07.1';
+const VERSION = '2026-10-07.2';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -107,10 +107,10 @@ function guardar() {
 
 /* --------------------------- dominio -------------------------------- */
 const ESTACIONES = {
-  verano:    { nombre: 'verano',    emoji: '🌞', temp: 28 },
-  otono:     { nombre: 'otoño',     emoji: '🍂', temp: 18 },
-  invierno:  { nombre: 'invierno',  emoji: '❄️', temp: 11 },
-  primavera: { nombre: 'primavera', emoji: '🌱', temp: 21 }
+  verano:    { nombre: 'verano',    temp: 28 },
+  otono:     { nombre: 'otoño',     temp: 18 },
+  invierno:  { nombre: 'invierno',  temp: 11 },
+  primavera: { nombre: 'primavera', temp: 21 }
 };
 /* las fichas guardan "otoño" con eñe; la clave interna va sin tilde */
 const claveEstacion = e => (e === 'otoño' ? 'otono' : e);
@@ -137,7 +137,7 @@ const TEMP_IDEAL = {
 /* Un perfume cargado a las apuradas puede no tener familia todavía. Antes de
    inventarle una, se lo muestra sin clasificar: el dato falso ensucia el
    perfil olfativo y las sugerencias. */
-const SIN_FAMILIA = { id: null, nombre: 'Sin clasificar', emoji: '❓', color: '#6b6478',
+const SIN_FAMILIA = { id: null, nombre: 'Sin clasificar', color: '#6b6478',
   desc: 'Todavía no le pusiste familia.', estaciones: [], momento: 'ambos' };
 const familia = id => D.FAMILIAS.find(f => f.id === id) || SIN_FAMILIA;
 const perfume = id => S.perfumes.find(p => p.id === id) || null;
@@ -178,18 +178,18 @@ const CLIMA_VIGENCIA = 15; // minutos que vale un dato antes de volver a pedirlo
 
 /* códigos WMO, que es lo que devuelve la API */
 const WMO = {
-  0: ['Despejado', '☀️'], 1: ['Casi despejado', '🌤'], 2: ['Parcialmente nublado', '⛅'], 3: ['Nublado', '☁️'],
-  45: ['Niebla', '🌫'], 48: ['Niebla con escarcha', '🌫'],
-  51: ['Llovizna leve', '🌦'], 53: ['Llovizna', '🌦'], 55: ['Llovizna fuerte', '🌦'],
-  56: ['Llovizna helada', '🌧'], 57: ['Llovizna helada', '🌧'],
-  61: ['Lluvia leve', '🌧'], 63: ['Lluvia', '🌧'], 65: ['Lluvia fuerte', '🌧'],
-  66: ['Lluvia helada', '🌧'], 67: ['Lluvia helada', '🌧'],
-  71: ['Nieve leve', '🌨'], 73: ['Nieve', '🌨'], 75: ['Nieve fuerte', '🌨'], 77: ['Granos de nieve', '🌨'],
-  80: ['Chaparrones', '🌦'], 81: ['Chaparrones', '🌦'], 82: ['Chaparrones fuertes', '🌦'],
-  85: ['Chaparrones de nieve', '🌨'], 86: ['Chaparrones de nieve', '🌨'],
-  95: ['Tormenta', '⛈'], 96: ['Tormenta con granizo', '⛈'], 99: ['Tormenta con granizo', '⛈']
+  0: ['Despejado'], 1: ['Casi despejado'], 2: ['Parcialmente nublado'], 3: ['Nublado'],
+  45: ['Niebla'], 48: ['Niebla con escarcha'],
+  51: ['Llovizna leve'], 53: ['Llovizna'], 55: ['Llovizna fuerte'],
+  56: ['Llovizna helada'], 57: ['Llovizna helada'],
+  61: ['Lluvia leve'], 63: ['Lluvia'], 65: ['Lluvia fuerte'],
+  66: ['Lluvia helada'], 67: ['Lluvia helada'],
+  71: ['Nieve leve'], 73: ['Nieve'], 75: ['Nieve fuerte'], 77: ['Granos de nieve'],
+  80: ['Chaparrones'], 81: ['Chaparrones'], 82: ['Chaparrones fuertes'],
+  85: ['Chaparrones de nieve'], 86: ['Chaparrones de nieve'],
+  95: ['Tormenta'], 96: ['Tormenta con granizo'], 99: ['Tormenta con granizo']
 };
-const describirClima = c => WMO[c] || ['Sin datos del cielo', '🌡'];
+const describirClima = c => WMO[c] || ['Sin datos del cielo'];
 /* códigos de llovizna, lluvia, chaparrón y tormenta */
 const LLUVIA = [51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99];
 const estaLloviendo = c => LLUVIA.indexOf(c) >= 0;
@@ -731,10 +731,10 @@ function renderHoy() {
   /* Todo lo que la app puede deducir sola va en una línea de texto: no son
      decisiones que haya que tomar antes de que te conteste. */
   const c = climaParaPuntaje();
-  const [cielo, emo] = c ? describirClima(c.codigo) : ['', ''];
+  const [cielo] = c ? describirClima(c.codigo) : [''];
   const desvío = Math.abs(ctx.temp - ESTACIONES[est].temp);
   $('#contextoLinea').innerHTML =
-    `${c ? emo : ESTACIONES[est].emoji} <b>${Math.round(ctx.temp)}°</b>` +
+    `<b>${Math.round(ctx.temp)}°</b>` +
     (c ? ` ${esc(cielo.toLowerCase())} en ${esc(c.lugar)}` : '') +
     ` · ${MOMENTOS[ctx.momento].toLowerCase()} de ${nombreEstacion(est)}` +
     (desvío >= 10 ? ' · mando por la temperatura, no por la estación' : '') +
@@ -766,7 +766,7 @@ function renderHoy() {
         <div class="it-name">${esc(p ? p.nombre : 'Perfume borrado')}</div>
         <div class="it-sub">${u.sprays} aplicaciones · ${OCASIONES[u.ocasion] || '—'} · tocá para corregir</div>
       </div>
-      <div class="it-act"><button data-borrar-uso="${u.id}" aria-label="Borrar uso">🗑</button></div></div>`;
+      <div class="it-act"><button data-borrar-uso="${u.id}" aria-label="Borrar uso">${ico('basura')}</button></div></div>`;
   }).join('');
 
   renderClima();
@@ -855,7 +855,7 @@ function fichaPrincipal(s, alternativa, c) {
     <div class="hero-cab">
       ${miniatura(p, 'frasquito-h')}
       <div class="hero-titulos">
-        <div class="hero-eyebrow">${f.emoji} ${esc(f.nombre)}${p.conc ? ' · ' + esc(p.conc) : ''}</div>
+        <div class="hero-eyebrow">${punto(f)}${esc(f.nombre)}${p.conc ? ' · ' + esc(p.conc) : ''}</div>
         <h2 class="hero-name">${esc(p.nombre)}</h2>
         <div class="hero-house">${esc(p.casa)}</div>
       </div>
@@ -880,17 +880,17 @@ function fichaPrincipal(s, alternativa, c) {
 function renderClima() {
   const l = $('#climaLinea');
   if (!S.ajustes.clima || !S.meta.lugar) {
-    l.innerHTML = `<button class="link" id="btnActivarClima">📍 Traer la temperatura sola</button>`;
+    l.innerHTML = `<button class="link" id="btnActivarClima">${ico('lugar')} Traer la temperatura sola</button>`;
     return;
   }
   const c = S.meta.clima;
   if (!c) { l.textContent = 'Consultando el clima…'; return; }
-  const [txt, emo] = describirClima(c.codigo);
+  const [txt] = describirClima(c.codigo);
   const mins = minutosDesde(c.ts);
   const sens = (typeof c.sensacion === 'number') ? c.sensacion : c.temp;
   const difSens = Math.abs(sens - c.temp) >= 2;
   l.innerHTML =
-    `${emo} <b>${Math.round(sens)}°</b>${difSens ? ' de sensación' : ''} · ${esc(txt)} en ${esc(c.lugar)} · ` +
+    `<b>${Math.round(sens)}°</b>${difSens ? ' de sensación' : ''} · ${esc(txt)} en ${esc(c.lugar)} · ` +
     `${mins < 1 ? 'recién' : 'hace ' + mins + ' min'} ` +
     `<button class="link" id="btnRefrescarClima">Actualizar</button>` +
     `<div class="hint">${difSens ? `Real ${Math.round(c.temp)}° · ` : ''}humedad ${c.humedad} %` +
@@ -1300,8 +1300,9 @@ const filtros = { texto: '', familia: '', orden: 'reciente', soloDisponibles: fa
 function renderColeccion() {
   // chips de familia, solo las que tenés
   const usadas = D.FAMILIAS.filter(f => S.perfumes.some(p => p.familia === f.id));
-  $('#filtroFamilia').innerHTML = [{ id: '', nombre: 'Todas', emoji: '🗂' }].concat(usadas)
-    .map(f => `<button class="chip${filtros.familia === f.id ? ' on' : ''}" data-fam="${f.id}">${f.emoji} ${esc(f.nombre)}</button>`)
+  $('#filtroFamilia').innerHTML = [{ id: '', nombre: 'Todas', color: null }].concat(usadas)
+    .map(f => `<button class="chip${filtros.familia === f.id ? ' on' : ''}" data-fam="${f.id}">${
+      f.color ? punto(f) : ''}${esc(f.nombre)}</button>`)
     .join('');
 
   const lista = filtrarColeccion();
@@ -1359,11 +1360,35 @@ function estrellas(n) {
 /* Un perfume sin familia o sin notas no participa del perfil olfativo, de los
    parecidos ni de lo que se aprende de las notas: conviene que se vea. */
 function etiquetaFamilia(p, f) {
-  if (!p.familia) return '❓ completar familia';
+  if (!p.familia) return 'sin clasificar';
   /* el emoji vivía en la marca de la izquierda, que ahora muestra el frasco */
-  if (!notasDe(p).length) return `${f.emoji} ${esc(f.nombre)} · ❓ completar notas`;
-  return `${f.emoji} ${esc(f.nombre)}`;
+  if (!notasDe(p).length) return `${punto(f)}${esc(f.nombre)} · faltan las notas`;
+  return `${punto(f)}${esc(f.nombre)}`;
 }
+
+/* ----------------------------- iconos -------------------------------
+   Los emojis se fueron de la interfaz. Son ilustraciones a color, dibujadas
+   por otro, cada una con su paleta y sus sombras: juntas en una pantalla eran
+   cincuenta y seis estilos peleando contra uno. Quedan solo donde son un
+   control y no un adorno (las estrellas del puntaje, las barras de estela).
+
+   Estos son de un solo trazo y heredan el color del texto, así siguen al tema
+   sin tener que mantener dos versiones. */
+const TRAZOS = {
+  basura:  '<path d="M5 7h14"/><path d="M10 7V5h4v2"/><path d="M6.5 7l.8 12h9.4l.8-12"/>',
+  camara:  '<path d="M4 8.5h3l1.3-2h7.4L17 8.5h3v10H4z"/><circle cx="12" cy="13" r="3.2"/>',
+  pegar:   '<rect x="7" y="4" width="10" height="16" rx="2"/><path d="M10 4V3h4v1"/><path d="M9.5 10h5"/><path d="M9.5 14h5"/>',
+  lugar:   '<path d="M12 21s6-5.2 6-10a6 6 0 1 0-12 0c0 4.8 6 10 6 10z"/><circle cx="12" cy="11" r="2.2"/>',
+  lote:    '<path d="M13 3 5 13h5l-1 8 8-10h-5z"/>'
+};
+function ico(nombre, clase) {
+  return `<svg class="ico ${clase || ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TRAZOS[nombre]}</svg>`;
+}
+
+/* El color de la familia, como un punto. Dice lo mismo que el emoji —de qué
+   familia es— sin traer una ilustración ajena a la pantalla. */
+const punto = f => `<i class="punto" style="background:${f.color}"></i>`;
 
 /* --------------------------- miniatura ------------------------------
    Cada perfume muestra un frasco. El que viene de fábrica está dibujado acá,
@@ -1516,7 +1541,7 @@ function abrirFicha(id) {
     <div class="ficha-top">
       ${miniatura(p, 'frasquito-g')}
       <div>
-        <p class="sub">${esc(p.casa)}${p.conc ? ' · ' + esc(p.conc) : ''} · ${f.emoji} ${esc(f.nombre)}</p>
+        <p class="sub">${esc(p.casa)}${p.conc ? ' · ' + esc(p.conc) : ''} · ${punto(f)}${esc(f.nombre)}</p>
         <div class="stars" style="font-size:15px">${estrellas(p.rating)}</div>
         <div class="foto-acc">
           <label class="btn btn-chico" for="fFoto">${p.foto ? 'Cambiar foto' : 'Sacar foto'}</label>
@@ -1549,7 +1574,7 @@ function abrirFicha(id) {
       ${us.slice(0, 8).map(u => `<div class="item" data-editar-uso="${u.id}" role="button" tabindex="0"><div class="it-main">
         <div class="it-name">${fmtFecha(u.fecha)} · ${OCASIONES[u.ocasion] || '—'}</div>
         <div class="it-sub">${u.sprays} aplicaciones${u.temp != null ? ` · ${Math.round(u.temp)}°` : ''}${u.nota ? ' · ' + esc(u.nota) : ''}</div>
-      </div><div class="it-act"><button data-borrar-uso="${u.id}" aria-label="Borrar uso">🗑</button></div></div>`).join('')}
+      </div><div class="it-act"><button data-borrar-uso="${u.id}" aria-label="Borrar uso">${ico('basura')}</button></div></div>`).join('')}
     </div></section>` : ''}
 
     <div class="btn-row">
@@ -1607,9 +1632,9 @@ function abrirFormulario(id) {
             .map(c => `<option${v.conc === c ? ' selected' : ''}>${c}</option>`).join('')}</select></label>
         <label class="field"><span>Familia</span>
           <select id="fFamilia">
-            <option value=""${!v.familia ? ' selected' : ''}>❓ Sin clasificar</option>
+            <option value=""${!v.familia ? ' selected' : ''}>Sin clasificar</option>
             ${D.FAMILIAS.map(f =>
-            `<option value="${f.id}"${v.familia === f.id ? ' selected' : ''}>${f.emoji} ${esc(f.nombre)}</option>`).join('')}</select></label>
+            `<option value="${f.id}"${v.familia === f.id ? ' selected' : ''}>${esc(f.nombre)}</option>`).join('')}</select></label>
       </div>
 
       <label class="field"><span>Notas de salida (separadas por coma)</span>
@@ -1621,9 +1646,9 @@ function abrirFormulario(id) {
       <datalist id="dlNotas">${D.NOTAS.map(n => `<option value="${esc(n.n)}"></option>`).join('')}</datalist>
 
       <div class="btn-row" style="margin:-4px 0 12px">
-        <label class="btn mini" for="fFotoIdent">📷 Leer de una foto</label>
+        <label class="btn mini" for="fFotoIdent">${ico('camara')} Leer de una foto</label>
         <input type="file" id="fFotoIdent" accept="image/*" hidden>
-        <button type="button" class="btn mini" id="btnPegarPiramide">📋 Pegar la pirámide</button>
+        <button type="button" class="btn mini" id="btnPegarPiramide">${ico('pegar')} Pegar la pirámide</button>
       </div>
       <p class="hint" style="margin:-8px 0 12px">Leer de una foto funciona con la <b>caja</b> o una etiqueta de papel, de frente y con buena luz. Sobre vidrio o cromado casi nunca puede: ahí cargalo a mano.</p>
       <div id="zonaIdent" class="ident" hidden></div>
@@ -1648,7 +1673,7 @@ function abrirFormulario(id) {
       <div class="field">
         <span>Estaciones</span>
         <div class="chips" id="gEstaciones">${Object.keys(ESTACIONES).map(k =>
-          chip('estaciones', k, ESTACIONES[k].emoji + ' ' + nombreEstacion(k),
+          chip('estaciones', k, nombreEstacion(k),
                (v.estaciones || []).map(claveEstacion).includes(k))).join('')}</div>
       </div>
       <div class="field">
@@ -2142,7 +2167,8 @@ function abrirLote() {
               : x.c ? `${x.exacto ? '✓' : '≈'} ${esc(x.c.casa)} · ${esc(x.c.conc)} · ${esc(familia(x.c.familia).nombre)}`
                     : 'No está en el catálogo: entra con el nombre y lo completás después'}</div>
           </div>
-          <div class="pf-mark" style="width:34px;height:34px;font-size:15px">${x.repetido ? '⏭' : (x.c ? familia(x.c.familia).emoji : '❓')}</div>
+          <div class="frasquito" style="width:34px;height:34px">${
+            x.repetido ? '' : (x.c ? punto(familia(x.c.familia)) : '')}</div>
         </div>`).join('')}</div>
         <p class="hint">${reconocidos} reconocidos · ${acompletar} para completar · ${repetidos} repetidos.</p>
         ${nuevos.length ? `<div class="btn-row"><button class="btn btn-accent" id="btnConfirmarLote">Agregar ${nuevos.length} a la colección</button></div>` : ''}`;
@@ -2291,7 +2317,7 @@ function renderNotas() {
     }
     $('#perfilSub').textContent = sub;
     $('#perfilFamilias').innerHTML = porFam.map(x => barra(
-      `${x.f.emoji} ${x.f.nombre}`,
+      `${punto(x.f)}${x.f.nombre}`,
       `${x.tiene} en la colección · ${x.usos} uso${x.usos === 1 ? '' : 's'}`,
       total ? (x.tiene / total) * 100 : 0, x.f.color)).join('');
     $('#perfilNotas').innerHTML = contarNotas(S.perfumes).slice(0, 12)
@@ -2299,8 +2325,9 @@ function renderNotas() {
   }
 
   // --- diccionario
-  $('#filtroFamiliaNota').innerHTML = [{ id: '', nombre: 'Todas', emoji: '🗂' }].concat(D.FAMILIAS)
-    .map(f => `<button class="chip${filtroNotas.familia === f.id ? ' on' : ''}" data-famnota="${f.id}">${f.emoji} ${esc(f.nombre)}</button>`).join('');
+  $('#filtroFamiliaNota').innerHTML = [{ id: '', nombre: 'Todas', color: null }].concat(D.FAMILIAS)
+    .map(f => `<button class="chip${filtroNotas.familia === f.id ? ' on' : ''}" data-famnota="${f.id}">${
+      f.color ? punto(f) : ''}${esc(f.nombre)}</button>`).join('');
 
   const t = filtroNotas.texto.trim().toLowerCase();
   const notas = D.NOTAS.filter(n =>
@@ -2538,7 +2565,7 @@ function renderUso() {
     return `<div class="item" data-editar-uso="${u.id}" role="button" tabindex="0"><div class="it-main">
       <div class="it-name">${esc(p ? p.nombre : 'Perfume borrado')}</div>
       <div class="it-sub">${fmtFecha(u.fecha)} · ${OCASIONES[u.ocasion] || '—'} · ${u.sprays} aplicaciones</div>
-    </div><div class="it-act"><button data-borrar-uso="${u.id}" aria-label="Borrar uso">🗑</button></div></div>`;
+    </div><div class="it-act"><button data-borrar-uso="${u.id}" aria-label="Borrar uso">${ico('basura')}</button></div></div>`;
   }).join('') : `<div class="vacio">Cuando registres usos van a aparecer acá.</div>`;
 }
 

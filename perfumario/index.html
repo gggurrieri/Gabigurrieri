@@ -61,7 +61,7 @@
         <p id="topbarSub">—</p>
       </div>
     </div>
-    <button class="icon-btn" id="btnSettings" title="Ajustes" aria-label="Ajustes">⚙</button>
+    <button class="icon-btn" id="btnSettings" title="Ajustes" aria-label="Ajustes"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></button>
   </header>
 
   <main>
@@ -76,20 +76,20 @@
         <button class="link" id="btnAjustarContexto">ajustar</button></p>
 
       <div class="chips scroll-x" id="ctxOcasion" role="group" aria-label="Qué vas a hacer">
-        <button class="chip" data-val="trabajo">💼 Trabajo</button>
-        <button class="chip" data-val="casual">👕 Diario</button>
-        <button class="chip" data-val="salida">🍸 Salida</button>
-        <button class="chip" data-val="cita">❤️ Cita</button>
-        <button class="chip" data-val="evento">✨ Evento</button>
-        <button class="chip" data-val="deporte">🏃 Deporte</button>
+        <button class="chip" data-val="trabajo">Trabajo</button>
+        <button class="chip" data-val="casual">Diario</button>
+        <button class="chip" data-val="salida">Salida</button>
+        <button class="chip" data-val="cita">Cita</button>
+        <button class="chip" data-val="evento">Evento</button>
+        <button class="chip" data-val="deporte">Deporte</button>
       </div>
 
       <!-- Dónde: el perfume se comporta distinto al aire libre que en un lugar
            cerrado, y es el único dato de contexto que la app no puede deducir
            sola. Opcional: si no tocás nada, no cambia nada. -->
       <div class="chips chips-sec" id="ctxAire" role="group" aria-label="Dónde vas a estar">
-        <button class="chip chip-sec" data-val="libre">🌳 Al aire libre</button>
-        <button class="chip chip-sec" data-val="adentro">🏠 Adentro</button>
+        <button class="chip chip-sec" data-val="libre">Al aire libre</button>
+        <button class="chip chip-sec" data-val="adentro">Adentro</button>
       </div>
 
       <!-- los controles finos, para el día que quieras corregir a mano -->
@@ -105,8 +105,8 @@
         <div class="field" style="margin-bottom:0">
           <span>Momento</span>
           <div class="chips" id="ctxMomento" role="group" aria-label="Momento del día">
-            <button class="chip" data-val="dia">☀️ Día</button>
-            <button class="chip" data-val="noche">🌙 Noche</button>
+            <button class="chip" data-val="dia">Día</button>
+            <button class="chip" data-val="noche">Noche</button>
           </div>
         </div>
       </section>
@@ -120,7 +120,7 @@
       </details>
 
       <div class="btn-row">
-        <button class="btn" id="btnViaje">✈️ Me voy de viaje</button>
+        <button class="btn" id="btnViaje">Me voy de viaje</button>
       </div>
 
       <section class="card" id="cardHoyUsos" hidden>
@@ -154,7 +154,7 @@
           </select>
         </label>
         <label class="check mini"><input type="checkbox" id="soloDisponibles"> Ocultar vacíos</label>
-        <button class="btn mini" id="btnLote">⚡ Carga rápida</button>
+        <button class="btn mini" id="btnLote">Carga rápida</button>
       </div>
 
       <p class="sub" id="coleccionResumen">—</p>
@@ -264,7 +264,7 @@
         <p class="sub" id="lugarActual">—</p>
         <label class="check"><input type="checkbox" id="setClima"> Traer la temperatura sola</label>
         <div class="btn-row">
-          <button class="btn" id="btnUbicacion">📍 Usar mi ubicación</button>
+          <button class="btn" id="btnUbicacion">Usar mi ubicación</button>
         </div>
         <p class="hint" id="avisoUbicacion" hidden></p>
         <label class="field" style="margin-top:10px">
@@ -300,10 +300,10 @@
   </main>
 
   <nav class="tabbar">
-    <button class="tab" data-view="hoy"><span>✨</span>Hoy</button>
-    <button class="tab" data-view="coleccion"><span>🧴</span>Colección</button>
-    <button class="tab" data-view="notas"><span>🌿</span>Notas</button>
-    <button class="tab" data-view="uso"><span>📊</span>Uso</button>
+    <button class="tab" data-view="hoy"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v2"/><path d="M12 19v2"/><path d="M4.2 4.2 5.6 5.6"/><path d="M18.4 18.4l1.4 1.4"/><path d="M3 12h2"/><path d="M19 12h2"/><path d="M4.2 19.8 5.6 18.4"/><path d="M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="3.6"/></svg>Hoy</button>
+    <button class="tab" data-view="coleccion"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3h4v3.2l2.3 2.6a3 3 0 0 1 .7 2V18a3 3 0 0 1-3 3H10a3 3 0 0 1-3-3V10.8a3 3 0 0 1 .7-2L10 6.2z"/><path d="M7 13h10"/></svg>Colección</button>
+    <button class="tab" data-view="notas"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21c0-6 3-10.5 9-12.5C20 15 16.5 19.5 12 21z"/><path d="M12 21c0-4-2-7.5-6-9 .5 5 2.5 8 6 9z"/></svg>Notas</button>
+    <button class="tab" data-view="uso"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V11"/><path d="M9.3 19V5"/><path d="M14.7 19v-6"/><path d="M20 19v-10"/></svg>Uso</button>
   </nav>
 </div>
 
@@ -313,7 +313,7 @@
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitulo">
     <div class="sheet-head">
       <h2 id="modalTitulo">—</h2>
-      <button class="icon-btn" data-close aria-label="Cerrar">✕</button>
+      <button class="icon-btn" data-close aria-label="Cerrar"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg></button>
     </div>
     <div class="sheet-body" id="modalBody"></div>
   </div>

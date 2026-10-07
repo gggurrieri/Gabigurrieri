@@ -446,7 +446,8 @@ const check = (n, c, d = '') => {
   const inventado = d.perfumes.find(x => x.nombre === 'Perfume Inventado XYZ');
   check('no le inventa familia al desconocido', !!inventado && inventado.familia === null);
   await p.fill('#busca', 'Inventado'); await p.waitForTimeout(250);  // venía filtrado desde G
-  check('lo marca como pendiente de completar', /completar/.test(await p.textContent('#listaColeccion')));
+  // el aviso dejó de ser "❓ completar familia" y pasó a decirlo con palabras
+  check('lo marca como sin clasificar', /sin clasificar/i.test(await p.textContent('#listaColeccion')));
   await p.fill('#busca', ''); await p.waitForTimeout(200);
 
   console.log('\nM · Clima automático');
@@ -1205,6 +1206,19 @@ const check = (n, c, d = '') => {
   check('ningún tamaño de letra escrito en px', letras.length === 0, letras.join(', '));
   const radios = (css.match(/border-radius:\s*[0-9]+px/g) || []);
   check('ningún radio escrito en px', radios.length === 0, radios.join(', '));
+
+  /* candado: nada de emojis a color en la interfaz. Son ilustraciones ajenas,
+     cada una con su paleta y sus sombras, y juntas eran cincuenta y seis
+     estilos peleando contra uno. Los glifos de un solo color que SON un
+     control —las estrellas del puntaje, las barras de estela— se quedan. */
+  const permitidos = new Set(['★', '☆', '▮', '▯', '✓', '✦', '·']);
+  const fuentes = ['index.html', 'assets/app.js', 'assets/datos.js']
+    .map(f => require('fs').readFileSync(path.resolve(__dirname, '..', f), 'utf8')).join('');
+  const dibujitos = Array.from(new Set(
+    Array.from(fuentes).filter(c => c.codePointAt(0) > 0x2190 && !permitidos.has(c))
+  )).filter(c => /\p{Emoji_Presentation}|\p{Extended_Pictographic}/u.test(c));
+  check('ningún emoji a color en la interfaz',
+    dibujitos.length === 0, dibujitos.join(' '));
 
   /* candado: lo que se toca con el dedo. "ajustar" llegó a medir 16px de alto
      y es la única puerta al termómetro. */
