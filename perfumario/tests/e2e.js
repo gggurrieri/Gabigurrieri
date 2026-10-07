@@ -1198,6 +1198,36 @@ const check = (n, c, d = '') => {
   check('ningún color escrito a mano fuera de los tokens',
     fuera.length === 0, fuera.join(', '));
 
+  /* candado: las escalas. Un tamaño de letra o un radio escrito en px es un
+     valor que alguien eligió a ojo, y así se llega a tener 13px, 13.5px y 14px
+     haciendo el mismo trabajo. */
+  const letras = (css.match(/font-size:\s*[0-9.]+px/g) || []);
+  check('ningún tamaño de letra escrito en px', letras.length === 0, letras.join(', '));
+  const radios = (css.match(/border-radius:\s*[0-9]+px/g) || []);
+  check('ningún radio escrito en px', radios.length === 0, radios.join(', '));
+
+  /* candado: lo que se toca con el dedo. "ajustar" llegó a medir 16px de alto
+     y es la única puerta al termómetro. */
+  // la sección anterior deja el formulario abierto y el modal tapa las pestañas
+  await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+  await ir('hoy');
+  const chicos = await p.evaluate(() => Array.from(
+    document.querySelectorAll('.btn, .link, .chip, .tab'))
+    .filter(e => e.offsetParent !== null)
+    .map(e => ({ q: e.className + ' ' + e.textContent.trim().slice(0, 14),
+                 alto: Math.round(e.getBoundingClientRect().height) }))
+    .filter(x => x.alto < 24));
+  check('nada de lo que se toca baja del mínimo de WCAG (24px)',
+    chicos.length === 0, chicos.map(x => `${x.q} ${x.alto}px`).join(' · '));
+  const alturas = await p.evaluate(() => {
+    const l = document.querySelector('#btnAjustarContexto');
+    const b = document.querySelector('#respuesta .btn');
+    return { link: l ? Math.round(l.getBoundingClientRect().height) : 0,
+             btn: b ? Math.round(b.getBoundingClientRect().height) : 0 };
+  });
+  check('los botones principales llegan a los 44px recomendados',
+    alturas.btn >= 44 && alturas.link >= 44, JSON.stringify(alturas));
+
   console.log('\nS · Sin errores');
   check('la consola quedó limpia', errs.length === 0, errs.slice(0, 3).join(' | '));
 
