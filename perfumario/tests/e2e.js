@@ -1167,6 +1167,37 @@ const check = (n, c, d = '') => {
     /no se pudo bajar el lector/i.test(sinRed.panel) &&
     await visible('#formPf'), sinRed.panel.slice(0, 70));
 
+  console.log('\nW · La hoja de estilos');
+  const css = require('fs').readFileSync(
+    path.resolve(__dirname, '..', 'assets', 'styles.css'), 'utf8');
+
+  /* candado: una clase que existe suelta (.mini{...}) Y además como modificador
+     de otra (.btn.mini{...}) es la trampa que ya rompió el formulario de alta.
+     La suelta le cambia la caja a la compuesta y el bug aparece lejos de donde
+     se escribió. */
+  const sueltas = new Set();
+  const modificadoras = new Set();
+  css.replace(/\/\*[\s\S]*?\*\//g, '')
+     .split(/[{}]/).filter((_, i) => i % 2 === 0)
+     .forEach(bloque => bloque.split(',').forEach(sel => {
+       const s0 = sel.trim();
+       if (/^\.[a-zA-Z][\w-]*$/.test(s0)) sueltas.add(s0.slice(1));
+       const comp = s0.match(/^\.([a-zA-Z][\w-]*)\.([a-zA-Z][\w-]*)$/);
+       if (comp) modificadoras.add(comp[2]);
+     }));
+  const chocan = Array.from(modificadoras).filter(x => sueltas.has(x));
+  check('ninguna clase es a la vez suelta y modificadora de otra',
+    chocan.length === 0, chocan.map(x => '.' + x).join(', '));
+
+  /* candado: ningún color escrito a mano fuera del bloque de tokens. Es por
+     donde se escapan siempre: el token no tiene la variante que hace falta y
+     alguien pega el valor. */
+  const fuera = css.slice(css.indexOf('}', css.indexOf(':root')))
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .match(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g) || [];
+  check('ningún color escrito a mano fuera de los tokens',
+    fuera.length === 0, fuera.join(', '));
+
   console.log('\nS · Sin errores');
   check('la consola quedó limpia', errs.length === 0, errs.slice(0, 3).join(' | '));
 
