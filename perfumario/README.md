@@ -498,6 +498,71 @@ entra en los parecidos ni en el perfil.
 
 Opcional, separado con barras: `Nombre | ml | precio`.
 
+## El sistema de diseño
+
+No usa Material, Carbon ni Polaris. Los tres son librerías de React o web
+components, con build y megabytes de CSS; esta app no tiene build, no tiene
+dependencias y se publica como un solo archivo. Adoptar cualquiera de ellos
+rompe justo lo que la hace portable. Lo que sí hace es robarles las ideas.
+
+Todo vive en el bloque `:root` de `assets/styles.css`.
+
+### Las escalas
+
+| | Pasos | De dónde venía |
+|---|---|---|
+| Espaciado `--sp-0` … `--sp-9` | 2, 4, 6, 8, 10, 12, 14, 16, 24, 32 | 19 valores distintos |
+| Tipografía `--t-1` … `--t-7` | 11, 12, 13, 15, 17, 20, 26 | 16 tamaños distintos |
+| Radios `--r-sm` … `--r-pill` | 9, 12, 16, 20, 999 | 7 valores distintos |
+
+Los valores que se fueron eran los que nadie había elegido: 7px, 9px, 11px,
+13px, 13.5px. Salen de mover un número hasta que se ve bien y dejarlo ahí, tres
+veces distintas para el mismo problema. Los que de verdad sostenían el diseño
+—10 y 12 de espaciado, 13 de letra— quedaron tal cual, así el redondeo movió
+uno o dos píxeles y nada más.
+
+La idea de la escala con nombre es de **Carbon**, que define el alto de fila de
+una tabla como "medium, el default" en vez de "40px". Se elige *el siguiente
+paso*, no un número nuevo.
+
+### Los nombres
+
+Los tokens de color siguen la convención de **Atlassian**: el nombre dice para
+qué sirve, no cómo se ve. Es `--linea-peligro`, no `--rojo-claro`; el día que el
+estado de error deje de ser rojo, el nombre sigue sirviendo.
+
+### El área de toque
+
+`.btn` y `.link` tienen 44px de alto mínimo. WCAG 2.2 exige 24 y la app ya lo
+cumplía casi en todo, salvo en un lugar: **"ajustar" medía 20px**, y es la única
+puerta al termómetro y al momento del día. En `.link` el padding agranda el área
+y un margen negativo la devuelve a su lugar, así lo que se toca crece sin que se
+mueva nada de lo que se ve.
+
+Los 44px salen de Apple y de Material. Google los midió al publicar Material 3
+Expressive: con objetivos más grandes y más contraste, los mayores de 45 rinden
+igual que los jóvenes. Esta app se usa con una mano y caminando.
+
+### Los candados
+
+Cuatro pruebas sobre la hoja de estilos, todas nacidas de errores que ya
+pasaron o de los que estaban por pasar:
+
+- Ninguna clase puede existir a la vez suelta (`.mini{}`) y como modificadora de
+  otra (`.btn.mini{}`). Esa trampa rompió el formulario de alta.
+- Ningún color escrito a mano fuera de los tokens.
+- Ningún tamaño de letra ni radio escrito en px.
+- Nada que se toque por debajo de los 24px, y los botones principales en 44.
+
+### Cómo se verificó que el primer paso no cambiaba nada
+
+El refactor se hizo en dos commits. El primero —pasar los colores sueltos a
+tokens— no tenía que mover un píxel, y eso se probó en vez de afirmarse: se
+capturaron las cuatro pantallas principales con la hoja nueva y con la vieja, y
+salieron **byte por byte iguales**. El segundo commit, el de las escalas, sí
+mueve píxeles, y por eso va separado: se puede mirar el diff de cada uno sabiendo
+qué esperar.
+
 ## Cómo está hecha
 
 HTML, CSS y JavaScript a mano, sin dependencias ni compilación. Cinco archivos:

@@ -1167,6 +1167,67 @@ const check = (n, c, d = '') => {
     /no se pudo bajar el lector/i.test(sinRed.panel) &&
     await visible('#formPf'), sinRed.panel.slice(0, 70));
 
+  console.log('\nW · La hoja de estilos');
+  const css = require('fs').readFileSync(
+    path.resolve(__dirname, '..', 'assets', 'styles.css'), 'utf8');
+
+  /* candado: una clase que existe suelta (.mini{...}) Y además como modificador
+     de otra (.btn.mini{...}) es la trampa que ya rompió el formulario de alta.
+     La suelta le cambia la caja a la compuesta y el bug aparece lejos de donde
+     se escribió. */
+  const sueltas = new Set();
+  const modificadoras = new Set();
+  css.replace(/\/\*[\s\S]*?\*\//g, '')
+     .split(/[{}]/).filter((_, i) => i % 2 === 0)
+     .forEach(bloque => bloque.split(',').forEach(sel => {
+       const s0 = sel.trim();
+       if (/^\.[a-zA-Z][\w-]*$/.test(s0)) sueltas.add(s0.slice(1));
+       const comp = s0.match(/^\.([a-zA-Z][\w-]*)\.([a-zA-Z][\w-]*)$/);
+       if (comp) modificadoras.add(comp[2]);
+     }));
+  const chocan = Array.from(modificadoras).filter(x => sueltas.has(x));
+  check('ninguna clase es a la vez suelta y modificadora de otra',
+    chocan.length === 0, chocan.map(x => '.' + x).join(', '));
+
+  /* candado: ningún color escrito a mano fuera del bloque de tokens. Es por
+     donde se escapan siempre: el token no tiene la variante que hace falta y
+     alguien pega el valor. */
+  const fuera = css.slice(css.indexOf('}', css.indexOf(':root')))
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .match(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g) || [];
+  check('ningún color escrito a mano fuera de los tokens',
+    fuera.length === 0, fuera.join(', '));
+
+  /* candado: las escalas. Un tamaño de letra o un radio escrito en px es un
+     valor que alguien eligió a ojo, y así se llega a tener 13px, 13.5px y 14px
+     haciendo el mismo trabajo. */
+  const letras = (css.match(/font-size:\s*[0-9.]+px/g) || []);
+  check('ningún tamaño de letra escrito en px', letras.length === 0, letras.join(', '));
+  const radios = (css.match(/border-radius:\s*[0-9]+px/g) || []);
+  check('ningún radio escrito en px', radios.length === 0, radios.join(', '));
+
+  /* candado: lo que se toca con el dedo. "ajustar" llegó a medir 16px de alto
+     y es la única puerta al termómetro. */
+  // la sección anterior deja el formulario abierto y el modal tapa las pestañas
+  await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+  await ir('hoy');
+  const chicos = await p.evaluate(() => Array.from(
+    document.querySelectorAll('.btn, .link, .chip, .tab'))
+    .filter(e => e.offsetParent !== null)
+    .map(e => ({ q: e.className + ' ' + e.textContent.trim().slice(0, 14),
+                 alto: Math.round(e.getBoundingClientRect().height) }))
+    .filter(x => x.alto < 24));
+  check('nada de lo que se toca baja del mínimo de WCAG (24px)',
+    chicos.length === 0, chicos.map(x => `${x.q} ${x.alto}px`).join(' · '));
+  const alturas = await p.evaluate(() => {
+    const l = document.querySelector('#btnAjustarContexto');
+    const b = document.querySelector('#respuesta .btn');
+    return { link: l ? Math.round(l.getBoundingClientRect().height) : 0,
+             btn: b ? Math.round(b.getBoundingClientRect().height) : 0 };
+  });
+  check('los botones principales llegan a los 44px recomendados',
+    alturas.btn >= 44 && alturas.link >= 44, JSON.stringify(alturas));
+
   console.log('\nS · Sin errores');
   check('la consola quedó limpia', errs.length === 0, errs.slice(0, 3).join(' | '));
 
