@@ -39,10 +39,55 @@ const check = (n, c, d = '') => {
     const hero = document.querySelector('#respuesta .hero');
     if (hero && hero.querySelector('.hero-name').textContent.includes(n))
       return (hero.querySelector('.hero-texto') || { textContent: '' }).textContent.replace(/\s+/g, ' ').trim();
-    const card = Array.from(document.querySelectorAll('#sugerencias .pf'))
-      .find(e => e.querySelector('.pf-name').textContent.includes(n));
-    return card ? card.querySelector('.razones').textContent.replace(/\s+/g, ' ').trim() : '';
+    const fila = Array.from(document.querySelectorAll('#sugerencias .otra'))
+      .find(e => e.querySelector('.otra-name').textContent.includes(n));
+    const r = fila && fila.querySelector('.otra-razon');
+    return r ? r.textContent.replace(/\s+/g, ' ').trim() : '';
   }, nombre);
+  /* Todas las razones, no sólo las dos que caben en la fila: salen del bloque
+     "Por qué hoy" de la ficha, que es donde la app las muestra completas. */
+  const razonesFicha = async nombre => {
+    const hay = await p.evaluate(n => {
+      document.querySelectorAll('[data-pruebaficha]').forEach(e => e.removeAttribute('data-pruebaficha'));
+      const det = document.querySelector('#otras');
+      if (det) det.open = true;
+      const hero = document.querySelector('#respuesta .hero');
+      let el = null;
+      if (hero && hero.querySelector('.hero-name').textContent.includes(n))
+        el = hero.querySelector('[data-ficha]');
+      else {
+        const fila = Array.from(document.querySelectorAll('#sugerencias .otra'))
+          .find(e => e.querySelector('.otra-name').textContent.includes(n));
+        el = fila && fila.querySelector('[data-ficha]');
+      }
+      if (!el) return false;
+      el.setAttribute('data-pruebaficha', '1');
+      return true;
+    }, nombre);
+    if (!hay) return '';
+    await p.tap('[data-pruebaficha]');
+    await p.waitForTimeout(300);
+    const txt = await p.evaluate(() => {
+      const b = document.querySelector('#modalBody .porque');
+      return b ? b.textContent.replace(/\s+/g, ' ').trim() : '';
+    });
+    await p.evaluate(() => { document.querySelector('#modal').hidden = true; });
+    await p.waitForTimeout(150);
+    return txt;
+  };
+  /* El texto de la pantalla más las razones completas de los tres del podio:
+     para afirmar "este dato entró en la decisión" sin atarse a qué perfume. */
+  const razonesDelPodio = async () => {
+    const nombres = await p.evaluate(() => {
+      const h = document.querySelector('#respuesta .hero');
+      const out = h ? [h.querySelector('.hero-name').textContent.trim()] : [];
+      return out.concat(Array.from(document.querySelectorAll('#sugerencias .otra'))
+        .map(e => e.querySelector('.otra-name').textContent.trim()));
+    });
+    let t = await p.textContent('#view-hoy');
+    for (const n of nombres) t += ' ' + await razonesFicha(n);
+    return t.replace(/\s+/g, ' ').trim();
+  };
   // el termómetro y el momento viven plegados detrás de "ajustar"
   const abrirContexto = async () => {
     if (await p.evaluate(() => document.querySelector('#cardContexto').hidden)) {
@@ -71,7 +116,7 @@ const check = (n, c, d = '') => {
     enElBuild > 0 && (await db()).perfumes.length === enElBuild,
     `${(await db()).perfumes.length} guardados vs ${enElBuild} en el build`);
   check('y sugiere sin que cargues nada',
-    await cuantos('#respuesta .hero') === 1 && await cuantos('#sugerencias .pf') === 2);
+    await cuantos('#respuesta .hero') === 1 && await cuantos('#sugerencias .otra') === 2);
   check('no le inventa usos', (await db()).usos.length === 0);
 
   /* candado: un perfume sin familia, sin estaciones o sin ocasiones no se puede
@@ -193,7 +238,7 @@ const check = (n, c, d = '') => {
   console.log('\nD · Sugerencias');
   await ir('hoy');
   check('da una respuesta y guarda las otras', await cuantos('#respuesta .hero') === 1 &&
-    await cuantos('#sugerencias .pf') === 2);
+    await cuantos('#sugerencias .otra') === 2);
   check('la respuesta viene redactada, no como lista de reglas',
     (await p.textContent('#respuesta .hero-texto')).trim().split('.').length >= 2,
     (await p.textContent('#respuesta .hero-texto')).slice(0, 80));
@@ -202,7 +247,7 @@ const check = (n, c, d = '') => {
     (await p.textContent('#respuesta')).replace(/\s+/g, ' ').slice(-90));
   check('muestra un puntaje', /^\d+$/.test((await p.textContent('#respuesta .hero-dato b')).trim()));
   check('y dice de qué es', /de puntaje/.test(await p.textContent('#respuesta .hero-dato')));
-  check('explica por qué', await cuantos('#respuesta .hero-texto') + await cuantos('#sugerencias .razones li') >= 3);
+  check('explica por qué', await cuantos('#respuesta .hero-texto') + await cuantos('#sugerencias .otra-razon') >= 3);
   check('dice en qué estación estamos', /(verano|otoño|invierno|primavera)/.test(await p.textContent('#contextoLinea')));
   check('ahora avisa de la copia', await visible('#avisoCopia'));
 
@@ -213,9 +258,9 @@ const check = (n, c, d = '') => {
     const h = document.querySelector('#respuesta .hero');
     const primero = h ? [h.querySelector('.hero-name').textContent.trim() + ':' +
                          h.querySelector('.hero-dato b').textContent.trim()] : [];
-    return primero.concat(Array.from(document.querySelectorAll('#sugerencias .pf'))
-      .map(e => e.querySelector('.pf-name').textContent.replace('★', '').trim() + ':' +
-                e.querySelector('.pf-score').textContent.trim())).join(' | ');
+    return primero.concat(Array.from(document.querySelectorAll('#sugerencias .otra'))
+      .map(e => e.querySelector('.otra-name').textContent.trim() + ':' +
+                e.querySelector('.otra-score').textContent.trim())).join(' | ');
   });
   const casual = await ranking();
   await p.tap('#ctxOcasion .chip[data-val="deporte"]'); await p.waitForTimeout(300);
@@ -235,7 +280,7 @@ const check = (n, c, d = '') => {
   check('el termómetro se mueve', (await p.textContent('#ctxTempOut')) === '35°', temp0);
   check('con calor no sugiere un gourmand denso',
     !/Khamrah|Baccarat/.test(await p.textContent('#view-hoy')),
-    (await p.textContent('#sugerencias .pf-name')).trim());
+    (await p.textContent('#sugerencias .otra-name')).trim());
 
   console.log('\nE · Registrar un uso');
   await p.tap('#ctxOcasion .chip[data-val="salida"]'); await p.waitForTimeout(250);
@@ -583,9 +628,9 @@ const check = (n, c, d = '') => {
   check('avisa que llueve', /Llueve: los frescos livianos/.test(conLluvia), conLluvia.replace(/\s+/g,' ').slice(0,70));
   check('y que hay viento', /viento 30 km\/h/i.test(conLluvia) && /Viento fuerte/.test(conLluvia),
     conLluvia.replace(/\s+/g, ' ').slice(0, 110));
+  const conViento = await razonesDelPodio();
   check('el viento entra en las razones de las sugerencias',
-    /viento de 30 km\/h/i.test(await p.textContent('#view-hoy')),
-    (await p.textContent('#view-hoy')).replace(/\s+/g, ' ').slice(0, 90));
+    /viento de 30 km\/h/i.test(conViento), conViento.slice(0, 120));
   check('la lluvia entra en las razones de las sugerencias',
     /Llueve y este aguanta|se va enseguida/.test(await p.textContent('#view-hoy')),
     (await p.textContent('#view-hoy')).replace(/\s+/g, ' ').slice(0, 90));
@@ -596,7 +641,7 @@ const check = (n, c, d = '') => {
   await p.tap('#btnRefrescarClima'); await p.waitForTimeout(700);
   check('si la API falla, lo dice sin romperse', /No pude traer el clima/.test(await p.textContent('#climaLinea')));
   check('y las sugerencias siguen ahí',
-    await cuantos('#respuesta .hero') === 1 && await cuantos('#sugerencias .pf') === 2);
+    await cuantos('#respuesta .hero') === 1 && await cuantos('#sugerencias .otra') === 2);
   climaFalla = false;
 
   console.log('\nM2 · Valija para un viaje');
@@ -701,7 +746,7 @@ const check = (n, c, d = '') => {
   await ir('hoy');
 
   await termometro(30);
-  const conCalor = await razonesDe(protagonistas.gour);
+  const conCalor = await razonesFicha(protagonistas.gour);
   check('con 30° avisa que no es la temperatura en que lo usás',
     conCalor === '' || /Lo usás con 9° y hoy hay 30°/.test(conCalor), conCalor.slice(0, 90));
   const conCalorCitrico = await razonesDe(protagonistas.cit);
@@ -770,7 +815,7 @@ const check = (n, c, d = '') => {
   await p.reload(); await p.waitForTimeout(500);
   const puntajes = await p.evaluate(() => [
     Number(document.querySelector('#respuesta .hero-dato b').textContent.trim())
-  ].concat(Array.from(document.querySelectorAll('#sugerencias .pf-score'))
+  ].concat(Array.from(document.querySelectorAll('#sugerencias .otra-score'))
     .map(e => Number(e.textContent.trim()))));
   check('un perfume sin puntuar no arranca castigado', sinYcon && puntajes[0] === puntajes[1],
     puntajes.join(' vs '));
@@ -1079,12 +1124,11 @@ const check = (n, c, d = '') => {
   /* "Duró poco" no condena el perfume: lo descalifica para algo largo */
   await conDevoluciones('corto', null);
   await p.tap('#ctxOcasion .chip[data-val="casual"]'); await p.waitForTimeout(400);
-  const enCorto = await ranking();
+  const enCorto = await razonesDelPodio();
   await p.tap('#ctxOcasion .chip[data-val="evento"]'); await p.waitForTimeout(400);
-  const enLargo = await ranking();
+  const enLargo = await razonesDelPodio();
   check('"duró poco" no molesta para el día a día pero sí para un evento',
-    !/duró poco/i.test(enCorto) && /duró poco/i.test(await p.textContent('#respuesta') + await p.textContent('#sugerencias')),
-    enLargo);
+    !/duró poco/i.test(enCorto) && /duró poco/i.test(enLargo), enLargo.slice(0, 140));
 
   // los cuatro botones, sobre el uso de hoy
   await p.evaluate(() => {

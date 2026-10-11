@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-11.6';
+const VERSION = '2026-10-11.7';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -818,8 +818,9 @@ function renderHoy() {
     $('#respuesta').innerHTML = fichaPrincipal(lista[0], lista[1], contextoActual());
     $('#sugerencias').innerHTML = lista.slice(1).map(x => fichaSugerencia(x)).join('');
     $('#otras').hidden = lista.length < 2;
-    const otras = $('#otras summary');
-    if (otras) otras.textContent = `Ver otras ${lista.length - 1} opciones`;
+    const t = $('#otrasTitulo');
+    const n = lista.length - 1;
+    if (t) t.textContent = n === 1 ? 'Otra opción' : `Otras ${n} opciones`;
   }
 
   avisoEmpate(lista);
@@ -1027,32 +1028,34 @@ function avisoEmpate(sugerencias) {
     `. Puntualos y los voy a poder separar.`;
 }
 
+/* Una alternativa es una alternativa. Antes cada una era una tarjeta del
+   mismo tamaño que la respuesta —tres razones, dos botones, el puntaje en
+   grande— y competía con ella en vez de acompañarla. Ahora es una fila: el
+   frasco, el nombre, UNA razón (la que más la distingue) y el puntaje. Toda
+   la fila abre la ficha; "me lo pongo" queda como acción chica al costado. */
 function fichaSugerencia(s, i) {
-  const p = s.p, f = familia(p.familia);
-  /* Orden: primero lo aprendido (es lo que distingue esta sugerencia de una
-     regla fija), después lo que pasa hoy afuera, y al final el resto. */
+  const p = s.p;
+  /* Dos razones como mucho: la mejor a favor y, si la hay, la que más pesa en
+     contra. La segunda es la que explica por qué esta quedó abajo y no arriba,
+     y es la que más sirve: una alternativa sin su pero no se puede comparar. */
   const peso = r => (r.aprendido ? 2 : (r.clima ? 1 : 0));
-  const ordenadas = s.razones.slice().sort((a, b) => peso(b) - peso(a));
-  const razones = ordenadas.slice(0, 3).map(r =>
-    `<li${r.aprendido ? ' class="aprendida"' : ''}>${r.aprendido ? '✦' : (r.bien ? '✓' : '·')} <b>${esc(r.txt)}</b></li>`).join('');
-  const pct = porcRestante(p);
-  return `<article class="card">
-    <div class="pf" data-ficha="${p.id}" role="button" tabindex="0">
-      ${miniatura(p, 'pf-mark')}
-      <div class="pf-main">
-        <div class="pf-name">${i === 0 ? '★ ' : ''}${esc(p.nombre)}</div>
-        <div class="pf-house">${esc(p.casa)}${p.conc ? ' · ' + esc(p.conc) : ''}</div>
-        <ul class="razones">${razones}</ul>
+  const orden = (a, b) => peso(b) - peso(a);
+  const aFavor = s.razones.filter(r => r.bien !== false).sort(orden)[0];
+  const enContra = s.razones.filter(r => r.bien === false).sort(orden)[0];
+  const muestra = [aFavor, enContra].filter(Boolean).slice(0, 2);
+  return `<div class="otra">
+    <div class="otra-tocar" data-ficha="${p.id}" role="button" tabindex="0">
+      ${miniatura(p, 'otra-mark')}
+      <div class="otra-main">
+        <div class="otra-name">${esc(p.nombre)}</div>
+        <div class="otra-casa">${esc(p.casa)}${p.conc ? ' · ' + esc(p.conc) : ''}</div>
+        ${muestra.map(r => `<div class="otra-razon${r.bien === false ? ' contra' : ''}"
+          >${r.aprendido ? '✦ ' : (r.bien === false ? '· ' : '')}${esc(r.txt)}</div>`).join('')}
       </div>
-      <div class="pf-right">
-        <div class="pf-score">${s.score}</div><div class="pf-score-cap">puntaje</div>
-        ${p.ml > 0 ? `<div>${pct} %</div>` : ''}</div>
+      <div class="otra-score">${s.score}</div>
     </div>
-    <div class="btn-row">
-      <button class="btn btn-accent" data-usar="${p.id}">Me lo pongo</button>
-      <button class="btn" data-ficha="${p.id}">Ver ficha</button>
-    </div>
-  </article>`;
+    <button class="otra-usar" data-usar="${p.id}">Me lo pongo</button>
+  </div>`;
 }
 
 /* Muestra el modelo en palabras. Si no se puede leer, no se puede confiar:
@@ -1857,6 +1860,8 @@ function abrirFicha(id) {
     </div>
     <input type="file" id="fFoto" accept="image/*" hidden>
 
+    ${porQueHoy(p)}
+
     <div class="piramide">
       ${nivel('Salida', p.salida)}${nivel('Corazón', p.corazon)}${nivel('Fondo', p.fondo)}
     </div>
@@ -1931,6 +1936,26 @@ function bloqueMezclas(p) {
         <div class="mezcla-score">${x.score}</div>
       </div>`).join('')}</div>
     <p class="hint">Probalo primero en la muñeca, con una aplicación de cada uno.</p>
+  </section>`;
+}
+
+/* El botón de la respuesta dice "Ver por qué, y la ficha", y la ficha nunca
+   mostraba el porqué: las razones vivían solo en la pantalla de Hoy, y ahí
+   entran dos. Acá entran todas, con el puntaje de hoy y el contexto con el
+   que se calculó, que es lo que las hace entendibles. */
+function porQueHoy(p) {
+  const c = contextoActual();
+  const s = puntuar(p, modeloAprendido(), c);
+  if (!s.razones.length) return '';
+  const peso = r => (r.aprendido ? 2 : (r.clima ? 1 : 0));
+  const orden = s.razones.slice().sort((a, b) => peso(b) - peso(a));
+  return `<section class="card porque">
+    <h2>Por qué hoy</h2>
+    <p class="sub">${Math.round(c.temp)}°, ${MOMENTOS[c.momento].toLowerCase()} de ${nombreEstacion(c.estacion)}, ${EN_OCASION[c.ocasion] || OCASIONES[c.ocasion].toLowerCase()}${
+      c.aire === 'libre' ? ', al aire libre' : c.aire === 'adentro' ? ', en un lugar cerrado' : ''}.</p>
+    <ul class="razones">${orden.map(r =>
+      `<li${r.aprendido ? ' class="aprendida"' : ''}>${r.aprendido ? '✦' : (r.bien ? '✓' : '·')} <b>${esc(r.txt)}</b></li>`).join('')}</ul>
+    <div class="porque-total"><b>${s.score}</b> de puntaje con este contexto</div>
   </section>`;
 }
 

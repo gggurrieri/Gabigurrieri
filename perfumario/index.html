@@ -72,6 +72,9 @@
          se muestra como texto, no como controles. -->
     <section class="view" id="view-hoy">
 
+      <!-- La pregunta, toda junta: el contexto que la app dedujo y lo que elegís
+           vos. Antes eran tres bloques sueltos al mismo nivel que la respuesta. -->
+      <section class="pregunta">
       <p class="contexto-linea" id="contextoLinea">—
         <button class="link" id="btnAjustarContexto">ajustar</button></p>
 
@@ -123,12 +126,17 @@
         </div>
       </section>
 
-      <div id="respuesta"></div>
-      <p class="empate" id="avisoEmpate" hidden></p>
+      </section>
 
+      <div id="respuesta"></div>
+
+      <!-- Las alternativas son alternativas: filas compactas, no tarjetas del
+           mismo tamaño que la respuesta. El aviso de empate vive acá adentro
+           porque habla justamente de ellas. -->
       <details id="otras">
-        <summary>Ver otras opciones</summary>
-        <div id="sugerencias" class="stack"></div>
+        <summary><span id="otrasTitulo">Otras opciones</span><i class="chev"></i></summary>
+        <p class="empate" id="avisoEmpate" hidden></p>
+        <div id="sugerencias" class="otras-lista"></div>
       </details>
 
       <!-- La semana: el pronóstico que la app ya baja llega a quince días y solo
