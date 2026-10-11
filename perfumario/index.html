@@ -102,11 +102,23 @@
             <output id="ctxTempOut">20°</output>
           </div>
         </div>
-        <div class="field" style="margin-bottom:0">
+        <div class="field">
           <span>Momento</span>
           <div class="chips" id="ctxMomento" role="group" aria-label="Momento del día">
             <button class="chip" data-val="dia">Día</button>
             <button class="chip" data-val="noche">Noche</button>
+          </div>
+        </div>
+        <!-- La estación sale del calendario. Poder moverla convierte la app en
+             algo para planear —"¿qué me pongo en enero?" en octubre— y no solo
+             para decidir hoy. -->
+        <div class="field" style="margin-bottom:0">
+          <span>Estación <button class="link" id="btnEstacionAuto" hidden>volver a la de hoy</button></span>
+          <div class="chips" id="ctxEstacion" role="group" aria-label="Estación">
+            <button class="chip" data-val="verano">Verano</button>
+            <button class="chip" data-val="otono">Otoño</button>
+            <button class="chip" data-val="invierno">Invierno</button>
+            <button class="chip" data-val="primavera">Primavera</button>
           </div>
         </div>
       </section>

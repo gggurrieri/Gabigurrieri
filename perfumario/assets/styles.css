@@ -323,6 +323,8 @@ button.item{width:100%;text-align:left;cursor:pointer;font:inherit}
 /* La fila de "dónde": es un modificador de la pregunta principal, no otra
    pregunta. Va más chica y más apagada para que se lea en ese orden. */
 .chips-sec{margin-top:-4px}
+/* cuando mirás otra estación, que se note que no es hoy */
+.imaginado{color:var(--accent);font-weight:600}
 .chip-sec{font-size:var(--t-3);padding:var(--sp-2) var(--sp-5);opacity:.75}
 .chip-sec.on{opacity:1}
 

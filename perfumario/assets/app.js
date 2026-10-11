@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-11.1';
+const VERSION = '2026-10-11.2';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -265,6 +265,10 @@ function traerClima(forzar) {
 function aplicarTempDelClima() {
   const c = S.meta.clima;
   if (!S.ajustes.clima || !c || ctx.manual) return;
+  /* Si elegiste otra estación, el clima de afuera no tiene nada que ver con lo
+     que estás imaginando: pedir "verano" y que el termómetro vuelva a los 14°
+     de hoy rompe justamente para lo que sirve. */
+  if (ctx.estacion) return;
   ctx.temp = (typeof c.sensacion === 'number') ? c.sensacion : c.temp;
 }
 
@@ -416,7 +420,15 @@ function toast(msg) {
    recuerda entre sesiones: si se guardara, un día que elegiste "al aire libre"
    te seguiría puntuando al aire libre un mes después, adentro de la oficina.
    Sin elegir, no cambia nada: la app se comporta exactamente como antes. */
-const ctx = { temp: null, momento: null, ocasion: 'casual', aire: null, manual: false };
+/* estacion: null = la del calendario. Se puede fijar a mano para preguntarle a
+   la app qué te pondrías en otra época del año, que es lo que hace falta para
+   planear una compra: en octubre no se puede ver cómo queda tu colección en
+   enero, y es justo cuando conviene mirarlo. */
+const ctx = { temp: null, momento: null, ocasion: 'casual', aire: null,
+              estacion: null, manual: false };
+
+/* La estación que manda: la elegida a mano, o la del almanaque. */
+const estacionVigente = () => ctx.estacion || estacionHoy();
 
 function momentoPorHora() {
   const h = new Date().getHours();
@@ -489,7 +501,7 @@ function contextoActual() {
   const cl = climaParaPuntaje();
   const c = {
     temp: ctx.temp, momento: ctx.momento, ocasion: ctx.ocasion, aire: ctx.aire,
-    estacion: estacionHoy(),
+    estacion: estacionVigente(),
     lluvia: !!(cl && estaLloviendo(cl.codigo)),
     humedad: cl ? cl.humedad : null,
     viento: cl ? cl.viento : null
@@ -721,12 +733,14 @@ function sugerir(n, m) {
 
 function renderHoy() {
   ctxInicial();
-  const est = estacionHoy();
+  const est = estacionVigente();
   $('#ctxTemp').value = ctx.temp;
   $('#ctxTempOut').textContent = Math.round(ctx.temp) + '°';
   $$('#ctxMomento .chip').forEach(c => c.classList.toggle('on', c.dataset.val === ctx.momento));
   $$('#ctxOcasion .chip').forEach(c => c.classList.toggle('on', c.dataset.val === ctx.ocasion));
   $$('#ctxAire .chip').forEach(c => c.classList.toggle('on', c.dataset.val === ctx.aire));
+  $$('#ctxEstacion .chip').forEach(c => c.classList.toggle('on', c.dataset.val === est));
+  $('#btnEstacionAuto').hidden = !ctx.estacion;
 
   /* Todo lo que la app puede deducir sola va en una línea de texto: no son
      decisiones que haya que tomar antes de que te conteste. */
@@ -737,6 +751,7 @@ function renderHoy() {
     `<b>${Math.round(ctx.temp)}°</b>` +
     (c ? ` ${esc(cielo.toLowerCase())} en ${esc(c.lugar)}` : '') +
     ` · ${MOMENTOS[ctx.momento].toLowerCase()} de ${nombreEstacion(est)}` +
+    (ctx.estacion ? ' <b class="imaginado">(imaginado)</b>' : '') +
     (desvío >= 10 ? ' · mando por la temperatura, no por la estación' : '') +
     ` <button class="link" id="btnAjustarContexto">ajustar</button>`;
 
@@ -2770,6 +2785,20 @@ function conectar() {
     ctx.elegida = true;
     S.ajustes.ocasion = c.dataset.val;   // la próxima vez arranca donde la dejaste
     guardar();
+    renderHoy();
+  });
+  $('#ctxEstacion').addEventListener('click', e => {
+    const c = e.target.closest('.chip'); if (!c) return;
+    ctx.estacion = (ctx.estacion === c.dataset.val) ? null : c.dataset.val;
+    /* Si no tocaste el termómetro, la temperatura acompaña a la estación: pedir
+       "verano" y seguir viendo 14° no sirve para imaginarse nada. Si lo moviste
+       vos, manda tu número. */
+    if (!ctx.manual) ctx.temp = ESTACIONES[estacionVigente()].temp;
+    renderHoy();
+  });
+  $('#btnEstacionAuto').addEventListener('click', () => {
+    ctx.estacion = null;
+    if (!ctx.manual) { ctx.temp = ESTACIONES[estacionHoy()].temp; aplicarTempDelClima(); }
     renderHoy();
   });
   $('#ctxAire').addEventListener('click', e => {

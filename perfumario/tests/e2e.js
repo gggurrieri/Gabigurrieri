@@ -1031,6 +1031,43 @@ const check = (n, c, d = '') => {
   await tocarAire('adentro');
   check('sin elegir nada, la dosis es la de siempre', await sprays() === base);
 
+  console.log('\nX · Imaginar otra estación');
+  await p.evaluate(() => localStorage.removeItem('perfumario_v1'));
+  await p.reload(); await p.waitForTimeout(1500);
+  await abrirContexto();
+
+  const estacionPuesta = () => p.evaluate(() =>
+    Array.from(document.querySelectorAll('#ctxEstacion .chip.on')).map(c => c.dataset.val));
+  const lineaCtx = () => p.textContent('#contextoLinea');
+
+  const hoyEs = (await estacionPuesta())[0];
+  check('arranca marcando la estación del calendario', !!hoyEs, hoyEs);
+  check('y no dice que sea imaginada', !/imaginado/.test(await lineaCtx()));
+
+  // se elige la estación opuesta, para que el cambio sea grande de verdad
+  const opuesta = { verano: 'invierno', invierno: 'verano', otono: 'primavera', primavera: 'otono' }[hoyEs];
+  const antesDeImaginar = await ranking();
+  await p.tap(`#ctxEstacion .chip[data-val="${opuesta}"]`); await p.waitForTimeout(500);
+
+  check('se puede mirar otra estación', (await estacionPuesta())[0] === opuesta);
+  check('y lo dice, para no confundirlo con hoy', /imaginado/.test(await lineaCtx()));
+  check('la temperatura acompaña a la estación',
+    Math.abs(await p.evaluate(() => +document.querySelector('#ctxTemp').value)
+      - { verano: 28, otono: 18, invierno: 11, primavera: 21 }[opuesta]) < 1);
+  check('y cambia lo que te recomienda', (await ranking()) !== antesDeImaginar);
+
+  await p.tap('#btnEstacionAuto'); await p.waitForTimeout(500);
+  check('se vuelve a hoy de un toque',
+    (await estacionPuesta())[0] === hoyEs && !/imaginado/.test(await lineaCtx()));
+  check('y vuelve a recomendar lo de antes', (await ranking()) === antesDeImaginar);
+
+  /* candado: si moviste el termómetro a mano, elegir estación no te lo pisa */
+  await termometro(7);
+  await p.tap(`#ctxEstacion .chip[data-val="${opuesta}"]`); await p.waitForTimeout(400);
+  check('si tocaste el termómetro, manda tu número',
+    await p.evaluate(() => +document.querySelector('#ctxTemp').value) === 7);
+  await p.tap('#btnEstacionAuto'); await p.waitForTimeout(300);
+
   console.log('\nU · Leer la etiqueta de una foto');
   /* El lector de texto se baja de un CDN y tarda segundos: acá se reemplaza por
      uno falso que devuelve el texto que uno quiera. Lo que se prueba es lo que
