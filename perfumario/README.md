@@ -388,6 +388,47 @@ más de 15 días, o no hay internet) **se pide la temperatura esperada** en luga
 inventar un clima; y si pedís tres pero con dos alcanza, lo dice, y no completa la
 lista con un perfume que no sirve para ese viaje.
 
+## Qué pasó después: la devolución
+
+Debajo del uso del día hay cuatro botones: **me lo elogiaron · justo · duró
+poco · me arrepentí**. Un toque, una vez por día.
+
+Es el dato más caro de conseguir de toda la app y el único que no es circular.
+Todo lo demás que el modelo sabe sale de **lo que elegiste**, y eso es un
+espejo: aprende tu rutina y te la devuelve. Lo que pasó *después* de ponértelo
+no se puede inferir de ninguna otra cosa. Hay que preguntarlo.
+
+Cómo entra al puntaje:
+
+- Hacen falta **dos devoluciones** para que cuente. Una sola noche mala no
+  condena un frasco.
+- Promedio positivo: **+14**, más que la ocasión. Promedio negativo: **−16**.
+- **"Duró poco" no es lo mismo que "no me gustó"**: no descalifica el perfume,
+  descalifica usarlo para algo largo. Resta 8 solo en salida, cita y evento, y
+  no molesta para el día a día.
+- Las razones aparecen con el número de veces —*"Te lo elogiaron 2 veces"*— y
+  marcadas como aprendidas, igual que lo que el modelo deduce solo.
+- Tocar de nuevo el botón elegido lo saca: una devolución equivocada se corrige.
+
+Los botones van **sobre el uso ya registrado**, no en el momento de
+registrarlo. Cuando te lo ponés todavía no sabés cómo salió.
+
+## Comprás una cosa, usás otra
+
+En la pestaña de Uso. Dos barras por familia: qué porcentaje de la colección es
+y qué porcentaje de los usos se lleva.
+
+Mirando la colección se ve qué tenés. Mirando la rotación se ve qué usás. Lo
+que no se ve en ninguna de las dos es **la distancia entre las dos**, y es
+justo lo que decide si la próxima compra tiene sentido.
+
+Va en porcentaje y no en cantidad a propósito: cinco ámbar sobre treinta
+frascos es 17 % de la colección; si son el 3 % de los usos, ese hueco de catorce
+puntos es la frase que nadie te dice en la perfumería.
+
+Con menos de cinco usos no dice nada: muestra cuántos faltan. Un gráfico que
+saca conclusiones de tres datos es peor que no tener gráfico.
+
 ## Cómo aprende de tus elecciones
 
 No hay nada mágico ni ninguna red neuronal: cuenta qué usaste en cada ocasión
@@ -697,9 +738,6 @@ disponible, pasale uno: `CHROME_PATH=/ruta/al/chrome node perfumario/tests/e2e.j
 ## Lo que falta
 
 Ideas anotadas para las próximas vueltas:
-
-- Un campo de devolución después del uso ("me lo elogiaron", "no duró nada") que
-  alimente el puntaje; hoy eso queda en una nota libre que el modelo no lee.
 
 - Usar `tempMin` / `tempMax` en el puntaje. Hoy la temperatura ideal sale de la
   familia (un cítrico luce a 27°, un ámbar a 10°), igual para todos los cítricos.
