@@ -1222,6 +1222,54 @@ const check = (n, c, d = '') => {
   check('con dos del mismo peso avisa que no combinan',
     /nada combina bien|se tapan|demasiado/i.test(texto), texto.slice(texto.indexOf('Mezclar'), texto.indexOf('Mezclar') + 140));
 
+  /* La mezcla, vista desde Hoy: estaba enterrada en la ficha y no se encontraba.
+     Con los dos del mismo peso cargados —que no combinan— la línea no tiene que
+     aparecer: una sugerencia que sale siempre no es una sugerencia. */
+  await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+  await ir('hoy');
+  check('si nada combina, el hero no ofrece mezclar',
+    await cuantos('#respuesta [data-mezcla]') === 0,
+    await p.textContent('#respuesta'));
+
+  // y ahora un par que sí: uno denso abajo, uno liviano arriba, con una nota en común
+  await p.evaluate(() => {
+    const base = { conc:'EDP', ml:100, mlRestante:100, precio:0, comprado:null, rating:0, nota:'',
+      ocasiones:['casual'], momento:'ambos', estaciones:['invierno','verano','otono','primavera'] };
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    st.perfumes = [
+      Object.assign({ id:'pe', creado:'2026-01-01', nombre:'Pesado', casa:'P', familia:'ambar',
+        estela:4, longevidad:9, salida:['Bergamota'], corazon:['Rosa'], fondo:['Vainilla'] }, base),
+      Object.assign({ id:'li', creado:'2026-01-01', nombre:'Liviano', casa:'P', familia:'citrica',
+        estela:2, longevidad:4, salida:['Bergamota'], corazon:['Limón'], fondo:['Almizcle blanco'] }, base)
+    ];
+    st.usos = [];
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+  });
+  await p.reload(); await p.waitForTimeout(1600);
+  const lineaMez = await p.evaluate(() => {
+    const e = document.querySelector('#respuesta [data-mezcla]');
+    return e ? e.closest('p').textContent.replace(/\s+/g, ' ').trim() : '';
+  });
+  check('cuando sí combinan, el hero lo ofrece sin que lo vayas a buscar',
+    lineaMez !== '', lineaMez);
+  check('y dice el orden: el denso abajo, el liviano encima',
+    /Pesado abajo/.test(lineaMez) && /Liviano encima/.test(lineaMez), lineaMez);
+  check('la razón que muestra es a favor, no un pero',
+    !/se tapan|nada en común|demasiado|puede no quedar nada|épocas distintas/i.test(lineaMez), lineaMez);
+
+  await p.tap('#respuesta [data-mezcla]'); await p.waitForTimeout(600);
+  check('y toca para abrir la ficha justo en el bloque de mezclar',
+    await p.evaluate(() => {
+      const m = document.querySelector('#modal');
+      const b = document.querySelector('#modalBody #bloqueMezclar');
+      if (!m || m.hidden || !b) return false;
+      // el bloque tiene que haber quedado a la vista, no abajo de todo
+      const caja = b.getBoundingClientRect();
+      return caja.top < window.innerHeight * 0.75;
+    }),
+    'modal ' + (await visible('#modal')));
+  await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+
   console.log('\nAB · Modo ciego');
   await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
   await p.evaluate(() => localStorage.removeItem('perfumario_v1'));
