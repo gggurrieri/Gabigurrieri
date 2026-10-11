@@ -1139,6 +1139,82 @@ const check = (n, c, d = '') => {
   check('se distingue lo que tenés de lo que usás',
     await cuantos('#compraUso .par-barra') === await cuantos('#compraUso .par') * 2);
 
+  console.log('\nAA · Mezclar dos');
+  await p.evaluate(() => localStorage.removeItem('perfumario_v1'));
+  await p.reload(); await p.waitForTimeout(1600);
+  await ir('coleccion');
+  await p.fill('#busca', 'Layton'); await p.waitForTimeout(300);
+  await p.tap('#view-coleccion .pf'); await p.waitForTimeout(500);
+  const mez = await p.evaluate(() => Array.from(document.querySelectorAll('#modalBody .mezcla')).map(e => ({
+    pasos: Array.from(e.querySelectorAll('.mezcla-paso')).map(x => x.textContent.replace(/^\d/, '').trim()),
+    por: e.querySelector('.mezcla-por').textContent.trim(),
+    score: +e.querySelector('.mezcla-score').textContent.trim() })));
+  check('propone combinaciones para un perfume denso', mez.length >= 1, JSON.stringify(mez).slice(0, 120));
+  check('siempre pone primero al que hace de base',
+    mez.every(x => x.pasos[0] === 'Layton'), mez.map(x => x.pasos.join(' → ')).join(' | '));
+  check('y explica por qué', mez.every(x => x.por.length > 5));
+  check('no propone cualquier cosa: todas pasan el umbral',
+    mez.every(x => x.score >= 60), mez.map(x => x.score).join(' '));
+
+  /* candado: dos perfumes del mismo peso no deberían recomendarse entre sí,
+     porque se tapan. Se arma el caso a propósito. */
+  await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+  await p.evaluate(() => {
+    const base = { conc:'EDP', ml:100, mlRestante:100, precio:0, comprado:null, longevidad:9,
+      estaciones:['invierno'], ocasiones:['salida'], momento:'noche', rating:0, nota:'', estela:5,
+      salida:['Bergamota'], corazon:['Rosa'], fondo:['Vainilla'] };
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    st.perfumes = [
+      Object.assign({ id:'b1', creado:'2026-01-01', nombre:'Bomba1', casa:'P', familia:'ambar' }, base),
+      Object.assign({ id:'b2', creado:'2026-01-01', nombre:'Bomba2', casa:'P', familia:'ambar' }, base)
+    ];
+    st.usos = [];
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+  });
+  await p.reload(); await p.waitForTimeout(1600);
+  await ir('coleccion');
+  await p.tap('#view-coleccion .pf'); await p.waitForTimeout(500);
+  const texto = await p.textContent('#modalBody');
+  check('con dos del mismo peso avisa que no combinan',
+    /nada combina bien|se tapan|demasiado/i.test(texto), texto.slice(texto.indexOf('Mezclar'), texto.indexOf('Mezclar') + 140));
+
+  console.log('\nAB · Modo ciego');
+  await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+  await p.evaluate(() => localStorage.removeItem('perfumario_v1'));
+  await p.reload(); await p.waitForTimeout(1600);
+  await ir('uso');
+  check('arranca explicando para qué sirve', /sin nombre ni marca/i.test(await p.textContent('#ciegoSub')));
+
+  await p.tap('#btnCiego'); await p.waitForTimeout(500);
+  check('muestra dos fichas', await cuantos('#modalBody .ciego-ficha') === 2);
+  const tapado = await p.textContent('#modalBody .ciego-par');
+  const nombres = await p.evaluate(() =>
+    JSON.parse(localStorage.getItem('perfumario_v1')).perfumes.map(x => x.nombre));
+  check('y ninguna dice el nombre ni la marca',
+    !nombres.some(n => tapado.includes(n)), tapado.slice(0, 90));
+  check('pero sí las notas y la estela', /Salida|Corazón|Fondo/.test(tapado) && /▮/.test(tapado));
+
+  await p.tap('#modalBody .ciego-ficha[data-ciego="a"]'); await p.waitForTimeout(600);
+  const guardadas = await p.evaluate(() => JSON.parse(localStorage.getItem('perfumario_v1')).ciego);
+  check('guarda la comparación con quién ganó',
+    guardadas.length === 1 && guardadas[0].gana && [guardadas[0].a, guardadas[0].b].includes(guardadas[0].gana),
+    JSON.stringify(guardadas[0]));
+  check('y sigue con otro par', await cuantos('#modalBody .ciego-ficha') === 2);
+
+  // con varias comparaciones aparece la tabla
+  await p.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    const ids = st.perfumes.slice(0, 4).map(x => x.id);
+    st.ciego = [];
+    for (let i = 0; i < 8; i++) st.ciego.push({
+      a: ids[i % 2], b: ids[2 + (i % 2)], gana: ids[i % 2], fecha: '2026-10-01' });
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+  });
+  await p.reload(); await p.waitForTimeout(1600);
+  await ir('uso');
+  check('con suficientes comparaciones arma el ranking',
+    await cuantos('#ciegoTabla .bar-row') >= 2, await p.textContent('#ciegoSub'));
+
   console.log('\nX · Imaginar otra estación');
   await p.evaluate(() => localStorage.removeItem('perfumario_v1'));
   await p.reload(); await p.waitForTimeout(1500);

@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-11.3';
+const VERSION = '2026-10-11.4';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -55,6 +55,7 @@ const DEFAULTS = {
   perfumes: [],  // {id,nombre,casa,conc,familia,salida[],corazon[],fondo[],ml,mlRestante,
                  //  precio,comprado,longevidad,estela,estaciones[],ocasiones[],momento,rating,nota,creado}
   usos: [],      // {id,fecha,perfumeId,sprays,ocasion,momento,temp,nota}
+  ciego: [],
   ajustes: { mlSpray: 0.1, moneda: '$', hemisferio: 'sur', aprender: true, clima: false, ocasion: 'casual' },
   meta: { version: 1, ultimaCopia: null,
           lugar: null,   // {nombre, lat, lon} elegido una vez en Ajustes
@@ -1116,6 +1117,90 @@ function avisoCopia() {
    cada perfume se elige por lo que agrega sobre los ya elegidos.        */
 let viaje = { lugar: null, dias: null };
 
+/* ---------------------- la semana que viene -------------------------
+   El pronóstico que la app ya baja llega a quince días y solo se usaba el de
+   hoy. Mostrar siete convierte a Perfumario en algo que se abre el domingo
+   para resolver la semana, y no solo cada mañana para decidir el día.
+
+   No repite: una vez que un perfume salió en un día, queda fuera de los
+   siguientes. Una semana entera con el mismo frasco no es una recomendación,
+   es un cartel de que no mirás la colección. */
+let semanaAbierta = false;
+
+function verSemana() {
+  semanaAbierta = !semanaAbierta;
+  $('#cardSemana').hidden = !semanaAbierta;
+  $('#btnSemana').textContent = semanaAbierta ? 'Ocultar la semana' : 'Ver la semana';
+  if (!semanaAbierta) return;
+  if (!S.perfumes.length) { $('#semanaSub').textContent = 'Primero cargá tu colección.'; return; }
+
+  const lugar = S.meta.lugar;
+  if (!S.ajustes.clima || !lugar) {
+    $('#semanaSub').textContent = 'Necesito el clima prendido y una ubicación, en Ajustes.';
+    $('#semana').innerHTML = '';
+    return;
+  }
+  $('#semanaSub').textContent = 'Buscando el pronóstico…';
+  $('#semana').innerHTML = '';
+
+  const url = `${CLIMA_API}?latitude=${lugar.lat}&longitude=${lugar.lon}` +
+    '&daily=apparent_temperature_max,apparent_temperature_min,temperature_2m_max,' +
+    'temperature_2m_min,relative_humidity_2m_mean,wind_speed_10m_max,precipitation_sum,' +
+    'weather_code&timezone=auto&forecast_days=7';
+
+  pedirJSON(url, 12000).then(d => {
+    const dd = d && d.daily;
+    if (!dd || !dd.time || !dd.time.length) throw new Error('sin pronóstico');
+    const sens = (arr, i, resp) => (arr && typeof arr[i] === 'number') ? arr[i] : resp;
+    const dias = dd.time.map((f, i) => ({
+      fecha: f,
+      max: sens(dd.apparent_temperature_max, i, dd.temperature_2m_max[i]),
+      min: sens(dd.apparent_temperature_min, i, dd.temperature_2m_min[i]),
+      humedad: dd.relative_humidity_2m_mean ? dd.relative_humidity_2m_mean[i] : null,
+      viento: dd.wind_speed_10m_max ? dd.wind_speed_10m_max[i] : null,
+      lluvia: (dd.precipitation_sum[i] || 0) >= 1 || estaLloviendo(dd.weather_code[i])
+    }));
+    return dias;
+  }).catch(() => {
+    $('#semanaSub').textContent = 'No se pudo traer el pronóstico. Probá con internet.';
+    return null;
+  }).then(dias => { if (dias) pintarSemana(dias); });
+}
+
+function pintarSemana(dias) {
+  const m = modeloAprendido();
+  const usados = new Set();
+  const vivos = S.perfumes.filter(p => !(p.ml > 0 && p.mlRestante <= 0));
+
+  const filas = dias.map(d => {
+    const ctxDia = {
+      temp: (d.max + d.min) / 2, arco: [d.min, d.max],
+      momento: 'dia', ocasion: S.ajustes.ocasion || 'casual',
+      estacion: estacionDe(d.fecha), lluvia: d.lluvia,
+      humedad: d.humedad, viento: d.viento, aire: null
+    };
+    const libres = vivos.filter(p => !usados.has(p.id));
+    const lista = (libres.length ? libres : vivos)
+      .map(p => Object.assign({ p }, puntuar(p, m, ctxDia))).sort((a, b) => b.score - a.score);
+    const g = lista[0];
+    if (g) usados.add(g.p.id);
+    return { d, g };
+  });
+
+  $('#semanaSub').textContent =
+    `${dias.length} días, ${new Set(filas.map(f => f.g && f.g.p.id)).size} perfumes distintos. Un toque abre la ficha.`;
+  $('#semana').innerHTML = filas.map(({ d, g }) => {
+    const dia = fromISO(d.fecha);
+    const nombreDia = ['dom','lun','mar','mié','jue','vie','sáb'][dia.getDay()];
+    const hoyEs = d.fecha === today();
+    return `<div class="dia${hoyEs ? ' dia-hoy' : ''}"${g ? ` data-ficha="${g.p.id}" role="button" tabindex="0"` : ''}>
+      <div class="dia-fecha"><b>${hoyEs ? 'hoy' : nombreDia}</b><span>${dia.getDate()}</span></div>
+      <div class="dia-clima">${Math.round(d.min)}° a ${Math.round(d.max)}°${d.lluvia ? ' · lluvia' : ''}</div>
+      <div class="dia-pf">${g ? punto(familia(g.p.familia)) + esc(g.p.nombre) : '—'}</div>
+    </div>`;
+  }).join('');
+}
+
 function abrirViaje() {
   const d1 = addDays(today(), 7), d2 = addDays(today(), 12);
   viaje = { lugar: null, dias: null };
@@ -1444,6 +1529,148 @@ function etiquetaFamilia(p, f) {
   return `${punto(f)}${esc(f.nombre)}`;
 }
 
+/* ----------------------------- modo ciego ---------------------------
+   Puntuar del 1 al 5 es casi imposible: unos ponen todo 4 y otros todo 2, y
+   la marca y el precio deciden antes que la nariz. Elegir entre dos es fácil.
+
+   Se muestran dos fichas SIN nombre ni casa —solo notas, familia, estela y
+   duración— y se pregunta cuál. De muchas comparaciones de a pares sale un
+   orden, y ese orden está limpio de etiqueta.
+
+   Cuando además hay estrellas puestas, se puede medir la distancia entre las
+   dos cosas: cuánto de lo que creés que te gusta es el olor y cuánto el
+   frasco.                                                                  */
+function parCiego() {
+  const aptos = S.perfumes.filter(p => notasDe(p).length >= 2);
+  if (aptos.length < 2) return null;
+  /* Se elige el par con MENOS comparaciones encima, no al azar: así el
+     torneo cubre toda la colección en vez de insistir con los mismos. */
+  const veces = {};
+  (S.ciego || []).forEach(c => { veces[c.a] = (veces[c.a] || 0) + 1; veces[c.b] = (veces[c.b] || 0) + 1; });
+  const orden = aptos.slice().sort((x, y) => (veces[x.id] || 0) - (veces[y.id] || 0));
+  const pozo = orden.slice(0, Math.max(4, Math.ceil(orden.length / 3)));
+  const a = pozo[Math.floor(Math.random() * pozo.length)];
+  const resto = aptos.filter(x => x.id !== a.id);
+  const b = resto[Math.floor(Math.random() * resto.length)];
+  return [a, b];
+}
+
+/* Victorias sobre comparaciones: simple y suficiente para este tamaño. */
+function tablaCiega() {
+  const c = S.ciego || [];
+  const t = {};
+  c.forEach(x => {
+    [x.a, x.b].forEach(id => { t[id] = t[id] || { ganó: 0, jugó: 0 }; t[id].jugó++; });
+    if (t[x.gana]) t[x.gana].ganó++;
+  });
+  return Object.keys(t).map(id => ({ p: perfume(id), ...t[id] }))
+    .filter(x => x.p).map(x => ({ ...x, pct: Math.round((x.ganó / x.jugó) * 100) }))
+    .sort((a, b) => b.pct - a.pct || b.jugó - a.jugó);
+}
+
+function fichaCiega(p, lado) {
+  const f = familia(p.familia);
+  const nivel = (t, arr) => (arr && arr.length)
+    ? `<div class="ciego-nivel"><span>${t}</span>${esc(arr.join(', '))}</div>` : '';
+  return `<button class="ciego-ficha" data-ciego="${lado}">
+    <div class="ciego-fam">${punto(f)}${esc(f.nombre)}${p.conc ? ' · ' + esc(p.conc) : ''}</div>
+    ${nivel('Salida', p.salida)}${nivel('Corazón', p.corazon)}${nivel('Fondo', p.fondo)}
+    <div class="ciego-datos">${p.longevidad ? p.longevidad + ' h · ' : ''}estela ${'▮'.repeat(p.estela || 0)}${'▯'.repeat(5 - (p.estela || 0))}</div>
+    <span class="ciego-elegir">Este</span>
+  </button>`;
+}
+
+let parActual = null;
+
+function abrirCiego() {
+  parActual = parCiego();
+  if (!parActual) {
+    abrirModal('Modo ciego', '<p class="sub">Hacen falta al menos dos perfumes con notas cargadas.</p>');
+    return;
+  }
+  const [a, b] = parActual;
+  const hechas = (S.ciego || []).length;
+  abrirModal('¿Cuál elegirías?', `
+    <p class="sub">Sin nombre ni marca: solo lo que hay adentro. Van ${hechas} comparacion${hechas === 1 ? '' : 'es'}.</p>
+    <div class="ciego-par">${fichaCiega(a, 'a')}${fichaCiega(b, 'b')}</div>
+    <div class="btn-row"><button class="btn" id="btnCiegoPaso">Ninguno / no sé</button></div>`);
+  $('#btnCiegoPaso').addEventListener('click', () => abrirCiego());
+}
+
+function resolverCiego(lado) {
+  if (!parActual) return;
+  const [a, b] = parActual;
+  const gana = lado === 'a' ? a : b;
+  S.ciego = (S.ciego || []).concat([{ a: a.id, b: b.id, gana: gana.id, fecha: today() }]);
+  guardar();
+  toast(`Elegiste ${gana.nombre}`);
+  render();
+  abrirCiego();
+}
+
+/* ------------------------- mezclar dos ------------------------------
+   Superponer dos perfumes es una práctica real —las marcas la promueven— y
+   tiene reglas, no es juntar lo que a uno le gusta. Las tres que importan:
+
+   1. Uno pone la base y el otro la apertura. Dos perfumes densos se tapan
+      entre sí; dos livianos se evaporan juntos y no queda nada.
+   2. Tiene que haber un puente: una nota compartida, o dos familias vecinas.
+      Sin nada en común no se mezclan, se pelean.
+   3. No dos ruidosos. La estela se suma, el perfume no.
+
+   Esto la app lo puede calcular porque ya tiene las pirámides, las familias,
+   la estela y la duración de cada frasco.                                  */
+
+/* Qué tan "de base" es una familia: las de abajo sostienen, las de arriba
+   abren. Es la misma escala de temperatura ideal, mirada al revés. */
+const PESO_FAMILIA = {
+  gourmand: 5, ambar: 5, cuero: 5, chipre: 4, amaderada: 4, almizclada: 3,
+  floral: 3, aromatica: 2, verde: 2, acuatica: 1, citrica: 1
+};
+const pesoDe = p => (PESO_FAMILIA[p.familia] || 3) + (p.estela || 3) / 3 + (p.longevidad || 6) / 6;
+
+function mezclasPara(base) {
+  const otros = S.perfumes.filter(p => p.id !== base.id && !(p.ml > 0 && p.mlRestante <= 0));
+  const notasA = new Set(notasDe(base).map(n => n.toLowerCase()));
+
+  return otros.map(otro => {
+    const razones = [];
+    let score = 50;
+
+    // 1. roles distintos: uno abajo y otro arriba
+    const dif = Math.abs(pesoDe(base) - pesoDe(otro));
+    if (dif >= 1.5) {
+      score += 22;
+      razones.push('uno pone la base y el otro la apertura');
+    } else if (dif < 0.6) {
+      score -= 18;
+      razones.push('los dos ocupan el mismo lugar: se tapan');
+    }
+
+    // 2. el puente: algo en común para que se peguen
+    const comunes = notasDe(otro).filter(n => notasA.has(n.toLowerCase()));
+    if (comunes.length >= 2) { score += 20; razones.push(`comparten ${comunes.slice(0, 2).join(' y ').toLowerCase()}`); }
+    else if (comunes.length === 1) { score += 12; razones.push(`los une ${comunes[0].toLowerCase()}`); }
+    else if (Math.abs((PESO_FAMILIA[base.familia] || 3) - (PESO_FAMILIA[otro.familia] || 3)) <= 2) {
+      score += 4; razones.push('familias vecinas');
+    } else { score -= 20; razones.push('no tienen nada en común'); }
+
+    // 3. ruido: la estela se suma
+    const ruido = (base.estela || 3) + (otro.estela || 3);
+    if (ruido >= 8) { score -= 20; razones.push('los dos proyectan fuerte: va a ser demasiado'); }
+    else if (ruido <= 4) { score -= 10; razones.push('los dos son discretos: puede no quedar nada'); }
+
+    // 4. que sirvan para el mismo clima
+    const est = (base.estaciones || []).filter(e => (otro.estaciones || []).includes(e));
+    if (est.length) { score += 8; razones.push(`los dos andan en ${est.map(nombreEstacion).join(' y ')}`); }
+    else { score -= 14; razones.push('son de épocas distintas del año'); }
+
+    const abajo = pesoDe(base) >= pesoDe(otro) ? base : otro;
+    const arriba = abajo === base ? otro : base;
+    return { p: otro, score: Math.round(clamp(score, 0, 100)), razones, abajo, arriba };
+  }).sort((a, b) => b.score - a.score);
+}
+
 /* ----------------------------- iconos -------------------------------
    Los emojis se fueron de la interfaz. Son ilustraciones a color, dibujadas
    por otro, cada una con su paleta y sus sombras: juntas en una pantalla eran
@@ -1659,6 +1886,8 @@ function abrirFicha(id) {
       <button class="btn btn-accent" data-usar="${p.id}">Registrar uso</button>
       <button class="btn" data-editar="${p.id}">Editar</button>
     </div>
+    ${bloqueMezclas(p)}
+
     <div class="btn-row">
       <button class="btn" data-rellenar="${p.id}">Rellené el frasco</button>
       <button class="btn" data-comparar="${p.id}">Comparar</button>
@@ -1678,6 +1907,33 @@ function abrirFicha(id) {
 }
 
 /* ---------------------------- formulario --------------------------- */
+/* Las tres mejores combinaciones, con el orden de aplicación. El orden no es
+   un detalle: lo denso va primero y pegado a la piel, lo liviano encima. Al
+   revés, el liviano queda sepultado. */
+function bloqueMezclas(p) {
+  const todas = mezclasPara(p);
+  if (todas.length < 1) return '';
+  const buenas = todas.filter(x => x.score >= 60).slice(0, 3);
+  if (!buenas.length) {
+    return `<section class="card"><h2>Mezclar</h2>
+      <p class="hint">Con lo que tenés, nada combina bien con este. La mejor opción
+      es ${esc(todas[0].p.nombre)} y aun así ${esc(todas[0].razones[0])}.</p></section>`;
+  }
+  return `<section class="card"><h2>Mezclar</h2>
+    <p class="sub">Primero el de abajo, pegado a la piel; el otro encima.</p>
+    <div class="stack-sm">${buenas.map(x => `
+      <div class="mezcla" data-ficha="${x.p.id}" role="button" tabindex="0">
+        <div class="mezcla-orden">
+          <span class="mezcla-paso"><b>1</b>${esc(x.abajo.nombre)}</span>
+          <span class="mezcla-paso"><b>2</b>${esc(x.arriba.nombre)}</span>
+        </div>
+        <div class="mezcla-por">${esc(x.razones.slice(0, 2).join(' · '))}</div>
+        <div class="mezcla-score">${x.score}</div>
+      </div>`).join('')}</div>
+    <p class="hint">Probalo primero en la muñeca, con una aplicación de cada uno.</p>
+  </section>`;
+}
+
 function abrirFormulario(id) {
   const p = id ? perfume(id) : null;
   const v = p || {
@@ -2554,6 +2810,35 @@ function tablaComparacion(a, b) {
    Se mide por familia y en porcentaje, no en cantidad: cinco ámbar sobre
    treinta frascos es 17 % de la colección; si son el 3 % de los usos, ese
    hueco de 14 puntos es la frase que nadie te dice en la perfumería. */
+function renderCiego() {
+  const t = tablaCiega();
+  const hechas = (S.ciego || []).length;
+  if (hechas < 5) {
+    $('#ciegoSub').textContent = hechas
+      ? `${hechas} comparacion${hechas === 1 ? '' : 'es'}. Desde cinco empieza a ordenarse.`
+      : 'Dos perfumes sin nombre ni marca: elegís por lo que hay adentro. Con el tiempo sale un orden limpio de etiqueta.';
+    $('#ciegoTabla').innerHTML = '';
+    return;
+  }
+
+  /* La parte que duele: comparar el orden ciego con las estrellas que pusiste
+     mirando el frasco. Solo se muestra si hay estrellas; si no, no hay con qué
+     comparar y decirlo igual sería inventar. */
+  const conEstrellas = t.filter(x => x.p.rating >= 1 && x.jugó >= 2);
+  let titular = `${hechas} comparaciones.`;
+  if (conEstrellas.length >= 3) {
+    const porCiego = conEstrellas.slice().sort((a, b) => b.pct - a.pct).map(x => x.p.id);
+    const porEstrella = conEstrellas.slice().sort((a, b) => b.p.rating - a.p.rating).map(x => x.p.id);
+    const movidos = porCiego.filter((id, i) => Math.abs(i - porEstrella.indexOf(id)) >= 2).length;
+    titular += movidos
+      ? ` ${movidos} de ${conEstrellas.length} cambian de lugar cuando no ves la marca.`
+      : ' Tu orden a ciegas coincide con tus estrellas: elegís por el olor.';
+  }
+  $('#ciegoSub').textContent = titular;
+  $('#ciegoTabla').innerHTML = t.filter(x => x.jugó >= 2).slice(0, 8)
+    .map(x => barra(x.p.nombre, `${x.ganó} de ${x.jugó}`, x.pct, familia(x.p.familia).color)).join('');
+}
+
 function compraContraUso() {
   const total = S.perfumes.length;
   const usos = S.usos.filter(u => perfume(u.perfumeId));
@@ -2665,6 +2950,7 @@ function renderUso() {
     x.p.nombre, `${x.c} uso${x.c === 1 ? '' : 's'} · ${Math.round((x.c / totalR) * 100)} %`,
     (x.c / ranking[0].c) * 100, familia(x.p.familia).color)).join('');
 
+  renderCiego();
   compraContraUso();
 
   // juntando polvo
@@ -2902,6 +3188,8 @@ function conectar() {
     guardar();
     renderHoy();
   });
+  $('#btnSemana').addEventListener('click', verSemana);
+  $('#btnCiego').addEventListener('click', abrirCiego);
   $('#ctxEstacion').addEventListener('click', e => {
     const c = e.target.closest('.chip'); if (!c) return;
     ctx.estacion = (ctx.estacion === c.dataset.val) ? null : c.dataset.val;
@@ -3041,6 +3329,9 @@ function conectar() {
       if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
+
+    const cg = e.target.closest('[data-ciego]');
+    if (cg) { resolverCiego(cg.dataset.ciego); return; }
 
     const dv = e.target.closest('[data-dev]');
     if (dv) {
