@@ -366,6 +366,57 @@ parecido de tu colección.
 Si ponés el mismo perfume de los dos lados, te avisa en lugar de corregirte la
 selección por atrás.
 
+## La semana que viene
+
+El pronóstico que la app ya baja llega a quince días y solo se usaba el de hoy.
+Un botón en Hoy abre siete filas: un perfume por día, con la mínima, la máxima
+y si llueve.
+
+**No repite**: una vez que un perfume sale en un día, queda fuera de los
+siguientes. Una semana entera con el mismo frasco no es una recomendación, es
+un cartel de que no estás mirando la colección.
+
+## Mezclar dos
+
+Superponer dos perfumes es una práctica real y tiene reglas. En cada ficha hay
+tres combinaciones propuestas, con el **orden de aplicación**, que no es un
+detalle: lo denso va primero y pegado a la piel, lo liviano encima. Al revés,
+el liviano queda sepultado.
+
+Las reglas que calcula, sobre datos que la app ya tenía:
+
+1. **Roles distintos.** Uno pone la base y el otro la apertura. Dos perfumes
+   densos se tapan entre sí; dos livianos se evaporan juntos y no queda nada.
+   El "peso de base" sale de la familia más la estela más la duración.
+2. **Un puente.** Una nota compartida, o dos familias vecinas. Sin nada en
+   común no se mezclan, se pelean.
+3. **No dos ruidosos.** La estela se suma, el perfume no.
+4. **El mismo clima.** Si uno es de invierno y el otro de verano, no es una
+   combinación, son dos perfumes distintos.
+
+Si nada supera el umbral lo dice, con el motivo. Una app que siempre encuentra
+tres recomendaciones no está calculando nada.
+
+## Modo ciego
+
+Puntuar del 1 al 5 es casi imposible: unos ponen todo 4 y otros todo 2, y la
+marca y el precio deciden antes que la nariz. Elegir entre dos es fácil.
+
+En la pestaña de Uso: dos fichas **sin nombre ni casa**, solo notas, familia,
+estela y duración. Elegís una. De muchas comparaciones de a pares sale un
+orden, y ese orden está limpio de etiqueta.
+
+- **El par no es al azar**: se eligen los perfumes con menos comparaciones
+  encima, así el torneo cubre toda la colección en vez de insistir con los
+  mismos cuatro.
+- **Con menos de cinco comparaciones no muestra ranking.**
+- **Cuando además hay estrellas puestas**, compara los dos órdenes y dice
+  cuántos perfumes cambian de lugar al no ver la marca. Si no hay estrellas no
+  dice nada: no habría con qué comparar.
+
+> El mecanismo se llama *pairwise comparison*. Da resultados más estables que
+> una nota absoluta porque elimina el sesgo de escala.
+
 ## Qué llevar de viaje
 
 **Hoy → ✈️ Me voy de viaje**: destino, fechas, qué vas a hacer allá y cuántos

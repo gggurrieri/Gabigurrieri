@@ -131,7 +131,16 @@
         <div id="sugerencias" class="stack"></div>
       </details>
 
+      <!-- La semana: el pronóstico que la app ya baja llega a quince días y solo
+           se usaba el de hoy. Mirarlo el domingo a la noche resuelve la semana. -->
+      <section class="card" id="cardSemana" hidden>
+        <h2>La semana que viene</h2>
+        <p class="sub" id="semanaSub">—</p>
+        <div id="semana" class="semana"></div>
+      </section>
+
       <div class="btn-row">
+        <button class="btn" id="btnSemana">Ver la semana</button>
         <button class="btn" id="btnViaje">Me voy de viaje</button>
       </div>
 
@@ -228,6 +237,15 @@
       <!-- El cruce que no se ve mirando ninguna de las dos listas por separado:
            qué proporción de la colección es cada familia, contra qué proporción
            de los usos. -->
+      <!-- Modo ciego: comparar de a dos sin ver el nombre, para sacar la marca
+           de la decisión. -->
+      <section class="card" id="cardCiego">
+        <h2>Modo ciego</h2>
+        <p class="sub" id="ciegoSub">—</p>
+        <div id="ciegoTabla" class="bars"></div>
+        <div class="btn-row"><button class="btn btn-accent" id="btnCiego">Comparar a ciegas</button></div>
+      </section>
+
       <section class="card" id="cardCompraUso">
         <h2>Comprás una cosa, usás otra</h2>
         <p class="sub" id="compraUsoSub">—</p>

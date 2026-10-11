@@ -23,7 +23,7 @@
   --sp-0:2px;  --sp-1:4px;  --sp-2:6px;  --sp-3:8px;   --sp-4:10px;
   --sp-5:12px; --sp-6:14px; --sp-7:16px; --sp-8:24px;  --sp-9:32px;
 
-  --t-1:11px;  --t-2:12px;  --t-3:13px;  --t-4:15px;
+  --t-0:10px;  --t-1:11px;  --t-2:12px;  --t-3:13px;  --t-4:15px;
   --t-5:17px;  --t-6:20px;  --t-7:26px;
 
   --r-sm:9px;  --r-md:12px; --r-lg:16px; --r-xl:20px; --r-pill:999px;
@@ -346,6 +346,45 @@ button.item{width:100%;text-align:left;cursor:pointer;font:inherit}
 .ref{display:inline-block;width:14px;height:6px;border-radius:var(--r-pill)}
 .ref-tengo{background:var(--muted)}
 .ref-uso{background:var(--accent)}
+
+/* la semana que viene: una fila por día */
+.semana{display:flex;flex-direction:column;gap:var(--sp-1);margin-top:var(--sp-5)}
+.dia{display:grid;grid-template-columns:auto 1fr;gap:var(--sp-1) var(--sp-5);
+  align-items:baseline;padding:var(--sp-3) var(--sp-4);border-radius:var(--r-md);cursor:pointer}
+.dia:active{background:var(--card-2)}
+.dia-hoy{background:var(--realce-sutil)}
+.dia-fecha{display:flex;gap:var(--sp-2);align-items:baseline;font-size:var(--t-2);color:var(--muted)}
+.dia-fecha b{color:var(--txt);font-weight:600;text-transform:capitalize}
+.dia-clima{font-size:var(--t-1);color:var(--muted);text-align:right}
+.dia-pf{grid-column:1 / -1;font-size:var(--t-3)}
+
+/* mezclar dos: el orden de aplicación primero, el motivo abajo */
+.mezcla{display:grid;grid-template-columns:1fr auto;gap:var(--sp-1) var(--sp-4);
+  background:var(--card-2);border-radius:var(--r-md);padding:var(--sp-4) var(--sp-5);cursor:pointer}
+.mezcla:active{opacity:.8}
+.mezcla-orden{grid-column:1;grid-row:1;display:flex;flex-wrap:wrap;
+  gap:var(--sp-2) var(--sp-4);font-size:var(--t-3)}
+.mezcla-paso{display:inline-flex;align-items:center;gap:var(--sp-2)}
+.mezcla-paso b{display:inline-flex;align-items:center;justify-content:center;
+  width:17px;height:17px;border-radius:var(--r-pill);background:var(--accent);
+  color:var(--accent-ink);font-size:var(--t-0);font-weight:700;flex:none}
+.mezcla-por{grid-column:1;grid-row:2;font-size:var(--t-1);color:var(--muted);line-height:1.4}
+.mezcla-score{grid-column:2;grid-row:1 / span 2;align-self:center;font-family:var(--display);
+  font-size:var(--t-5);color:var(--accent);font-variant-numeric:tabular-nums}
+
+/* modo ciego: dos fichas sin nombre, una al lado de la otra */
+.ciego-par{display:flex;gap:var(--sp-3);margin-bottom:var(--sp-4)}
+.ciego-ficha{flex:1;min-width:0;text-align:left;background:var(--card-2);border:0;
+  border-radius:var(--r-md);padding:var(--sp-5);color:var(--txt);cursor:pointer;
+  display:flex;flex-direction:column;gap:var(--sp-2)}
+.ciego-ficha:active{opacity:.8}
+.ciego-fam{font-size:var(--t-1);color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.ciego-nivel{font-size:var(--t-2);line-height:1.4}
+.ciego-nivel span{display:block;font-size:var(--t-1);color:var(--muted)}
+.ciego-datos{font-size:var(--t-1);color:var(--muted);margin-top:var(--sp-1)}
+.ciego-elegir{margin-top:var(--sp-3);text-align:center;background:var(--accent);
+  color:var(--accent-ink);border-radius:var(--r-pill);padding:var(--sp-3);
+  font-size:var(--t-2);font-weight:600}
 .chip-sec{font-size:var(--t-3);padding:var(--sp-2) var(--sp-5);opacity:.75}
 .chip-sec.on{opacity:1}
 
