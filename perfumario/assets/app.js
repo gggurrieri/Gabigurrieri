@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-11.4';
+const VERSION = '2026-10-11.5';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -2651,9 +2651,9 @@ function renderNotas() {
     }
     $('#perfilSub').textContent = sub;
     $('#perfilFamilias').innerHTML = porFam.map(x => barra(
-      `${punto(x.f)}${x.f.nombre}`,
+      x.f.nombre,
       `${x.tiene} en la colección · ${x.usos} uso${x.usos === 1 ? '' : 's'}`,
-      total ? (x.tiene / total) * 100 : 0, x.f.color)).join('');
+      total ? (x.tiene / total) * 100 : 0, x.f.color, punto(x.f))).join('');
     $('#perfilNotas').innerHTML = contarNotas(S.perfumes).slice(0, 12)
       .map(x => `<span class="tag" data-nota="${esc(x.n)}"><b>${esc(x.n)}</b> ${x.c}</span>`).join('');
   }
@@ -2881,9 +2881,12 @@ function compraContraUso() {
   '<p class="hint par-ref"><i class="ref ref-tengo"></i> lo que tenés &nbsp; <i class="ref ref-uso"></i> lo que usás</p>';
 }
 
-function barra(lbl, val, pct, color) {
+/* `marca` es el único trozo de HTML que entra sin escapar, y lo arma la app
+   (el punto de color de la familia). La etiqueta y el valor siguen escapados:
+   son texto que puede venir de lo que escribiste vos. */
+function barra(lbl, val, pct, color, marca) {
   return `<div class="bar-row">
-    <div class="bar-lbl">${esc(lbl)}</div><div class="bar-val">${esc(val)}</div>
+    <div class="bar-lbl">${marca || ''}${esc(lbl)}</div><div class="bar-val">${esc(val)}</div>
     <div class="bar-track"><i style="width:${clamp(pct, 2, 100)}%${color ? `;background:${color}` : ''}"></i></div>
   </div>`;
 }
