@@ -89,6 +89,33 @@ hace falta a las nueve de la noche es una respuesta.
   la app aprendió se mudó a la pestaña Uso, que es donde se miran las
   estadísticas.
 
+### Segunda pasada: jerarquía
+
+La primera pasada sacó controles. La segunda ordenó lo que quedó, porque nueve
+bloques seguidos al mismo nivel visual se leen como una lista, no como una
+respuesta.
+
+- **La pregunta, en un solo bloque.** La línea de contexto ("21°, noche de
+  primavera") y las dos filas de chips viven dentro de `.pregunta`, con un fondo
+  apenas distinto: se ve que son una cosa, y que la respuesta es otra.
+- **Las alternativas son alternativas.** Eran tarjetas de 216 px con miniatura,
+  tres razones, el puntaje grande con su etiqueta y dos botones: casi el tamaño
+  del hero. Ahora son filas de **75 px** —miniatura chica, nombre, casa, hasta
+  dos razones, puntaje y un "Me lo pongo" de pastilla—, dentro de una tarjeta
+  propia que se abre y se cierra. La pantalla pasó de **1.166 px a 914 px**.
+- **Dos razones, no una.** La primera versión de la fila mostraba una sola razón
+  y la prueba lo detectó enseguida: filtrar por "la mejor" escondía las
+  advertencias. Ahora muestra **la mejor a favor y la más relevante en contra**,
+  que es lo que cambia una decisión.
+- **"Ver otras 2 opciones" tiene forma.** Era un triangulito dorado suelto entre
+  el hero y los botones. Ahora es una fila de 44 px con su título —"Otra opción"
+  o "Otras N opciones", según cuántas haya— y un chevron que gira al abrir.
+- **La ficha ahora muestra el porqué.** El botón decía "Ver por qué, y la ficha"
+  y la ficha nunca mostraba el porqué: era un agujero viejo. El bloque **Por qué
+  hoy** abre la ficha con el contexto, la lista completa y ordenada de razones
+  —las aprendidas primero, después las del clima— y el puntaje. Las filas
+  compactas muestran dos razones justamente porque el resto está acá.
+
 ## Cómo decide qué recomendarte
 
 El número grande de cada tarjeta es el **puntaje**, de 0 a 100, y lleva su
