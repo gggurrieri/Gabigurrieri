@@ -1031,6 +1031,114 @@ const check = (n, c, d = '') => {
   await tocarAire('adentro');
   check('sin elegir nada, la dosis es la de siempre', await sprays() === base);
 
+  console.log('\nY · Devolución después del uso');
+  /* Dos perfumes idénticos salvo la devolución, para que lo único que pueda
+     separarlos sea lo que pasó al usarlos. */
+  const conDevoluciones = async (resA, resB) => {
+    await p.evaluate(([ra, rb]) => {
+      const base = {
+        conc: 'EDP', familia: 'aromatica', salida: ['Bergamota'], corazon: ['Lavanda'],
+        fondo: ['Cedro'], ml: 100, mlRestante: 100, precio: 0, comprado: null, longevidad: 8,
+        estaciones: ['verano', 'primavera', 'otoño', 'invierno'],
+        ocasiones: ['trabajo', 'casual', 'salida', 'cita', 'evento', 'deporte'],
+        momento: 'ambos', rating: 0, nota: '', estela: 3
+      };
+      const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+      st.perfumes = [
+        Object.assign({ id: 'cariño', creado: '2026-01-01', nombre: 'Carino', casa: 'Prueba' }, base),
+        Object.assign({ id: 'bronca', creado: '2026-01-01', nombre: 'Bronca', casa: 'Prueba' }, base)
+      ];
+      const viejo = new Date(); viejo.setDate(viejo.getDate() - 20);
+      const f = viejo.toISOString().slice(0, 10);
+      st.usos = [];
+      [['cariño', ra], ['bronca', rb]].forEach(([id, r], i) => {
+        for (let k = 0; k < 2; k++) st.usos.push({
+          id: `d${i}${k}`, perfumeId: id, fecha: f, ocasion: 'casual', sprays: 3, temp: 20,
+          nota: '', resultado: r });
+      });
+      localStorage.setItem('perfumario_v1', JSON.stringify(st));
+    }, [resA, resB]);
+    await p.reload(); await p.waitForTimeout(1500);
+  };
+
+  await conDevoluciones(null, null);
+  const empate = await ranking();
+  check('sin devoluciones los dos quedan parejos',
+    Math.abs(+empate.split('|')[0].split(':')[1] - +empate.split('|')[1].split(':')[1]) <= 1, empate);
+
+  await conDevoluciones('elogio', 'mal');
+  const conDev = await ranking();
+  check('el que te elogiaron gana al que te arrepentiste',
+    conDev.split(':')[0] === 'Carino', conDev);
+  check('y la respuesta dice por qué, con el número de veces',
+    /elogiaron 2 veces/i.test(await p.textContent('#respuesta')), '');
+  await ir('hoy');
+  check('el que falló lo dice también',
+    /arrepentiste/i.test(await p.textContent('#sugerencias')), await p.textContent('#sugerencias'));
+
+  /* "Duró poco" no condena el perfume: lo descalifica para algo largo */
+  await conDevoluciones('corto', null);
+  await p.tap('#ctxOcasion .chip[data-val="casual"]'); await p.waitForTimeout(400);
+  const enCorto = await ranking();
+  await p.tap('#ctxOcasion .chip[data-val="evento"]'); await p.waitForTimeout(400);
+  const enLargo = await ranking();
+  check('"duró poco" no molesta para el día a día pero sí para un evento',
+    !/duró poco/i.test(enCorto) && /duró poco/i.test(await p.textContent('#respuesta') + await p.textContent('#sugerencias')),
+    enLargo);
+
+  // los cuatro botones, sobre el uso de hoy
+  await p.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    st.usos = [{ id: 'hoy1', perfumeId: 'cariño', fecha: new Date().toISOString().slice(0,10),
+                 ocasion: 'casual', sprays: 3, temp: 20, nota: '' }];
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+  });
+  await p.reload(); await p.waitForTimeout(1500);
+  check('el uso de hoy pregunta cómo salió',
+    await cuantos('#hoyUsos .devolucion .chip') === 4);
+  await p.tap('#hoyUsos .chip[data-devval="elogio"]'); await p.waitForTimeout(400);
+  check('se guarda de un toque',
+    await p.evaluate(() => JSON.parse(localStorage.getItem('perfumario_v1')).usos[0].resultado) === 'elogio');
+  await p.tap('#hoyUsos .chip[data-devval="elogio"]'); await p.waitForTimeout(400);
+  check('y tocándolo de nuevo se corrige',
+    !await p.evaluate(() => JSON.parse(localStorage.getItem('perfumario_v1')).usos[0].resultado));
+
+  console.log('\nZ · Comprás una cosa, usás otra');
+  await ir('uso');
+  check('con pocos usos no saca conclusiones',
+    /todav[íi]a no alcanza|Registr[áa]/.test(await p.textContent('#compraUsoSub')),
+    await p.textContent('#compraUsoSub'));
+
+  // colección mitad cítrica mitad ámbar, pero todos los usos son cítricos
+  await p.evaluate(() => {
+    const base = { conc:'EDP', salida:['Bergamota'], corazon:['Lavanda'], fondo:['Cedro'],
+      ml:100, mlRestante:100, precio:0, comprado:null, longevidad:8,
+      estaciones:['verano','primavera','otoño','invierno'],
+      ocasiones:['casual'], momento:'ambos', rating:0, nota:'', estela:3 };
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    st.perfumes = [
+      Object.assign({ id:'c1', creado:'2026-01-01', nombre:'Cit1', casa:'P', familia:'citrica' }, base),
+      Object.assign({ id:'c2', creado:'2026-01-01', nombre:'Cit2', casa:'P', familia:'citrica' }, base),
+      Object.assign({ id:'a1', creado:'2026-01-01', nombre:'Amb1', casa:'P', familia:'ambar' }, base),
+      Object.assign({ id:'a2', creado:'2026-01-01', nombre:'Amb2', casa:'P', familia:'ambar' }, base)
+    ];
+    st.usos = [];
+    for (let i = 0; i < 8; i++) st.usos.push({ id:'x'+i, perfumeId:'c1',
+      fecha:new Date().toISOString().slice(0,10), ocasion:'casual', sprays:3, temp:20, nota:'' });
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+  });
+  await p.reload(); await p.waitForTimeout(1500);
+  await ir('uso');
+  const sub = await p.textContent('#compraUsoSub');
+  check('nombra la familia que tenés y no usás', /[áa]mbar/i.test(sub), sub);
+  check('y la que usás de más', /c[íi]trica/i.test(sub), sub);
+  const difs = await p.evaluate(() =>
+    Array.from(document.querySelectorAll('#compraUso .par-dif')).map(e => e.textContent.trim()));
+  check('la diferencia está bien calculada: 50 % de la colección, 100 % de los usos',
+    difs.includes('+50') && difs.includes('-50'), difs.join(' '));
+  check('se distingue lo que tenés de lo que usás',
+    await cuantos('#compraUso .par-barra') === await cuantos('#compraUso .par') * 2);
+
   console.log('\nX · Imaginar otra estación');
   await p.evaluate(() => localStorage.removeItem('perfumario_v1'));
   await p.reload(); await p.waitForTimeout(1500);

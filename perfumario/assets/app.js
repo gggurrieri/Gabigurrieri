@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-11.2';
+const VERSION = '2026-10-11.3';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -563,6 +563,32 @@ function puntuar(p, m, c) {
     txt: (puntos[0] > ideal ? `Con ${rango} se puede volver pesado` : `Con ${rango} se va a sentir poco`),
     bien: false });
 
+  /* Lo que te pasó cuando lo usaste. Pesa fuerte —más que la ocasión— porque
+     es la única señal que no sale de tu propia rutina. Hacen falta dos
+     devoluciones para que cuente: una sola noche mala no condena un frasco. */
+  const dev = devolucionesDe(p.id);
+  if (dev.total >= 2) {
+    if (dev.neto >= 0.8) {
+      score += 14;
+      razones.push({ txt: dev.cuenta.elogio
+        ? `Te lo elogiaron ${dev.cuenta.elogio} ${dev.cuenta.elogio === 1 ? 'vez' : 'veces'}`
+        : `Te funcionó las ${dev.total} veces que lo usaste`, bien: true, aprendido: true });
+    } else if (dev.neto <= -0.8) {
+      score -= 16;
+      razones.push({ txt: dev.cuenta.mal
+        ? `Te arrepentiste ${dev.cuenta.mal} ${dev.cuenta.mal === 1 ? 'vez' : 'veces'} de ponértelo`
+        : 'No te viene funcionando', bien: false, aprendido: true });
+    }
+    /* "Duró poco" no es lo mismo que "no me gustó": no descalifica el perfume,
+       descalifica usarlo para algo largo. */
+    const corto = dev.cuenta.corto / dev.total;
+    if (corto >= 0.5 && ['salida', 'cita', 'evento'].includes(c.ocasion)) {
+      score -= 8;
+      razones.push({ txt: 'Te duró poco las veces que lo usaste, y esto es largo',
+                     bien: false, aprendido: true });
+    }
+  }
+
   // momento del día (un viaje tiene mañanas y noches: ahí no se evalúa)
   const mom = p.momento || 'ambos';
   if (!c.sinMomento) {
@@ -705,6 +731,30 @@ function puntuar(p, m, c) {
   return { score: Math.round(clamp(score, 0, 100)), razones };
 }
 
+/* ------------------- devolución después del uso ---------------------
+   El modelo aprendía de lo que elegís, y eso es un espejo: aprende tu rutina y
+   te la devuelve. Lo que vale es qué pasó DESPUÉS de ponértelo, y eso no se
+   puede inferir de ninguna otra cosa: hay que preguntarlo.
+
+   Cuatro botones, una vez por día, sobre el uso que ya registraste. Es el dato
+   más caro de conseguir de toda la app y el único que no es circular. */
+const DEVOLUCIONES = {
+  elogio: { txt: 'Me lo elogiaron', peso:  2 },
+  bien:   { txt: 'Justo',          peso:  1 },
+  corto:  { txt: 'Duró poco',      peso: -1 },
+  mal:    { txt: 'Me arrepentí',   peso: -2 }
+};
+
+function devolucionesDe(id) {
+  const con = S.usos.filter(u => u.perfumeId === id && u.resultado && DEVOLUCIONES[u.resultado]);
+  const cuenta = { elogio: 0, bien: 0, corto: 0, mal: 0 };
+  con.forEach(u => cuenta[u.resultado]++);
+  return {
+    total: con.length, cuenta,
+    neto: con.length ? con.reduce((a, u) => a + DEVOLUCIONES[u.resultado].peso, 0) / con.length : 0
+  };
+}
+
 function sugerir(n, m) {
   m = m || modeloAprendido();
   const cuantos = n || 3;
@@ -777,11 +827,13 @@ function renderHoy() {
   $('#cardHoyUsos').hidden = !hoy.length;
   $('#hoyUsos').innerHTML = hoy.map(u => {
     const p = perfume(u.perfumeId);
-    return `<div class="item" data-editar-uso="${u.id}" role="button" tabindex="0"><div class="it-main">
+    return `<div class="uso-hoy">
+      <div class="item" data-editar-uso="${u.id}" role="button" tabindex="0"><div class="it-main">
         <div class="it-name">${esc(p ? p.nombre : 'Perfume borrado')}</div>
         <div class="it-sub">${u.sprays} aplicaciones · ${OCASIONES[u.ocasion] || '—'} · tocá para corregir</div>
       </div>
-      <div class="it-act"><button data-borrar-uso="${u.id}" aria-label="Borrar uso">${ico('basura')}</button></div></div>`;
+      <div class="it-act"><button data-borrar-uso="${u.id}" aria-label="Borrar uso">${ico('basura')}</button></div></div>
+      ${devolucionChips(u)}</div>`;
   }).join('');
 
   renderClima();
@@ -792,6 +844,17 @@ function renderHoy() {
 /* Cuántas aplicaciones y dónde. El frío frena la proyección y pide una más;
    la humedad alta la multiplica y pide una menos; un espacio cerrado —oficina,
    gimnasio— también. */
+/* Los cuatro botones. Se muestran sobre el uso ya registrado, no en el momento
+   de registrarlo: cuando te lo ponés todavía no sabés cómo salió. */
+function devolucionChips(u) {
+  return `<div class="devolucion">
+    <span class="devolucion-pre">${u.resultado ? '¿Cómo salió?' : '¿Cómo salió?'}</span>
+    <div class="chips">${Object.keys(DEVOLUCIONES).map(k =>
+      `<button class="chip chip-sec${u.resultado === k ? ' on' : ''}" data-dev="${u.id}" data-devval="${k}"
+        >${DEVOLUCIONES[k].txt}</button>`).join('')}</div>
+  </div>`;
+}
+
 function dosis(p, c) {
   const estela = p.estela || 3;
   let n = 3;
@@ -2483,6 +2546,56 @@ function tablaComparacion(a, b) {
   </div>`;
 }
 
+/* ------------------ comprás una cosa, usás otra ---------------------
+   Mirando la colección se ve qué tenés. Mirando la rotación se ve qué usás.
+   Lo que no se ve en ninguna de las dos es la DISTANCIA entre las dos, que es
+   justo lo que decide si la próxima compra tiene sentido.
+
+   Se mide por familia y en porcentaje, no en cantidad: cinco ámbar sobre
+   treinta frascos es 17 % de la colección; si son el 3 % de los usos, ese
+   hueco de 14 puntos es la frase que nadie te dice en la perfumería. */
+function compraContraUso() {
+  const total = S.perfumes.length;
+  const usos = S.usos.filter(u => perfume(u.perfumeId));
+  const card = $('#cardCompraUso');
+  if (!card) return;
+
+  if (!total || usos.length < 5) {
+    $('#compraUsoSub').textContent = usos.length
+      ? `Con ${usos.length} uso${usos.length === 1 ? '' : 's'} todavía no alcanza. Desde cinco empieza a decir algo.`
+      : 'Registrá algunos usos y acá vas a ver qué comprás contra qué usás.';
+    $('#compraUso').innerHTML = '';
+    return;
+  }
+
+  const filas = D.FAMILIAS.map(f => {
+    const tengo = S.perfumes.filter(p => p.familia === f.id).length;
+    const uso = usos.filter(u => (perfume(u.perfumeId) || {}).familia === f.id).length;
+    return { f, tengo: (tengo / total) * 100, uso: (uso / usos.length) * 100 };
+  }).filter(x => x.tengo > 0 || x.uso > 0)
+    .sort((a, b) => (b.uso - b.tengo) - (a.uso - a.tengo));
+
+  const mayor = filas.slice().sort((a, b) => Math.abs(b.uso - b.tengo) - Math.abs(a.uso - a.tengo))[0];
+  const sobra = filas[filas.length - 1], falta = filas[0];
+  $('#compraUsoSub').innerHTML = mayor && Math.abs(mayor.uso - mayor.tengo) >= 8
+    ? `Tenés ${Math.round(sobra.tengo)} % de ${esc(sobra.f.nombre.toLowerCase())} y le das ${Math.round(sobra.uso)} % de tus usos; ` +
+      `con ${esc(falta.f.nombre.toLowerCase())} pasa al revés. Lo que comprás y lo que usás no son lo mismo.`
+    : 'Lo que tenés y lo que usás se parecen bastante.';
+
+  $('#compraUso').innerHTML = filas.map(x => {
+    const dif = Math.round(x.uso - x.tengo);
+    return `<div class="par">
+      <div class="par-lbl">${punto(x.f)}${esc(x.f.nombre)}</div>
+      <div class="par-dif${dif > 0 ? ' mas' : dif < 0 ? ' menos' : ''}">${dif > 0 ? '+' : ''}${dif}</div>
+      <div class="par-barras">
+        <div class="par-barra"><i style="width:${clamp(x.tengo, 1, 100)}%;background:var(--muted)"></i></div>
+        <div class="par-barra"><i style="width:${clamp(x.uso, 1, 100)}%;background:${x.f.color}"></i></div>
+      </div>
+    </div>`;
+  }).join('') +
+  '<p class="hint par-ref"><i class="ref ref-tengo"></i> lo que tenés &nbsp; <i class="ref ref-uso"></i> lo que usás</p>';
+}
+
 function barra(lbl, val, pct, color) {
   return `<div class="bar-row">
     <div class="bar-lbl">${esc(lbl)}</div><div class="bar-val">${esc(val)}</div>
@@ -2551,6 +2664,8 @@ function renderUso() {
   $('#rotacion').innerHTML = ranking.slice(0, 10).map(x => barra(
     x.p.nombre, `${x.c} uso${x.c === 1 ? '' : 's'} · ${Math.round((x.c / totalR) * 100)} %`,
     (x.c / ranking[0].c) * 100, familia(x.p.familia).color)).join('');
+
+  compraContraUso();
 
   // juntando polvo
   const polvo = S.perfumes.map(p => ({ p, ult: ultimoUso(p.id) }))
@@ -2924,6 +3039,19 @@ function conectar() {
       cerrarModal(); ir('notas');
       const card = $('#cardComparar');
       if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
+    const dv = e.target.closest('[data-dev]');
+    if (dv) {
+      e.stopPropagation();
+      const u = S.usos.find(x => x.id === dv.dataset.dev);
+      if (u) {
+        // volver a tocar el mismo lo saca: una devolución equivocada se corrige
+        u.resultado = (u.resultado === dv.dataset.devval) ? null : dv.dataset.devval;
+        guardar(); render();
+        if (u.resultado) toast('Anotado: lo voy a tener en cuenta');
+      }
       return;
     }
 
