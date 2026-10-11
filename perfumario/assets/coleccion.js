@@ -164,6 +164,7 @@ window.PERFUMARIO_COLECCION = {
       "longevidad": 6,
       "estela": 3,
       "estaciones": [
+        "verano",
         "primavera",
         "otoño"
       ],
@@ -845,6 +846,7 @@ window.PERFUMARIO_COLECCION = {
       "longevidad": 8,
       "estela": 3,
       "estaciones": [
+        "verano",
         "primavera",
         "otoño"
       ],
