@@ -276,7 +276,7 @@ con su id (`col001.jpg`, `col00g.jpg`…) y las mete recortadas y achicadas
 adentro de `assets/coleccion.js`. Usa el mismo tamaño y la misma calidad que la
 app cuando la foto se saca del teléfono, así las dos vías dan el mismo
 resultado. **Las originales no entran al repo**: 11 MB de fotos de cámara
-quedaron en 159 KB adentro del build, que es lo único que la app necesita para
+quedaron en 159 KB adentro del build (quince de veinticinco perfumes), que es lo único que la app necesita para
 mostrarlas en 44 px.
 
 **La foto de verdad la sacás vos**, desde la ficha. Se recorta cuadrada, se
