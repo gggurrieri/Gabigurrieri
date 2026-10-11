@@ -1441,6 +1441,22 @@ const check = (n, c, d = '') => {
   check('ningún emoji a color en la interfaz',
     dibujitos.length === 0, dibujitos.join(' '));
 
+  /* candado: HTML que se ve como texto. Pasó de verdad en el perfil olfativo:
+     barra() escapa la etiqueta —bien, porque puede traer lo que escribiste
+     vos— y alguien le metió adentro el punto de color de la familia, así que
+     la pantalla mostraba <i class="punto" style="background:#... en crudo.
+     Se recorren las cuatro vistas y se mira el texto visible, no el HTML. */
+  // la sección anterior deja el formulario abierto y el modal tapa las pestañas
+  await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+  const crudo = [];
+  for (const v of ['hoy', 'coleccion', 'notas', 'uso']) {
+    await ir(v);
+    const t = await p.evaluate(() => document.querySelector('.view.active').innerText);
+    const m = t.match(/<[a-z!\/][^>]{0,60}/gi);
+    if (m) crudo.push(v + ': ' + m[0]);
+  }
+  check('no se ve HTML como texto en ninguna vista', crudo.length === 0, crudo.join(' · '));
+
   /* candado: lo que se toca con el dedo. "ajustar" llegó a medir 16px de alto
      y es la única puerta al termómetro. */
   // la sección anterior deja el formulario abierto y el modal tapa las pestañas
