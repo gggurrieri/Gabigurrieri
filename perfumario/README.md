@@ -424,6 +424,28 @@ Las reglas que calcula, sobre datos que la app ya tenía:
 Si nada supera el umbral lo dice, con el motivo. Una app que siempre encuentra
 tres recomendaciones no está calculando nada.
 
+### Dónde se ofrece
+
+El bloque vive en la ficha de cada perfume, abajo de todo. Eso lo volvía
+invisible: para llegar había que abrir un perfume —que uno abre para otra
+cosa— y pasar de largo el historial. La función no se usaba porque no se
+encontraba, que es distinto de que no sirva.
+
+Ahora la respuesta de Hoy ofrece la mejor mezcla en una línea, al lado de la
+alternativa: *"Mezclar: Eros Flame abajo, Blue Jeans encima, uno pone la base y
+el otro la apertura"*. Tocarla abre la ficha **ya posicionada en el bloque**.
+
+Dos decisiones que la sostienen:
+
+- **El corte es 70, no 60.** La ficha lista las tres mejores desde 60 porque
+  ahí fuiste vos a buscar. En Hoy aparece sin que nadie la pida, así que tiene
+  que valer la interrupción: una sugerencia que sale siempre deja de ser una
+  sugerencia.
+- **La razón que muestra es a favor.** `mezclasPara` devuelve todas las razones
+  en orden, los peros incluidos, porque así se leen en la ficha. Para poder
+  pedir "una a favor" sin adivinar mirando el texto, ahora también devuelve
+  `contras` con cuáles restan puntaje.
+
 ## Modo ciego
 
 Puntuar del 1 al 5 es casi imposible: unos ponen todo 4 y otros todo 2, y la

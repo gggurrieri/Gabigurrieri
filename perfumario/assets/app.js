@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-11.7';
+const VERSION = '2026-10-11.8';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -928,6 +928,22 @@ function redactar(s, c) {
   return frases.slice(0, 3).join(' ');
 }
 
+/* Mezclar vivía sólo adentro de la ficha, abajo de todo: para encontrarlo
+   había que abrir un perfume —que uno abre para otra cosa— y pasar de largo el
+   historial. La función no se usaba porque no se veía, que es distinto de que
+   no sirva. Esta línea la saca a la superficie en el único momento en que es
+   útil, y sólo cuando hay una mezcla que de verdad vale: el corte es 70, más
+   exigente que el 60 con el que la ficha lista las tres mejores, porque una
+   sugerencia que aparece siempre deja de ser una sugerencia. */
+function lineaMezcla(p) {
+  const mejor = mezclasPara(p)[0];
+  if (!mejor || mejor.score < 70) return '';
+  const porque = mejor.razones.find(r => !mejor.contras.includes(r));
+  return `<p class="hero-alt"><b>Mezclar:</b>
+    <button class="link" data-mezcla="${p.id}">${esc(mejor.abajo.nombre)} abajo,
+    ${esc(mejor.arriba.nombre)} encima</button>${porque ? ', ' + esc(porque) : ''}.</p>`;
+}
+
 function fichaPrincipal(s, alternativa, c) {
   const p = s.p, f = familia(p.familia);
   const pct = porcRestante(p);
@@ -943,6 +959,7 @@ function fichaPrincipal(s, alternativa, c) {
     <p class="hero-texto">${redactar(s, c)}</p>
     ${alternativa ? `<p class="hero-alt"><b>Alternativa:</b> ${esc(alternativa.p.nombre)},
       ${esc(contraste(alternativa, s))}.</p>` : ''}
+    ${lineaMezcla(p)}
     <p class="hero-alt"><b>Aplicación:</b> ${esc(dosis(p, c))}</p>
     <div class="hero-pie">
       <button class="btn btn-accent" data-usar="${p.id}">Me lo pongo</button>
@@ -1637,40 +1654,46 @@ function mezclasPara(base) {
   const notasA = new Set(notasDe(base).map(n => n.toLowerCase()));
 
   return otros.map(otro => {
-    const razones = [];
+    /* Las razones salen todas en la misma lista, en orden, porque así se leen
+       en la ficha. Pero afuera hace falta poder pedir "una a favor" sin que
+       salga un pero: `contras` anota cuáles restan, en vez de adivinarlo
+       después mirando el texto. */
+    const razones = [], contras = [];
+    const aFavor = t => razones.push(t);
+    const pero = t => { razones.push(t); contras.push(t); };
     let score = 50;
 
     // 1. roles distintos: uno abajo y otro arriba
     const dif = Math.abs(pesoDe(base) - pesoDe(otro));
     if (dif >= 1.5) {
       score += 22;
-      razones.push('uno pone la base y el otro la apertura');
+      aFavor('uno pone la base y el otro la apertura');
     } else if (dif < 0.6) {
       score -= 18;
-      razones.push('los dos ocupan el mismo lugar: se tapan');
+      pero('los dos ocupan el mismo lugar: se tapan');
     }
 
     // 2. el puente: algo en común para que se peguen
     const comunes = notasDe(otro).filter(n => notasA.has(n.toLowerCase()));
-    if (comunes.length >= 2) { score += 20; razones.push(`comparten ${comunes.slice(0, 2).join(' y ').toLowerCase()}`); }
-    else if (comunes.length === 1) { score += 12; razones.push(`los une ${comunes[0].toLowerCase()}`); }
+    if (comunes.length >= 2) { score += 20; aFavor(`comparten ${comunes.slice(0, 2).join(' y ').toLowerCase()}`); }
+    else if (comunes.length === 1) { score += 12; aFavor(`los une ${comunes[0].toLowerCase()}`); }
     else if (Math.abs((PESO_FAMILIA[base.familia] || 3) - (PESO_FAMILIA[otro.familia] || 3)) <= 2) {
-      score += 4; razones.push('familias vecinas');
-    } else { score -= 20; razones.push('no tienen nada en común'); }
+      score += 4; aFavor('familias vecinas');
+    } else { score -= 20; pero('no tienen nada en común'); }
 
     // 3. ruido: la estela se suma
     const ruido = (base.estela || 3) + (otro.estela || 3);
-    if (ruido >= 8) { score -= 20; razones.push('los dos proyectan fuerte: va a ser demasiado'); }
-    else if (ruido <= 4) { score -= 10; razones.push('los dos son discretos: puede no quedar nada'); }
+    if (ruido >= 8) { score -= 20; pero('los dos proyectan fuerte: va a ser demasiado'); }
+    else if (ruido <= 4) { score -= 10; pero('los dos son discretos: puede no quedar nada'); }
 
     // 4. que sirvan para el mismo clima
     const est = (base.estaciones || []).filter(e => (otro.estaciones || []).includes(e));
-    if (est.length) { score += 8; razones.push(`los dos andan en ${est.map(nombreEstacion).join(' y ')}`); }
-    else { score -= 14; razones.push('son de épocas distintas del año'); }
+    if (est.length) { score += 8; aFavor(`los dos andan en ${est.map(nombreEstacion).join(' y ')}`); }
+    else { score -= 14; pero('son de épocas distintas del año'); }
 
     const abajo = pesoDe(base) >= pesoDe(otro) ? base : otro;
     const arriba = abajo === base ? otro : base;
-    return { p: otro, score: Math.round(clamp(score, 0, 100)), razones, abajo, arriba };
+    return { p: otro, score: Math.round(clamp(score, 0, 100)), razones, contras, abajo, arriba };
   }).sort((a, b) => b.score - a.score);
 }
 
@@ -1924,7 +1947,7 @@ function bloqueMezclas(p) {
       <p class="hint">Con lo que tenés, nada combina bien con este. La mejor opción
       es ${esc(todas[0].p.nombre)} y aun así ${esc(todas[0].razones[0])}.</p></section>`;
   }
-  return `<section class="card"><h2>Mezclar</h2>
+  return `<section class="card" id="bloqueMezclar"><h2>Mezclar</h2>
     <p class="sub">Primero el de abajo, pegado a la piel; el otro encima.</p>
     <div class="stack-sm">${buenas.map(x => `
       <div class="mezcla" data-ficha="${x.p.id}" role="button" tabindex="0">
@@ -3412,6 +3435,16 @@ function conectar() {
       filtros.texto = nota.dataset.nota;
       $('#busca').value = nota.dataset.nota;
       ir('coleccion');
+      return;
+    }
+
+    /* Antes del data-ficha: la línea del hero vive adentro de la tarjeta que
+       ya abre la ficha, y si gana el genérico nunca se llega al bloque. */
+    const mez = e.target.closest('[data-mezcla]');
+    if (mez) {
+      abrirFicha(mez.dataset.mezcla);
+      const b = $('#bloqueMezclar');
+      if (b) b.scrollIntoView({ block: 'start', behavior: 'smooth' });
       return;
     }
 
