@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-11.8';
+const VERSION = '2026-10-11.9';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -1649,7 +1649,8 @@ const PESO_FAMILIA = {
 };
 const pesoDe = p => (PESO_FAMILIA[p.familia] || 3) + (p.estela || 3) / 3 + (p.longevidad || 6) / 6;
 
-function mezclasPara(base) {
+function mezclasPara(base, c) {
+  c = c || contextoActual();
   const otros = S.perfumes.filter(p => p.id !== base.id && !(p.ml > 0 && p.mlRestante <= 0));
   const notasA = new Set(notasDe(base).map(n => n.toLowerCase()));
 
@@ -1662,6 +1663,9 @@ function mezclasPara(base) {
     const aFavor = t => razones.push(t);
     const pero = t => { razones.push(t); contras.push(t); };
     let score = 50;
+
+    const abajo = pesoDe(base) >= pesoDe(otro) ? base : otro;
+    const arriba = abajo === base ? otro : base;
 
     // 1. roles distintos: uno abajo y otro arriba
     const dif = Math.abs(pesoDe(base) - pesoDe(otro));
@@ -1681,18 +1685,64 @@ function mezclasPara(base) {
       score += 4; aFavor('familias vecinas');
     } else { score -= 20; pero('no tienen nada en común'); }
 
-    // 3. ruido: la estela se suma
+    /* 3. El clima, que es lo que convierte esto en una recomendación de hoy y
+       no en una tabla de compatibilidades fija.
+
+       La mezcla no hereda la temperatura ideal de ninguno de los dos: tiene la
+       suya. El de abajo manda en el fondo, que es lo que queda puesto durante
+       horas, así que pesa más (60/40). Un ámbar con un cítrico encima no es un
+       cítrico: a 32° sigue siendo demasiado abrigo. */
+    const idealDe = p => (TEMP_IDEAL[p.familia] != null ? TEMP_IDEAL[p.familia] : 18);
+    const ideal = idealDe(abajo) * 0.6 + idealDe(arriba) * 0.4;
+    const difT = Math.abs(c.temp - ideal);
+    score -= Math.min(26, difT * 1.1);
+    if (difT <= 4) aFavor(`la mezcla cae justo con ${Math.round(c.temp)}°`);
+    else if (difT >= 12) pero(c.temp > ideal
+      ? `con ${Math.round(c.temp)}° los dos juntos pesan demasiado`
+      : `con ${Math.round(c.temp)}° la mezcla se queda corta`);
+
+    /* 4. El ruido se suma, y el calor y la humedad lo levantan todavía más:
+       dos perfumes que por separado están bien, superpuestos a 30° son otra
+       cosa. Con frío pasa al revés: dos discretos no llegan a despegar. */
     const ruido = (base.estela || 3) + (otro.estela || 3);
-    if (ruido >= 8) { score -= 20; pero('los dos proyectan fuerte: va a ser demasiado'); }
-    else if (ruido <= 4) { score -= 10; pero('los dos son discretos: puede no quedar nada'); }
+    const calor = c.temp >= 26 || (typeof c.humedad === 'number' && c.humedad >= 75);
+    const frio = c.temp <= 12;
+    const techo = calor ? 7 : 8;
+    const piso = frio ? 5 : 4;
+    if (ruido >= techo) {
+      score -= calor ? 24 : 20;
+      pero(calor
+        ? `con ${Math.round(c.temp)}° los dos proyectan fuerte: va a ser demasiado`
+        : 'los dos proyectan fuerte: va a ser demasiado');
+    } else if (ruido <= piso) {
+      score -= frio ? 14 : 10;
+      pero(frio
+        ? `con ${Math.round(c.temp)}° dos discretos no van a levantar`
+        : 'los dos son discretos: puede no quedar nada');
+    }
 
-    // 4. que sirvan para el mismo clima
-    const est = (base.estaciones || []).filter(e => (otro.estaciones || []).includes(e));
-    if (est.length) { score += 8; aFavor(`los dos andan en ${est.map(nombreEstacion).join(' y ')}`); }
-    else { score -= 14; pero('son de épocas distintas del año'); }
+    /* 5. La estación de hoy, no la que los dos tengan en común: lo que importa
+       es si sirven para salir HOY. Que coincidan entre sí no sirve de nada si
+       los dos son de invierno y estamos en enero. */
+    const est = c.estacion;
+    const sirve = p => (p.estaciones || []).map(claveEstacion).includes(est);
+    const nEst = (sirve(base) ? 1 : 0) + (sirve(otro) ? 1 : 0);
+    if (nEst === 2) { score += 10; aFavor(`los dos andan en ${nombreEstacion(est)}`); }
+    else if (nEst === 0) { score -= 14; pero(`ninguno de los dos es para ${nombreEstacion(est)}`); }
+    else { score -= 4; pero(`${sirve(base) ? otro.nombre : base.nombre} no es para ${nombreEstacion(est)}`); }
 
-    const abajo = pesoDe(base) >= pesoDe(otro) ? base : otro;
-    const arriba = abajo === base ? otro : base;
+    /* 6. Lluvia y viento se la aguanta la duración combinada: en una mezcla
+       manda la del de abajo, que es la que sostiene el fondo. */
+    const dura = Math.max(base.longevidad || 0, otro.longevidad || 0);
+    if (c.lluvia) {
+      if (dura >= 8) { score += 6; aFavor('llueve y la mezcla aguanta'); }
+      else if (dura) { score -= 8; pero('con lluvia una mezcla tan liviana no dura'); }
+    }
+    if (typeof c.viento === 'number' && c.viento >= 25) {
+      if (ruido >= 6) { score += 5; aFavor(`con viento de ${Math.round(c.viento)} km/h igual se sostiene`); }
+      else { score -= 6; pero(`con viento de ${Math.round(c.viento)} km/h no va a llegar a nadie`); }
+    }
+
     return { p: otro, score: Math.round(clamp(score, 0, 100)), razones, contras, abajo, arriba };
   }).sort((a, b) => b.score - a.score);
 }
@@ -1939,27 +1989,65 @@ function abrirFicha(id) {
    un detalle: lo denso va primero y pegado a la piel, lo liviano encima. Al
    revés, el liviano queda sepultado. */
 function bloqueMezclas(p) {
-  const todas = mezclasPara(p);
-  if (todas.length < 1) return '';
-  const buenas = todas.filter(x => x.score >= 60).slice(0, 3);
-  if (!buenas.length) {
-    return `<section class="card"><h2>Mezclar</h2>
-      <p class="hint">Con lo que tenés, nada combina bien con este. La mejor opción
-      es ${esc(todas[0].p.nombre)} y aun así ${esc(todas[0].razones[0])}.</p></section>`;
-  }
-  return `<section class="card" id="bloqueMezclar"><h2>Mezclar</h2>
-    <p class="sub">Primero el de abajo, pegado a la piel; el otro encima.</p>
-    <div class="stack-sm">${buenas.map(x => `
-      <div class="mezcla" data-ficha="${x.p.id}" role="button" tabindex="0">
-        <div class="mezcla-orden">
-          <span class="mezcla-paso"><b>1</b>${esc(x.abajo.nombre)}</span>
-          <span class="mezcla-paso"><b>2</b>${esc(x.arriba.nombre)}</span>
-        </div>
-        <div class="mezcla-por">${esc(x.razones.slice(0, 2).join(' · '))}</div>
-        <div class="mezcla-score">${x.score}</div>
-      </div>`).join('')}</div>
+  const c = contextoActual();
+  const todas = mezclasPara(p, c);
+  if (!todas.length) return '';
+
+  /* Antes mostraba las tres mejores y punto. Una lista es otra cosa: te deja
+     elegir, y sobre todo te deja ver POR QUÉ las de abajo están abajo.
+
+     Dos cortes, no uno. El de calidad (65) dice cuáles valen; el de cantidad
+     (8) dice cuántas entran sin que haya que scrollear la colección entera.
+     Un día templado deja pasar casi todo —a 21° pasan 19 de 24— y una lista
+     de 19 no es una lista, es la colección otra vez. Las demás siguen ahí,
+     ordenadas y con el motivo escrito, a un toque. */
+  const CORTE = 65, CUANTAS = 8;
+  const buenas = todas.filter(x => x.score >= CORTE);
+  const si = buenas.slice(0, CUANTAS);
+  const no = todas.slice(si.length);
+
+  const fila = x => {
+    /* En las que no llegan, lo que importa es el pero: mostrarles la razón a
+       favor sería contestar otra pregunta. */
+    const flojo = x.score < CORTE;
+    const motivos = (flojo && x.contras.length ? x.contras : x.razones).slice(0, 2);
+    return `<div class="mezcla${flojo ? ' mezcla-flojo' : ''}"
+      data-ficha="${x.p.id}" role="button" tabindex="0">
+    <div class="mezcla-orden">
+      <span class="mezcla-paso"><b>1</b>${esc(x.abajo.nombre)}</span>
+      <span class="mezcla-paso"><b>2</b>${esc(x.arriba.nombre)}</span>
+    </div>
+    <div class="mezcla-por">${esc(motivos.join(' · '))}</div>
+    <div class="mezcla-score">${x.score}</div>
+  </div>`;
+  };
+
+  return `<section class="card" id="bloqueMezclar"><h2>Mezclar con…</h2>
+    <p class="sub">Primero el de abajo, pegado a la piel; el otro encima.
+      ${todas.length} combinaciones posibles, ordenadas para ${esc(contextoMezcla(c))}.</p>
+    ${si.length
+      ? `<div class="stack-sm mezcla-si">${si.map(fila).join('')}</div>`
+      : `<p class="hint" style="margin-top:0">Con este clima, ninguna de tu colección
+         llega a estar buena. La mejor es ${esc(todas[0].p.nombre)} y aun así
+         ${esc(todas[0].razones[0])}.</p>`}
+    ${no.length ? `<details class="mezcla-no">
+      <summary>${no.length === 1 ? 'La otra' : `Las otras ${no.length}`}<i class="chev"></i></summary>
+      <div class="stack-sm">${no.map(fila).join('')}</div>
+    </details>` : ''}
     <p class="hint">Probalo primero en la muñeca, con una aplicación de cada uno.</p>
   </section>`;
+}
+
+/* La frase que dice con qué datos se ordenó la lista. Sin esto el número de
+   cada fila es un veredicto sin contexto, y mañana con otra temperatura va a
+   ser otro sin que se entienda por qué. */
+function contextoMezcla(c) {
+  const partes = [`${Math.round(c.temp)}°`];
+  if (typeof c.humedad === 'number' && c.humedad >= 75) partes.push('humedad alta');
+  if (c.lluvia) partes.push('lluvia');
+  if (typeof c.viento === 'number' && c.viento >= 25) partes.push(`viento de ${Math.round(c.viento)} km/h`);
+  partes.push(`${articuloEstacion(c.estacion)} ${nombreEstacion(c.estacion)}`);
+  return partes.join(', ').replace(/, ([^,]*)$/, ' en $1');
 }
 
 /* El botón de la respuesta dice "Ver por qué, y la ficha", y la ficha nunca

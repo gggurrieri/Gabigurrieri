@@ -1189,16 +1189,81 @@ const check = (n, c, d = '') => {
   await ir('coleccion');
   await p.fill('#busca', 'Layton'); await p.waitForTimeout(300);
   await p.tap('#view-coleccion .pf'); await p.waitForTimeout(500);
-  const mez = await p.evaluate(() => Array.from(document.querySelectorAll('#modalBody .mezcla')).map(e => ({
-    pasos: Array.from(e.querySelectorAll('.mezcla-paso')).map(x => x.textContent.replace(/^\d/, '').trim()),
-    por: e.querySelector('.mezcla-por').textContent.trim(),
-    score: +e.querySelector('.mezcla-score').textContent.trim() })));
-  check('propone combinaciones para un perfume denso', mez.length >= 1, JSON.stringify(mez).slice(0, 120));
-  check('siempre pone primero al que hace de base',
-    mez.every(x => x.pasos[0] === 'Layton'), mez.map(x => x.pasos.join(' → ')).join(' | '));
-  check('y explica por qué', mez.every(x => x.por.length > 5));
-  check('no propone cualquier cosa: todas pasan el umbral',
-    mez.every(x => x.score >= 60), mez.map(x => x.score).join(' '));
+  const leerMezclas = () => p.evaluate(() => {
+    const leer = sel => Array.from(document.querySelectorAll(sel)).map(e => ({
+      pasos: Array.from(e.querySelectorAll('.mezcla-paso')).map(x => x.textContent.replace(/^\d/, '').trim()),
+      por: e.querySelector('.mezcla-por').textContent.replace(/\s+/g, ' ').trim(),
+      flojo: e.classList.contains('mezcla-flojo'),
+      score: +e.querySelector('.mezcla-score').textContent.trim() }));
+    return { si: leer('#bloqueMezclar .mezcla-si .mezcla'),
+             no: leer('#bloqueMezclar .mezcla-no .mezcla'),
+             sub: (document.querySelector('#bloqueMezclar .sub') || {}).textContent.replace(/\s+/g, ' ').trim() };
+  });
+  const mez = await leerMezclas();
+  check('despliega una lista, no tres fijas', mez.si.length > 3, `${mez.si.length} arriba del corte`);
+  check('pero no te tira la colección entera encima', mez.si.length <= 8, String(mez.si.length));
+  check('las que muestra primero pasan el corte',
+    mez.si.every(x => x.score >= 65), mez.si.map(x => x.score).join(' '));
+  check('y explica cada una', mez.si.every(x => x.por.length > 5));
+  check('las que no llegan quedan a un toque, no borradas',
+    mez.no.length > 0 && mez.si.length + mez.no.length >= 10,
+    `${mez.si.length} + ${mez.no.length}`);
+  const flojas = mez.no.filter(x => x.flojo);
+  check('las que no llegan al corte se ven distinto de las que sólo no entraron',
+    flojas.length > 0 && flojas.every(x => x.score < 65) &&
+    mez.no.filter(x => !x.flojo).every(x => x.score >= 65),
+    `${flojas.length} flojas de ${mez.no.length}`);
+  check('y en ésas el motivo es el pero, no el elogio',
+    flojas.every(x => /se tapan|nada en común|demasiado|no van a levantar|no es para|queda corta|pesan|no va a llegar|no dura|quedar nada/i.test(x.por)),
+    flojas.slice(0, 2).map(x => x.por).join(' || '));
+  check('y dice con qué clima ordenó la lista',
+    /\d+°/.test(mez.sub) && /combinaciones posibles/.test(mez.sub), mez.sub);
+
+  /* Lo que de verdad importa: que el clima mueva la lista. Tres perfumes
+     armados a propósito —uno pesado, uno liviano, y la base— y el mismo par
+     medido con frío y con calor. */
+  await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+  await p.evaluate(() => {
+    const base = { conc:'EDP', ml:100, mlRestante:100, precio:0, comprado:null, rating:0, nota:'',
+      ocasiones:['casual'], momento:'ambos', estaciones:['verano','invierno','otono','primavera'] };
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    st.perfumes = [
+      Object.assign({ id:'ba', creado:'2026-01-01', nombre:'Madero', casa:'P', familia:'amaderada',
+        estela:3, longevidad:7, salida:['Bergamota'], corazon:['Geranio'], fondo:['Cedro'] }, base),
+      Object.assign({ id:'pe', creado:'2026-01-01', nombre:'Pesado', casa:'P', familia:'gourmand',
+        estela:4, longevidad:9, salida:['Bergamota'], corazon:['Canela'], fondo:['Vainilla'] }, base),
+      Object.assign({ id:'li', creado:'2026-01-01', nombre:'Liviano', casa:'P', familia:'citrica',
+        estela:2, longevidad:4, salida:['Bergamota'], corazon:['Limón'], fondo:['Almizcle blanco'] }, base)
+    ];
+    st.usos = [];
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+  });
+  await p.reload(); await p.waitForTimeout(1600);
+
+  const conMadero = async grados => {
+    await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+    await ir('hoy');
+    await abrirContexto();
+    await termometro(grados);
+    await ir('coleccion');
+    await p.fill('#busca', 'Madero'); await p.waitForTimeout(300);
+    await p.tap('#view-coleccion .pf'); await p.waitForTimeout(500);
+    const r = await leerMezclas();
+    const todas = r.si.concat(r.no);
+    const de = n => (todas.find(x => x.pasos.includes(n)) || { score: -1, por: '' });
+    return { pesado: de('Pesado'), liviano: de('Liviano'), sub: r.sub };
+  };
+  const frio = await conMadero(6);
+  const calor = await conMadero(33);
+  check('la misma mezcla densa puntúa menos con calor que con frío',
+    calor.pesado.score < frio.pesado.score,
+    `6° → ${frio.pesado.score} · 33° → ${calor.pesado.score}`);
+  check('y con calor el liviano le gana al pesado, que con frío perdía',
+    frio.liviano.score < frio.pesado.score && calor.liviano.score > calor.pesado.score,
+    `frío ${frio.liviano.score} vs ${frio.pesado.score} · calor ${calor.liviano.score} vs ${calor.pesado.score}`);
+  check('y lo dice con todas las letras',
+    /33°/.test(calor.pesado.por) || /33°/.test(calor.sub),
+    calor.pesado.por + ' // ' + calor.sub);
 
   /* candado: dos perfumes del mismo peso no deberían recomendarse entre sí,
      porque se tapan. Se arma el caso a propósito. */

@@ -405,10 +405,11 @@ un cartel de que no estás mirando la colección.
 
 ## Mezclar dos
 
-Superponer dos perfumes es una práctica real y tiene reglas. En cada ficha hay
-tres combinaciones propuestas, con el **orden de aplicación**, que no es un
-detalle: lo denso va primero y pegado a la piel, lo liviano encima. Al revés,
-el liviano queda sepultado.
+Superponer dos perfumes es una práctica real y tiene reglas. Al abrir la ficha
+de cualquier perfume, el bloque **Mezclar con…** lista todas las combinaciones
+posibles con el resto de la colección, ordenadas, con el **orden de
+aplicación** —que no es un detalle: lo denso va primero y pegado a la piel, lo
+liviano encima; al revés, el liviano queda sepultado—, el motivo y el puntaje.
 
 Las reglas que calcula, sobre datos que la app ya tenía:
 
@@ -417,12 +418,49 @@ Las reglas que calcula, sobre datos que la app ya tenía:
    El "peso de base" sale de la familia más la estela más la duración.
 2. **Un puente.** Una nota compartida, o dos familias vecinas. Sin nada en
    común no se mezclan, se pelean.
-3. **No dos ruidosos.** La estela se suma, el perfume no.
-4. **El mismo clima.** Si uno es de invierno y el otro de verano, no es una
-   combinación, son dos perfumes distintos.
+3. **El clima de hoy**, que es lo que la convierte en una recomendación y no en
+   una tabla fija. Está abajo, en detalle.
+4. **El ruido, leído contra ese clima.** La estela se suma, el perfume no.
+5. **La estación de hoy**, no la que los dos tengan en común: que coincidan
+   entre sí no sirve de nada si los dos son de invierno y estamos en enero.
 
-Si nada supera el umbral lo dice, con el motivo. Una app que siempre encuentra
-tres recomendaciones no está calculando nada.
+### El clima manda
+
+La mezcla **no hereda la temperatura ideal de ninguno de los dos: tiene la
+suya**. El de abajo manda en el fondo, que es lo que queda puesto durante
+horas, así que pesa más (60/40). Un ámbar con un cítrico encima no es un
+cítrico: a 32° sigue siendo demasiado abrigo.
+
+- **Temperatura.** Castigo de hasta 26 puntos según cuánto se aleje la
+  temperatura real de la ideal de la mezcla, y lo dice con el número: *"con 33°
+  los dos juntos pesan demasiado"*, *"con 5° la mezcla se queda corta"*.
+- **El umbral de ruido se mueve con el clima.** El calor y la humedad alta
+  levantan la proyección: con 26° o más, o 75 % de humedad, dos perfumes que
+  por separado están bien superpuestos son otra cosa, y el techo baja de 8 a 7
+  con un castigo mayor. Con frío pasa al revés: dos discretos no llegan a
+  despegar, y el piso sube.
+- **Lluvia y viento** se los aguanta la duración y la estela combinadas.
+
+Medido: la misma mezcla densa puntúa **41 con 21° y 3 con 33°**, y con calor
+las combinaciones livianas le pasan por arriba. Hay una prueba que lo fija.
+
+### Una lista, con dos cortes
+
+Antes mostraba las tres mejores y punto. Una lista deja elegir, y sobre todo
+deja ver **por qué las de abajo están abajo**.
+
+Hay dos cortes, no uno. El de **calidad** (65) dice cuáles valen; el de
+**cantidad** (8) dice cuántas entran sin que haya que scrollear la colección
+entera. Un día templado deja pasar casi todo —a 21° pasan 19 de 24— y una
+lista de 19 no es una lista, es la colección otra vez. Las demás siguen ahí,
+ordenadas y a un toque.
+
+En las que no llegan, el motivo que se muestra es **el pero, no el elogio**:
+mostrarles la razón a favor sería contestar otra pregunta. Para eso
+`mezclasPara` devuelve `contras` además de `razones`.
+
+Si con el clima de hoy ninguna llega, lo dice con el motivo. Una app que
+siempre encuentra tres recomendaciones no está calculando nada.
 
 ### Dónde se ofrece
 
@@ -437,14 +475,11 @@ el otro la apertura"*. Tocarla abre la ficha **ya posicionada en el bloque**.
 
 Dos decisiones que la sostienen:
 
-- **El corte es 70, no 60.** La ficha lista las tres mejores desde 60 porque
-  ahí fuiste vos a buscar. En Hoy aparece sin que nadie la pida, así que tiene
-  que valer la interrupción: una sugerencia que sale siempre deja de ser una
-  sugerencia.
-- **La razón que muestra es a favor.** `mezclasPara` devuelve todas las razones
-  en orden, los peros incluidos, porque así se leen en la ficha. Para poder
-  pedir "una a favor" sin adivinar mirando el texto, ahora también devuelve
-  `contras` con cuáles restan puntaje.
+- **El corte es 70, más alto que el 65 de la lista.** En la ficha fuiste vos a
+  buscar. En Hoy aparece sin que nadie la pida, así que tiene que valer la
+  interrupción: una sugerencia que sale siempre deja de ser una sugerencia.
+- **La razón que muestra es a favor**, usando el mismo `contras` que la lista
+  usa al revés.
 
 ## Modo ciego
 

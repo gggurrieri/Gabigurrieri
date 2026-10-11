@@ -298,7 +298,7 @@ button.item{width:100%;text-align:left;cursor:pointer;font:inherit}
   border-bottom:1.5px solid var(--muted);transform:rotate(45deg);
   transition:transform .18s ease;margin-right:3px;flex:none;
 }
-#otras[open] .chev{transform:rotate(-135deg);margin:4px 3px 0 0}
+details[open]>summary .chev{transform:rotate(-135deg);margin:4px 3px 0 0}
 #otras .empate{margin:0 var(--sp-5) var(--sp-4);font-size:var(--t-2)}
 .otras-lista{padding:0 var(--sp-3) var(--sp-3)}
 
@@ -419,6 +419,20 @@ button.item{width:100%;text-align:left;cursor:pointer;font:inherit}
 .mezcla-por{grid-column:1;grid-row:2;font-size:var(--t-1);color:var(--muted);line-height:1.4}
 .mezcla-score{grid-column:2;grid-row:1 / span 2;align-self:center;font-family:var(--display);
   font-size:var(--t-5);color:var(--accent);font-variant-numeric:tabular-nums}
+.mezcla-si>.mezcla+.mezcla{margin-top:var(--sp-3)}
+/* Las que no llegan siguen en la lista, apagadas: el valor está en poder ver
+   por qué no, no en que desaparezcan. */
+.mezcla-no{margin-top:var(--sp-4)}
+.mezcla-no summary{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:var(--sp-3) var(--sp-1);cursor:pointer;list-style:none;
+  font-size:var(--t-2);color:var(--muted);min-height:44px;
+}
+.mezcla-no summary::-webkit-details-marker{display:none}
+.mezcla-no .stack-sm{padding-bottom:var(--sp-2)}
+.mezcla-flojo{background:transparent;padding-left:0;padding-right:0}
+.mezcla-flojo .mezcla-paso b{background:var(--muted);color:var(--card)}
+.mezcla-flojo .mezcla-score{color:var(--muted);font-size:var(--t-4)}
 
 /* modo ciego: dos fichas sin nombre, una al lado de la otra */
 .ciego-par{display:flex;gap:var(--sp-3);margin-bottom:var(--sp-4)}
