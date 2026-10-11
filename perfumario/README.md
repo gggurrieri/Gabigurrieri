@@ -190,6 +190,29 @@ campo que a veces hace algo y a veces nada, sin decir cuál, es peor que no
 tenerlo. Además lo que escribís no se puede aprender: el modelo que aprende de
 las elecciones trabaja sobre categorías, y cada frase libre es única.
 
+## Imaginar otra estación
+
+En el panel de *ajustar* se puede mover la estación, además de la temperatura y
+el momento. Sirve para algo que la app no podía hacer: **planear**. En octubre
+no había forma de ver cómo queda la colección en enero, que es justo cuando
+conviene mirarlo para decidir una compra.
+
+Tres detalles:
+
+- **La temperatura acompaña a la estación** si no la tocaste a mano. Pedir
+  "verano" y seguir viendo 14° no deja imaginarse nada. Si moviste el
+  termómetro vos, manda tu número.
+- **El clima automático se desactiva solo** mientras estás mirando otra
+  estación. Si no, el dato real de afuera pisaría la temperatura y la pantalla
+  volvería a hoy sin avisar.
+- **Lo dice en la línea de arriba**: *"28° · noche de verano **(imaginado)**"*,
+  y hay un "volver a la de hoy" al lado. Una app que muestra una recomendación
+  para otra época sin decirlo es una app que miente en silencio.
+
+Esto salió de una pregunta que no se podía contestar con la app: *"según la
+colección, ¿qué me falta para verano?"*. Para responderla hubo que falsear el
+reloj del navegador desde afuera.
+
 ## El clima, automático
 
 En **Ajustes → Clima** elegís una ciudad (o tocás "Usar mi ubicación") y la
