@@ -1400,6 +1400,47 @@ const check = (n, c, d = '') => {
     'modal ' + (await visible('#modal')));
   await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
 
+  console.log('\nAD · Lo que distingue a la app se ve');
+  /* Un revisor de App Store abre la app dos minutos, con la colección vacía, y
+     decide si es "indistinguible de lo que ya existe". Si lo único que ve es
+     colección + clima, esto no se publica. Lo que se verifica acá es que lo
+     distinto esté a la vista desde el primer segundo, sin datos cargados. */
+  await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+  await p.evaluate(() => localStorage.removeItem('perfumario_v1'));
+  await p.reload(); await p.waitForTimeout(1200);
+  const primerDia = (await p.textContent('#respuesta')).replace(/\s+/g, ' ');
+  check('el primer día nombra lo que ninguna otra hace',
+    /Mide cuánto te dura de verdad/.test(primerDia) &&
+    /Te dice con cuál mezclarlo/.test(primerDia) &&
+    /Te arma la valija/.test(primerDia) &&
+    /Te compara de a dos a ciegas/.test(primerDia),
+    primerDia.slice(0, 150));
+  check('y promete la cuenta, no una IA',
+    /te muestra la cuenta/i.test(primerDia) && !/\bIA\b|\bAI\b/.test(primerDia),
+    primerDia.slice(0, 80));
+
+  await ir('uso');
+  const ordenUso = await p.evaluate(() => Array.from(
+    document.querySelectorAll('#view-uso > .card > h2, #view-uso > .kpis'))
+    .map(e => e.tagName === 'DIV' ? 'KPIs' : e.textContent.trim()));
+  check('la pestaña Uso abre con lo que distingue, no con los números de siempre',
+    ordenUso.slice(0, 3).join(' | ') === 'La caja y tu piel | Modo ciego | Comprás una cosa, usás otra',
+    ordenUso.join(' | '));
+  check('y los números generales quedan después',
+    ordenUso.indexOf('KPIs') > ordenUso.indexOf('Comprás una cosa, usás otra'), ordenUso.join(' | '));
+
+  /* El candado que importa: vacías no se esconden. Una tarjeta oculta es una
+     función que nadie sabe que existe. */
+  check('las tres se ven con la colección vacía',
+    await visible('#cardPiel') && await visible('#cardCiego') && await visible('#cardCompraUso'));
+  check('y vacías explican para qué sirven',
+    /se mide en tu piel/.test(await p.textContent('#pielSub')) &&
+    /sin nombre ni marca/.test(await p.textContent('#ciegoSub')) &&
+    /qué comprás contra qué usás/.test(await p.textContent('#compraUsoSub')),
+    [await p.textContent('#pielSub'), await p.textContent('#ciegoSub')].join(' || ').slice(0, 160));
+
+  await desdeCero();
+
   console.log('\nAC · Cuánto dura de verdad, en tu piel');
   /* Los usos se arman con ts a mano: esperar seis horas reales no es una prueba,
      es una siesta. Lo que se verifica es la aritmética y qué hace el motor con

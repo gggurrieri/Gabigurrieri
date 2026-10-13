@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-13.2';
+const VERSION = '2026-10-13.3';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -1088,7 +1088,18 @@ function pantallaVacia() {
     <h2>Todavía no hay nada que elegir</h2>
     <p class="arranque-txt">Perfumario elige por vos entre los perfumes que
       <b>ya tenés</b>, por la temperatura de hoy, la ocasión y lo que aprende de
-      tu uso. Para empezar necesita al menos uno.</p>
+      tu uso. Y te muestra la cuenta: cada sugerencia viene con sus razones.</p>
+    <!-- Lo que ninguna otra de la categoría hace. Va acá y no en una pantalla
+         de bienvenida aparte porque una bienvenida se saltea; esto se lee
+         mientras el usuario decide si vale la pena cargar el primer frasco. -->
+    <ul class="arranque-lista">
+      <li><b>Mide cuánto te dura de verdad</b>, en tu piel, y te avisa cuando la
+        caja exagera.</li>
+      <li><b>Te dice con cuál mezclarlo</b>, en qué orden y por qué.</li>
+      <li><b>Te arma la valija</b> para un viaje, contra el pronóstico del destino.</li>
+      <li><b>Te compara de a dos a ciegas</b>, sin la marca a la vista.</li>
+    </ul>
+    <p class="arranque-txt">Para empezar necesita al menos uno.</p>
     <div class="btn-row">
       <button class="btn btn-accent" data-primero="1">Agregar mi primer perfume</button>
     </div>
@@ -3254,8 +3265,17 @@ function renderPiel() {
   }).filter(Boolean).sort((a, b) =>
     Math.abs(b.dif == null ? 0 : b.dif) - Math.abs(a.dif == null ? 0 : a.dif));
 
-  $('#cardPiel').hidden = !filas.length;
-  if (!filas.length) return;
+  /* Vacía no se esconde: explica. Una tarjeta oculta es una función que nadie
+     sabe que existe, y ésta es justamente la que separa a esta app del resto.
+     El día uno no hay nada medido, y ése es el día que hay que contarlo. */
+  if (!filas.length) {
+    const conUsos = S.usos.filter(u => u.ts).length;
+    $('#pielSub').textContent = conUsos
+      ? `Registraste ${conUsos} uso${conUsos === 1 ? '' : 's'} con hora. Cuando la app te pregunte si todavía lo sentís, acá va a aparecer cuánto te dura de verdad cada uno.`
+      : 'Toda app te deja escribir que un perfume dura 8 horas: ese número sale de la caja. Acá se mide en tu piel. Registrá un uso y, unas horas después, la app te pregunta si todavía lo sentís.';
+    $('#listaPiel').innerHTML = '';
+    return;
+  }
 
   const firmes = filas.filter(x => x.r.firme).length;
   $('#pielSub').textContent = firmes

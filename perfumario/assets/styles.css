@@ -441,6 +441,13 @@ details[open]>summary .chev{transform:rotate(-135deg);margin:4px 3px 0 0}
 .arranque-txt{margin:0;font-size:var(--t-4);line-height:1.6;color:var(--muted)}
 .arranque-txt b{color:var(--txt);font-weight:500}
 .arranque .hint{margin-top:var(--sp-6)}
+.arranque-lista{margin:var(--sp-6) 0 var(--sp-5);padding:0;list-style:none;
+  display:flex;flex-direction:column;gap:var(--sp-4)}
+.arranque-lista li{font-size:var(--t-3);line-height:1.5;color:var(--muted);
+  padding-left:var(--sp-6);position:relative}
+.arranque-lista li:before{content:"";position:absolute;left:0;top:.55em;
+  width:5px;height:5px;border-radius:var(--r-pill);background:var(--accent)}
+.arranque-lista b{color:var(--txt);font-weight:500}
 
 /* la caja contra tu piel: el número medido se distingue del declarado */
 .medido{color:var(--accent)}

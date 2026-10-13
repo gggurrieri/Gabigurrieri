@@ -228,31 +228,24 @@
 
     <!-- ============================ USO ============================ -->
     <section class="view" id="view-uso">
-      <div class="kpis" id="kpisUso"></div>
 
-      <section class="card" id="cardAprendizaje" hidden>
-        <h2>Lo que aprendí de vos</h2>
-        <p class="sub" id="aprendizajeSub">—</p>
-        <div id="aprendizajeReglas"></div>
-      </section>
+      <!-- El orden es el mensaje. Esta pestaña tenía arriba los números que
+           tiene cualquier app de la categoría —usos del mes, ml gastados— y
+           abajo las tres cosas que no tiene ninguna. Ahora al revés: lo que
+           distingue a la app se ve sin scrollear, y los números generales
+           quedan donde corresponde, que es después.
 
-      <!-- Lo que dice la caja contra lo que dice tu piel. Es el único dato de la
-           app que no se puede copiar de ningún lado: lo genera el uso. -->
-      <section class="card" id="cardPiel" hidden>
+           Y ninguna de las tres se esconde cuando está vacía: una tarjeta
+           oculta es una función que nadie sabe que existe. Vacías explican
+           para qué sirven, que es justo lo que hay que decirle a alguien el
+           primer día. -->
+
+      <section class="card" id="cardPiel">
         <h2>La caja y tu piel</h2>
         <p class="sub" id="pielSub">—</p>
         <div id="listaPiel" class="stack-sm"></div>
       </section>
 
-      <section class="card">
-        <h2>Rotación</h2>
-        <p class="sub" id="rotacionSub">—</p>
-        <div id="rotacion" class="bars"></div>
-      </section>
-
-      <!-- El cruce que no se ve mirando ninguna de las dos listas por separado:
-           qué proporción de la colección es cada familia, contra qué proporción
-           de los usos. -->
       <!-- Modo ciego: comparar de a dos sin ver el nombre, para sacar la marca
            de la decisión. -->
       <section class="card" id="cardCiego">
@@ -262,10 +255,27 @@
         <div class="btn-row"><button class="btn btn-accent" id="btnCiego">Comparar a ciegas</button></div>
       </section>
 
+      <!-- El cruce que no se ve mirando ninguna de las dos listas por separado:
+           qué proporción de la colección es cada familia, contra qué proporción
+           de los usos. -->
       <section class="card" id="cardCompraUso">
         <h2>Comprás una cosa, usás otra</h2>
         <p class="sub" id="compraUsoSub">—</p>
         <div id="compraUso" class="bars-par"></div>
+      </section>
+
+      <section class="card" id="cardAprendizaje" hidden>
+        <h2>Lo que aprendí de vos</h2>
+        <p class="sub" id="aprendizajeSub">—</p>
+        <div id="aprendizajeReglas"></div>
+      </section>
+
+      <div class="kpis" id="kpisUso"></div>
+
+      <section class="card">
+        <h2>Rotación</h2>
+        <p class="sub" id="rotacionSub">—</p>
+        <div id="rotacion" class="bars"></div>
       </section>
 
       <section class="card" id="cardPolvo" hidden>

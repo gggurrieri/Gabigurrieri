@@ -25,6 +25,43 @@ contesta igual —bloquear sería mentir sobre lo que puede hacer— pero avisa:
 empiezan a valer."* A partir de tres el aviso se va solo. En vez de un muro,
 una pendiente.
 
+## Que lo distinto se vea
+
+Un revisor de App Store abre la app dos minutos, con la colección vacía, y
+decide si es *"indistinguishable from what's already widely available"* —la
+guía 4.3(b), que es motivo de rechazo—. Si en esos dos minutos lo único que ve
+es colección + clima, no importa lo que haya abajo.
+
+Tres cambios, con un criterio común: **una función que no se ve no existe**.
+
+### El primer día nombra lo que ninguna otra hace
+
+La pantalla de arranque decía lo mismo que dicen las ocho competidoras: elige
+por la temperatura, la ocasión y tu uso. Ahora agrega lo que sólo hace ésta
+—mide cuánto te dura de verdad, te dice con cuál mezclarlo, te arma la valija,
+te compara a ciegas— y promete **la cuenta, no una IA**, que es la diferencia
+de fondo con el resto de la categoría.
+
+Va ahí y no en una pantalla de bienvenida aparte porque una bienvenida se
+saltea; esto se lee mientras el usuario decide si vale la pena cargar el primer
+frasco.
+
+### El orden de la pestaña Uso es el mensaje
+
+Tenía arriba los números que tiene cualquier app —usos del mes, ml gastados, el
+más puesto— y abajo las tres cosas que no tiene ninguna. El primer scroll de la
+pestaña más distintiva era el contenido más genérico de la app.
+
+Ahora abre con **La caja y tu piel**, **Modo ciego** y **Comprás una cosa, usás
+otra**; los números generales quedan después.
+
+### Vacías explican, no se esconden
+
+`cardPiel` se ocultaba cuando no había mediciones, que es exactamente el día
+que hay que contar qué hace. Las tres tarjetas distintivas ahora se ven siempre:
+sin datos, dicen para qué sirven. Es el mismo problema de *discoverability* que
+tuvo el bloque de mezclas, aplicado como regla en vez de caso por caso.
+
 ## Preguntarme cómo va
 
 En Ajustes, de 3 a 6 horas, **4 por defecto**: es donde empiezan a separarse los
