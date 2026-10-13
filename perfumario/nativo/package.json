@@ -2,15 +2,15 @@
   "name": "perfumario-nativo",
   "version": "1.0.0",
   "private": true,
-  "description": "Envoltorio nativo de Perfumario: la misma app, con notificaciones locales y almacenamiento del sistema.",
+  "description": "Envoltorio iOS de Perfumario: la misma app, con notificaciones locales.",
   "scripts": {
     "www": "bash ../tools/build-nativo.sh",
-    "sync": "npm run www && npx cap sync",
-    "android": "npm run sync && npx cap open android"
+    "sync": "npm run www && npx cap sync ios",
+    "ios": "npm run sync && npx cap open ios"
   },
   "dependencies": {
-    "@capacitor/android": "8.5.3",
     "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3",
     "@capacitor/local-notifications": "8.3.1"
   },
   "devDependencies": {

@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-13.4';
+const VERSION = '2026-10-13.5';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -898,25 +898,35 @@ const Nativo = {
   },
   disponible() { return !!this.plugin(); },
 
-  async permiso() {
+  /* En iOS el permiso se pide UNA sola vez: si el usuario dice que no, la app no
+     puede volver a preguntar nunca —hay que ir a Ajustes del teléfono—. Por eso
+     la pregunta del sistema no sale al abrir la app, cuando nadie sabe para qué
+     es, sino cuando elegís la hora en Ajustes, con la explicación en pantalla.
+
+     `pedir: false` (el arranque) sólo mira si ya está dado. `pedir: true` (al
+     tocar el ajuste) es el único momento en que aparece el cartel del sistema. */
+  async permiso(pedir) {
     const pl = this.plugin();
-    if (!pl) return false;
+    if (!pl) return 'no-nativo';
     try {
       let r = await pl.checkPermissions();
-      if (r.display === 'prompt' || r.display === 'prompt-with-rationale') r = await pl.requestPermissions();
-      return r.display === 'granted';
-    } catch (e) { return false; }
+      if (pedir && (r.display === 'prompt' || r.display === 'prompt-with-rationale')) {
+        r = await pl.requestPermissions();
+      }
+      return r.display;
+    } catch (e) { return 'error'; }
   },
 
   /* Reconciliar, no "agregar": se mira lo que el sistema tiene agendado contra
      lo que debería tener, y se corrige la diferencia. Programar sin cancelar
      deja avisos de usos ya medidos, que es la forma más rápida de que alguien
      apague las notificaciones para siempre. */
-  async sincronizar() {
+  async sincronizar(pedir) {
     const pl = this.plugin();
     if (!pl) return { programados: 0, cancelados: 0 };
     try {
-      if (!(await this.permiso())) return { programados: 0, cancelados: 0 };
+      const estado = await this.permiso(pedir);
+      if (estado !== 'granted') return { programados: 0, cancelados: 0, permiso: estado };
       const quiero = avisosPendientes();
       const quieroIds = quiero.map(a => a.id);
       const hay = ((await pl.getPending()) || {}).notifications || [];
@@ -931,7 +941,7 @@ const Nativo = {
           extra: { usoId: a.usoId }
         }))
       });
-      return { programados: faltan.length, cancelados: sobran.length };
+      return { programados: faltan.length, cancelados: sobran.length, permiso: 'granted' };
     } catch (e) { return { programados: 0, cancelados: 0, error: String(e) }; }
   }
 };
@@ -940,10 +950,13 @@ const Nativo = {
    el ajuste puede cambiar la lista, y recalcularla entera es barato. En el
    navegador sale por la primera línea y no cuesta nada. */
 let avisoTimer = null;
+let permisoAvisos = 'no-nativo';
 function sincronizarAvisos() {
   if (!Nativo.disponible()) return;
   clearTimeout(avisoTimer);
-  avisoTimer = setTimeout(() => Nativo.sincronizar(), 400);
+  avisoTimer = setTimeout(() => Nativo.sincronizar(false).then(r => {
+    if (r.permiso && r.permiso !== permisoAvisos) { permisoAvisos = r.permiso; render(); }
+  }), 400);
 }
 
 /* La que usa el motor para decidir. Si hay medición firme, manda la medición:
@@ -3482,9 +3495,11 @@ function renderAjustes() {
      opción que promete una notificación que nunca llega es peor que no tenerla. */
   $('#avisoRecordar').textContent = !S.ajustes.recordar
     ? 'Sin esto, la duración real no se puede medir y la app sigue usando la que dice la caja.'
-    : Nativo.disponible()
-      ? `Te aviso a las ${S.ajustes.recordar} horas de cada uso, con una sola notificación. Si contestás antes, no te llega.`
-      : `Por ahora la pregunta aparece en Hoy, sobre el uso del día, cuando abrís la app pasadas las ${S.ajustes.recordar} horas. La notificación que te avisa sola llega con la versión de la tienda: una web no puede programar avisos sin un servidor.`;
+    : !Nativo.disponible()
+      ? `Por ahora la pregunta aparece en Hoy, sobre el uso del día, cuando abrís la app pasadas las ${S.ajustes.recordar} horas. La notificación que te avisa sola llega con la versión de la tienda: una web no puede programar avisos sin un servidor.`
+      : permisoAvisos === 'denied'
+        ? 'Las notificaciones están bloqueadas para Perfumario. Se activan desde Ajustes del teléfono; mientras tanto la pregunta te espera en Hoy.'
+        : `Te aviso a las ${S.ajustes.recordar} horas de cada uso, con una sola notificación. Si contestás antes, no te llega.`;
   const ver = $('#versionApp');
   if (ver) ver.textContent = 'Versión ' + VERSION;
   const c = S.meta.clima;
@@ -3747,7 +3762,15 @@ function conectar() {
     toast(e.target.checked ? 'Vuelvo a mirar tu historial' : 'Sugerencias solo por reglas fijas');
   });
   $('#setRecordar').addEventListener('change', e => {
-    S.ajustes.recordar = +e.target.value || 0; guardar(); render();
+    S.ajustes.recordar = +e.target.value || 0; guardar();
+    if (S.ajustes.recordar && Nativo.disponible()) {
+      // el único lugar donde sale el cartel del sistema, con el texto que lo explica al lado
+      Nativo.sincronizar(true).then(r => {
+        permisoAvisos = r.permiso || permisoAvisos;
+        render();
+        if (permisoAvisos === 'denied') toast('Las notificaciones están bloqueadas para la app');
+      });
+    } else { render(); }
     toast(S.ajustes.recordar ? `Te pregunto a las ${S.ajustes.recordar} horas` : 'No te pregunto más');
   });
   $('#setHemisferio').addEventListener('change', e => {

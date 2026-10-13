@@ -953,7 +953,7 @@ salieron **byte por byte iguales**. El segundo commit, el de las escalas, sí
 mueve píxeles, y por eso va separado: se puede mirar el diff de cada uno sabiendo
 qué esperar.
 
-## El envoltorio nativo
+## El envoltorio de iOS
 
 La app es la misma: `perfumario/nativo/` es un proyecto de **Capacitor** que la
 carga tal cual, sin compilar ni empaquetar nada. No hay dos versiones que
@@ -961,18 +961,38 @@ mantener — `tools/build-nativo.sh` copia `index.html`, `assets/` y el manifies
 a `nativo/www/` y listo.
 
 Lo único que agrega el envoltorio es lo que una web no puede hacer: la
-**notificación local** a la hora elegida.
+**notificación local** a la hora elegida. Que es, además, lo que pide la guía
+4.2 de la App Store.
+
+### Hace falta una Mac
+
+Xcode corre sólo en macOS y no hay forma de compilar una app de iOS sin eso. Sin
+Mac propia, las salidas son una Mac en la nube o un *runner* de macOS en CI,
+todas pagas. El Apple Developer Program son **US$99 por año**, obligatorios para
+publicar y también para tener la app en un teléfono propio más de siete días.
 
 ### El código está partido en dos a propósito
 
 - **`avisosPendientes()` es una función pura**: dice qué avisos *deberían*
   existir mirando sólo el estado. Se prueba sin teléfono, sin permisos y sin
   esperar cuatro horas.
-- **`Nativo.sincronizar()` es el cable**: lleva esa lista al sistema operativo
-  y, en el navegador, sale por la primera línea sin hacer nada.
+- **`Nativo.sincronizar()` es el cable**: lleva esa lista al sistema y, en el
+  navegador, sale por la primera línea sin hacer nada.
 
 La política se prueba; el cable no. Las nueve pruebas de la sección AE son todas
 sobre la primera.
+
+### El permiso se pide una sola vez, y en el momento correcto
+
+En iOS el cartel del sistema aparece **una vez**: si el usuario dice que no, la
+app no puede volver a preguntar nunca — hay que ir a Ajustes del teléfono. Por
+eso no sale al abrir la app, cuando nadie sabe para qué es, sino **al elegir la
+hora en Ajustes**, con la explicación en pantalla al lado.
+
+En el arranque sólo se consulta si ya está dado (`pedir: false`); el único lugar
+que dispara el pedido es ese cambio de ajuste. Y si quedó bloqueado, la pantalla
+lo dice y explica que la pregunta igual espera en Hoy, en vez de fingir que el
+aviso va a llegar.
 
 ### Reconciliar, no agregar
 
@@ -994,22 +1014,24 @@ publicada en la tienda.
 
 ### Cómo se compila
 
-Hace falta Android Studio con su SDK; acá sólo se arma el proyecto.
+En una Mac con Xcode y CocoaPods:
 
 ```
 cd perfumario/nativo
 npm install
-npx cap add android      # sólo la primera vez
-npm run sync             # arma www y copia todo al proyecto Android
-npx cap open android     # abre Android Studio para compilar y firmar
+npx cap add ios          # sólo la primera vez
+npm run sync             # arma www y copia todo al proyecto de Xcode
+npx cap open ios         # abre Xcode para firmar y compilar
 ```
 
-`android/`, `www/` y `node_modules/` no se versionan: se regeneran con esos
-comandos.
+`ios/`, `www/` y `node_modules/` no se versionan: se regeneran con esos
+comandos. El `appId` (`ar.gurrieri.perfumario`) hay que hacerlo coincidir con el
+Bundle ID que se cree en la cuenta de desarrollador.
 
-Falta todavía, y es trabajo de la plataforma y no de la app: el **widget de
-pantalla de inicio** con la elección del día, y mover la copia de seguridad del
-`localStorage` al almacenamiento del sistema para que sobreviva de verdad.
+Falta todavía, y es código Swift y no JavaScript: el **widget de pantalla de
+inicio** con la elección del día —que necesita un App Group para compartir el
+dato entre la app y el widget— y mover la copia de seguridad al almacenamiento
+del sistema para que sobreviva de verdad.
 
 ## Cómo está hecha
 
