@@ -412,7 +412,12 @@
 <script src="assets/coleccion.js"></script>
 <script src="assets/app.js"></script>
 <script>
-if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+/* El service worker sirve para la versión web: guarda la app para abrirla sin
+   internet. Adentro del envoltorio nativo los archivos ya están en el
+   dispositivo, así que no agrega nada y sí puede servir una versión vieja
+   después de actualizar desde la tienda. */
+const enNativo = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !enNativo) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
 </script>

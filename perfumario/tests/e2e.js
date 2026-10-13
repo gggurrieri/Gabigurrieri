@@ -1400,6 +1400,83 @@ const check = (n, c, d = '') => {
     'modal ' + (await visible('#modal')));
   await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
 
+  console.log('\nAE · El aviso a las N horas');
+  /* El canal de entrega no se puede probar acá: no hay teléfono ni hay cuatro
+     horas. Lo que sí se prueba es la política, que es donde están las
+     decisiones y donde estarían los errores. Por eso vive en una función pura
+     y aparte: el cable no se prueba, la política sí. */
+  await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+  await p.evaluate(() => {
+    const base = { conc:'EDP', ml:100, mlRestante:100, precio:0, comprado:null, rating:0, nota:'',
+      ocasiones:['casual'], momento:'ambos', estaciones:['verano','invierno','otono','primavera'],
+      estela:3, longevidad:7, salida:['Bergamota'], corazon:['Rosa'], fondo:['Vainilla'] };
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    st.perfumes = [Object.assign({ id:'av', creado:'2026-01-01', nombre:'Testigo', casa:'P',
+      familia:'amaderada' }, base)];
+    const ahora = Date.now();
+    st.usos = [
+      // recién puesto: el aviso todavía está por delante
+      { id:'a1', perfumeId:'av', fecha:'2026-01-02', ts:new Date(ahora - 1 * 3600000).toISOString(),
+        ocasion:'casual', sprays:3, temp:20, nota:'' },
+      // ya contestado y apagado: no hay nada que preguntar
+      { id:'a2', perfumeId:'av', fecha:'2026-01-02', ts:new Date(ahora - 2 * 3600000).toISOString(),
+        ocasion:'casual', sprays:3, temp:20, nota:'', controles:[{h:1,estado:'no'}] },
+      // viejo: la hora del aviso ya pasó, no se agenda el pasado
+      { id:'a3', perfumeId:'av', fecha:'2026-01-02', ts:new Date(ahora - 20 * 3600000).toISOString(),
+        ocasion:'casual', sprays:3, temp:20, nota:'' },
+      // sin hora: no se puede medir, no se avisa
+      { id:'a4', perfumeId:'av', fecha:'2026-01-02', ts:null,
+        ocasion:'casual', sprays:3, temp:20, nota:'' }
+    ];
+    st.ajustes = Object.assign(st.ajustes || {}, { recordar: 4 });
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+  });
+  await p.reload(); await p.waitForTimeout(1200);
+
+  const avisos = await p.evaluate(() => window.PERFUMARIO_DEBUG.avisosPendientes()
+    .map(a => ({ uso: a.usoId, id: a.id, texto: a.texto,
+                 enHoras: Math.round((a.cuando - Date.now()) / 360000) / 10 })));
+  check('avisa sólo por el uso que todavía puede medirse',
+    avisos.length === 1 && avisos[0].uso === 'a1',
+    avisos.map(a => a.uso).join(', ') || 'ninguno');
+  check('y lo pone a las 4 horas del uso, no a las 4 de ahora',
+    Math.abs(avisos[0].enHoras - 3) < 0.2, String(avisos[0].enHoras));
+  check('el texto dice qué perfume y cuánto hace',
+    /Te pusiste Testigo hace 4 horas/.test(avisos[0].texto), avisos[0].texto);
+
+  check('el id es estable: el mismo uso da siempre el mismo número',
+    await p.evaluate(() => window.PERFUMARIO_DEBUG.idNumerico('a1') ===
+                           window.PERFUMARIO_DEBUG.idNumerico('a1') &&
+                           window.PERFUMARIO_DEBUG.idNumerico('a1') !==
+                           window.PERFUMARIO_DEBUG.idNumerico('a2')));
+
+  check('contestar "ya no está" apaga el aviso', await p.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    st.usos.find(u => u.id === 'a1').controles = [{ h: 1, estado: 'no' }];
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+    return true;
+  }));
+  await p.reload(); await p.waitForTimeout(1000);
+  check('— comprobado',
+    await p.evaluate(() => window.PERFUMARIO_DEBUG.avisosPendientes().length) === 0);
+
+  check('apagar el ajuste apaga todos', await p.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    st.usos.find(u => u.id === 'a1').controles = [];
+    st.ajustes.recordar = 0;
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+    return true;
+  }));
+  await p.reload(); await p.waitForTimeout(1000);
+  check('— comprobado',
+    await p.evaluate(() => window.PERFUMARIO_DEBUG.avisosPendientes().length) === 0);
+
+  check('en el navegador no se rompe nada: el puente no está y la app anda',
+    await p.evaluate(() => window.PERFUMARIO_DEBUG.nativoDisponible()) === false &&
+    await cuantos('.tab') === 4);
+
+  await desdeCero();
+
   console.log('\nAD · Lo que distingue a la app se ve');
   /* Un revisor de App Store abre la app dos minutos, con la colección vacía, y
      decide si es "indistinguible de lo que ya existe". Si lo único que ve es

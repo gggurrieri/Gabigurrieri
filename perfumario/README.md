@@ -953,6 +953,64 @@ salieron **byte por byte iguales**. El segundo commit, el de las escalas, sí
 mueve píxeles, y por eso va separado: se puede mirar el diff de cada uno sabiendo
 qué esperar.
 
+## El envoltorio nativo
+
+La app es la misma: `perfumario/nativo/` es un proyecto de **Capacitor** que la
+carga tal cual, sin compilar ni empaquetar nada. No hay dos versiones que
+mantener — `tools/build-nativo.sh` copia `index.html`, `assets/` y el manifiesto
+a `nativo/www/` y listo.
+
+Lo único que agrega el envoltorio es lo que una web no puede hacer: la
+**notificación local** a la hora elegida.
+
+### El código está partido en dos a propósito
+
+- **`avisosPendientes()` es una función pura**: dice qué avisos *deberían*
+  existir mirando sólo el estado. Se prueba sin teléfono, sin permisos y sin
+  esperar cuatro horas.
+- **`Nativo.sincronizar()` es el cable**: lleva esa lista al sistema operativo
+  y, en el navegador, sale por la primera línea sin hacer nada.
+
+La política se prueba; el cable no. Las nueve pruebas de la sección AE son todas
+sobre la primera.
+
+### Reconciliar, no agregar
+
+`sincronizar()` mira lo que el sistema tiene agendado contra lo que debería
+tener y corrige la diferencia: programa lo que falta y **cancela lo que sobra**.
+Programar sin cancelar deja avisos de usos ya medidos, que es la forma más
+rápida de que alguien apague las notificaciones para siempre.
+
+Un aviso se cae solo cuando el uso ya se midió, cuando se borra el uso, o cuando
+se apaga el ajuste. El id que usa el sistema es un entero derivado del id del
+uso con un hash estable: el mismo uso tiene que dar siempre el mismo número,
+porque es con eso que después se cancela.
+
+### Qué se desactiva adentro del envoltorio
+
+El **service worker** no se registra: adentro los archivos ya están en el
+dispositivo, no agrega nada, y uno viejo en caché puede tapar una actualización
+publicada en la tienda.
+
+### Cómo se compila
+
+Hace falta Android Studio con su SDK; acá sólo se arma el proyecto.
+
+```
+cd perfumario/nativo
+npm install
+npx cap add android      # sólo la primera vez
+npm run sync             # arma www y copia todo al proyecto Android
+npx cap open android     # abre Android Studio para compilar y firmar
+```
+
+`android/`, `www/` y `node_modules/` no se versionan: se regeneran con esos
+comandos.
+
+Falta todavía, y es trabajo de la plataforma y no de la app: el **widget de
+pantalla de inicio** con la elección del día, y mover la copia de seguridad del
+`localStorage` al almacenamiento del sistema para que sobreviva de verdad.
+
 ## Cómo está hecha
 
 HTML, CSS y JavaScript a mano, sin dependencias ni compilación. Cinco archivos:

@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-13.3';
+const VERSION = '2026-10-13.4';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -110,7 +110,11 @@ function cargarMiColeccion() {
   toast(n ? `Agregados ${n} perfumes` : 'Ya los tenías a todos');
 }
 function guardar() {
-  try { localStorage.setItem(KEY, JSON.stringify(S)); return true; }
+  try {
+    localStorage.setItem(KEY, JSON.stringify(S));
+    if (typeof sincronizarAvisos === 'function') sincronizarAvisos();
+    return true;
+  }
   catch (e) { toast('No se pudo guardar: el navegador está sin espacio'); return false; }
 }
 
@@ -840,6 +844,106 @@ function longevidadReal(id) {
   // ninguna llegó a apagarse: lo único cierto es que duró al menos lo máximo visto
   const max = Math.max.apply(null, ms.map(m => m.horas));
   return { horas: max, n: ms.length, firme: false, cota: true };
+}
+
+/* -------------------- el aviso a las N horas ------------------------
+   La medición depende de que alguien conteste, y para contestar hay que
+   acordarse. En el navegador eso sólo pasa si abrís la app; en la versión
+   nativa llega una notificación a la hora elegida.
+
+   El código está partido en dos a propósito. `avisosPendientes` es una función
+   pura: dice qué avisos DEBERÍAN existir mirando sólo el estado, y se puede
+   probar sin notificaciones, sin permisos y sin esperar cuatro horas —que es
+   exactamente lo que no se puede hacer con el canal de entrega—. El adaptador
+   de abajo sólo lleva esa lista al sistema operativo, y en el navegador no
+   hace nada. La política se prueba; el cable, no. */
+const HORA_MS = 3600000;
+
+function avisosPendientes(ahora) {
+  ahora = ahora || Date.now();
+  const horas = S.ajustes.recordar || 0;
+  if (!horas) return [];
+  return S.usos.filter(u => {
+    if (!u.ts) return false;
+    const m = medicionDe(u);
+    if (m && m.cerrada) return false;   // ya se apagó: no hay nada que preguntar
+    return new Date(u.ts).getTime() + horas * HORA_MS > ahora;
+  }).map(u => {
+    const p = perfume(u.perfumeId);
+    return {
+      id: idNumerico(u.id),
+      usoId: u.id,
+      cuando: new Date(new Date(u.ts).getTime() + horas * HORA_MS),
+      titulo: '¿Todavía lo sentís?',
+      texto: (p ? `Te pusiste ${p.nombre} hace ${horas} horas. ` : `Hace ${horas} horas que te lo pusiste. `) +
+             'Un toque y queda medido.'
+    };
+  });
+}
+
+/* El sistema pide un entero y los ids de uso son cadenas. Tiene que ser
+   estable: el mismo uso siempre el mismo número, porque es con eso que después
+   se cancela el aviso que ya no corresponde. */
+function idNumerico(s) {
+  let h = 0;
+  for (let i = 0; i < String(s).length; i++) h = (h * 31 + String(s).charCodeAt(i)) % 2147483647;
+  return h || 1;
+}
+
+const Nativo = {
+  plugin() {
+    const C = window.Capacitor;
+    return (C && C.isNativePlatform && C.isNativePlatform() &&
+            C.Plugins && C.Plugins.LocalNotifications) || null;
+  },
+  disponible() { return !!this.plugin(); },
+
+  async permiso() {
+    const pl = this.plugin();
+    if (!pl) return false;
+    try {
+      let r = await pl.checkPermissions();
+      if (r.display === 'prompt' || r.display === 'prompt-with-rationale') r = await pl.requestPermissions();
+      return r.display === 'granted';
+    } catch (e) { return false; }
+  },
+
+  /* Reconciliar, no "agregar": se mira lo que el sistema tiene agendado contra
+     lo que debería tener, y se corrige la diferencia. Programar sin cancelar
+     deja avisos de usos ya medidos, que es la forma más rápida de que alguien
+     apague las notificaciones para siempre. */
+  async sincronizar() {
+    const pl = this.plugin();
+    if (!pl) return { programados: 0, cancelados: 0 };
+    try {
+      if (!(await this.permiso())) return { programados: 0, cancelados: 0 };
+      const quiero = avisosPendientes();
+      const quieroIds = quiero.map(a => a.id);
+      const hay = ((await pl.getPending()) || {}).notifications || [];
+      const sobran = hay.filter(n => quieroIds.indexOf(n.id) === -1);
+      if (sobran.length) await pl.cancel({ notifications: sobran.map(n => ({ id: n.id })) });
+      const hayIds = hay.map(n => n.id);
+      const faltan = quiero.filter(a => hayIds.indexOf(a.id) === -1);
+      if (faltan.length) await pl.schedule({
+        notifications: faltan.map(a => ({
+          id: a.id, title: a.titulo, body: a.texto,
+          schedule: { at: a.cuando },
+          extra: { usoId: a.usoId }
+        }))
+      });
+      return { programados: faltan.length, cancelados: sobran.length };
+    } catch (e) { return { programados: 0, cancelados: 0, error: String(e) }; }
+  }
+};
+
+/* Se llama en cada guardado, con un respiro: cualquier cambio en los usos o en
+   el ajuste puede cambiar la lista, y recalcularla entera es barato. En el
+   navegador sale por la primera línea y no cuesta nada. */
+let avisoTimer = null;
+function sincronizarAvisos() {
+  if (!Nativo.disponible()) return;
+  clearTimeout(avisoTimer);
+  avisoTimer = setTimeout(() => Nativo.sincronizar(), 400);
 }
 
 /* La que usa el motor para decidir. Si hay medición firme, manda la medición:
@@ -3376,9 +3480,11 @@ function renderAjustes() {
   $('#setRecordar').value = String(S.ajustes.recordar || 0);
   /* Decir qué puede y qué no puede hacer la app es parte del producto: una
      opción que promete una notificación que nunca llega es peor que no tenerla. */
-  $('#avisoRecordar').textContent = S.ajustes.recordar
-    ? `Por ahora la pregunta aparece en Hoy, sobre el uso del día, cuando abrís la app pasadas las ${S.ajustes.recordar} horas. La notificación que te avisa sola llega con la versión de la tienda: una web no puede programar avisos sin un servidor.`
-    : 'Sin esto, la duración real no se puede medir y la app sigue usando la que dice la caja.';
+  $('#avisoRecordar').textContent = !S.ajustes.recordar
+    ? 'Sin esto, la duración real no se puede medir y la app sigue usando la que dice la caja.'
+    : Nativo.disponible()
+      ? `Te aviso a las ${S.ajustes.recordar} horas de cada uso, con una sola notificación. Si contestás antes, no te llega.`
+      : `Por ahora la pregunta aparece en Hoy, sobre el uso del día, cuando abrís la app pasadas las ${S.ajustes.recordar} horas. La notificación que te avisa sola llega con la versión de la tienda: una web no puede programar avisos sin un servidor.`;
   const ver = $('#versionApp');
   if (ver) ver.textContent = 'Versión ' + VERSION;
   const c = S.meta.clima;
@@ -3846,8 +3952,29 @@ function confirmarBorrado(id) {
   setTimeout(chau, 2000);   // por si el navegador no dispara el evento
 })();
 
+/* Una ventana mínima para las pruebas: la política de avisos vive adentro del
+   IIFE y no hay otra forma de mirarla desde afuera sin un teléfono. Son tres
+   funciones de lectura, no tocan nada. */
+window.PERFUMARIO_DEBUG = {
+  avisosPendientes: a => avisosPendientes(a),
+  idNumerico: x => idNumerico(x),
+  nativoDisponible: () => Nativo.disponible()
+};
+
 cargar();
 conectar();
 ir('hoy');
+
+/* Tocar la notificación tiene que dejarte donde está la pregunta, no en la
+   última pantalla que hayas visto: el aviso prometió una cosa y la app tiene
+   que cumplirla sin pedirte un paso más. */
+if (Nativo.disponible()) {
+  try {
+    Nativo.plugin().addListener('localNotificationActionPerformed', () => {
+      ir('hoy'); render();
+    });
+  } catch (e) { /* si el plugin cambia de forma, la app sigue andando igual */ }
+  sincronizarAvisos();
+}
 
 })();

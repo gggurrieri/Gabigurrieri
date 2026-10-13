@@ -4,3 +4,7 @@ tmp/
 node_modules/
 package-lock.json
 package.json
+
+# El package.json del envoltorio nativo sí va: no es un archivo de trabajo,
+# es la lista de plugins con la que se compila la app.
+!perfumario/nativo/package.json

@@ -1,0 +1,13 @@
+{
+  "appId": "ar.gurrieri.perfumario",
+  "appName": "Perfumario",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#0B0A0B"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "iconColor": "#D9A85C"
+    }
+  }
+}
