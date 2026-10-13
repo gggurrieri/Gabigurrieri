@@ -314,6 +314,28 @@
         <p class="hint">Con esto prendido, las sugerencias se corrigen según lo que realmente usás en cada ocasión. Apagalo y vuelve a recomendar solo por las reglas fijas.</p>
       </section>
 
+      <!-- Cuándo preguntarte cómo va el perfume. Hoy define cuándo la app te lo
+           pone adelante al abrirla; con la versión nativa es la hora a la que
+           llega la notificación. La política es la misma, cambia el canal. -->
+      <section class="card">
+        <h2>Preguntarme cómo va</h2>
+        <label class="field">
+          <span>A las cuántas horas de ponérmelo</span>
+          <select id="setRecordar">
+            <option value="0">No preguntar</option>
+            <option value="3">3 horas</option>
+            <option value="4">4 horas</option>
+            <option value="5">5 horas</option>
+            <option value="6">6 horas</option>
+          </select>
+        </label>
+        <p class="hint">De esa respuesta sale cuánto dura cada perfume en tu piel, que es
+          el dato que la app usa para avisarte si uno no te va a llegar hasta el final
+          de un evento. Antes de las 3 horas no sirve preguntar: a esa altura todos
+          están puestos.</p>
+        <p class="hint" id="avisoRecordar">—</p>
+      </section>
+
       <section class="card">
         <h2>Clima</h2>
         <p class="sub" id="lugarActual">—</p>

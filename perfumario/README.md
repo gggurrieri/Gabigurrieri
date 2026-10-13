@@ -4,6 +4,51 @@ App web para tu colección de perfumes: qué tenés, qué ponerte hoy y qué sig
 cada nota olfativa. Funciona sin conexión y guarda todo en el navegador: no hay
 servidor, no hay cuenta, no hay datos que salgan del dispositivo.
 
+## El primer día
+
+Una app que aprende de tu uso no tiene nada que mostrar el día que la abrís:
+es el **arranque en frío**, y es el único día que hay para convencer a alguien.
+
+Hasta que se encaró la publicación, la colección del autor entraba sola en el
+primer arranque. Para una app de tienda eso no va: nadie quiere abrir una app y
+encontrarse los veinticinco frascos de otro. **Ahora arranca vacía.** La
+colección sigue en el build y se carga con un toque, pero ya no se impone.
+
+La pantalla vacía antes decía *"Andá a Colección → Agregar"*, que es mandar al
+usuario a otra pantalla a resolver un problema que le creaste. Ahora dice qué
+hace la app en una frase y el botón que lo resuelve está ahí mismo, con dos
+salidas más: seis de ejemplo, o la colección del autor.
+
+Y hay un estado intermedio que no existía. Con **uno o dos** cargados la app
+contesta igual —bloquear sería mentir sobre lo que puede hacer— pero avisa:
+*"Con uno solo no hay mucho para comparar. Cargá dos más y las sugerencias
+empiezan a valer."* A partir de tres el aviso se va solo. En vez de un muro,
+una pendiente.
+
+## Preguntarme cómo va
+
+En Ajustes, de 3 a 6 horas, **4 por defecto**: es donde empiezan a separarse los
+que duran de los que no. Antes de las 3 no sirve preguntar, porque a esa altura
+todos están puestos.
+
+Hoy esa hora decide cuándo la pregunta aparece en Hoy al abrir la app. La
+notificación que avisa sola **no se puede hacer en una web**: no existe forma
+estándar de programar una notificación local sin un servidor. Chrome lo intentó
+con *Notification Triggers* y abandonó el desarrollo —"it wasn't clear that we
+could provide consistent and reliable experiences across platforms"—, y desde
+el lado de Apple la respuesta es que las notificaciones programadas no existen
+en el estándar. Lo único que queda es Web Push, que necesita un servidor
+mandando el aviso a la hora exacta.
+
+Por eso el ajuste **dice en voz alta lo que todavía no puede hacer**. La
+alternativa era poner el selector y callarse: el usuario elige "4 horas", no le
+llega nada, y concluye que la app está rota. Una opción que promete algo que no
+cumple es peor que no tener la opción.
+
+De paso, esto resuelve el problema inverso: una notificación programada es una
+función que **literalmente no puede ser un sitio web**, que es exactamente lo
+que pide la guía 4.2 de la App Store.
+
 ## La colección viene adentro
 
 `assets/coleccion.js` trae una colección cargada de fábrica: la primera vez que

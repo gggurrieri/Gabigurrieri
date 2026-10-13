@@ -105,19 +105,81 @@ const check = (n, c, d = '') => {
     await p.waitForTimeout(400);
   };
   const cuantos = async s => p.evaluate(x => document.querySelectorAll(x).length, s);
+  /* Volver al punto de partida. Desde que la app arranca vacía, "borrar todo"
+     ya no deja la colección del build: hay que pedirla, que es justo lo que
+     hace un usuario nuevo que toca "cargar la del autor". */
+  const desdeCero = async (espera = 1500) => {
+    await p.evaluate(() => localStorage.removeItem('perfumario_v1'));
+    await p.reload(); await p.waitForTimeout(600);
+    await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+    await p.tap('.tab[data-view="hoy"]'); await p.waitForTimeout(200);
+    await p.tap('#respuesta [data-semilla]'); await p.waitForTimeout(espera);
+  };
 
-  console.log('\nA · La colección viene en el build');
-  /* Cuántos trae la semilla lo dice la semilla, no un número escrito acá: si
-     se agrega o se saca un perfume, la prueba sigue midiendo lo que importa
-     (que entre completa) en vez de romperse por el conteo. */
+  console.log('\nA · El primer día: la app arranca vacía');
+  /* Hasta que se publicó, la colección del autor entraba sola. Para una app de
+     tienda eso no va: nadie quiere abrir una app y encontrarse los frascos de
+     otro. Lo que se verifica ahora es lo contrario de antes. */
   const enElBuild = await p.evaluate(() =>
     ((window.PERFUMARIO_COLECCION || { perfumes: [] }).perfumes || []).length);
-  check('la carga sola en el primer arranque',
-    enElBuild > 0 && (await db()).perfumes.length === enElBuild,
-    `${(await db()).perfumes.length} guardados vs ${enElBuild} en el build`);
-  check('y sugiere sin que cargues nada',
-    await cuantos('#respuesta .hero') === 1 && await cuantos('#sugerencias .otra') === 2);
+  check('no se impone ninguna colección en el primer arranque',
+    (await db()).perfumes.length === 0,
+    `${(await db()).perfumes.length} guardados`);
   check('no le inventa usos', (await db()).usos.length === 0);
+  check('la pantalla vacía explica qué hace la app, no adónde ir',
+    /elige por vos entre los perfumes que\s+ya tenés/.test(await p.textContent('#respuesta')),
+    (await p.textContent('#respuesta')).replace(/\s+/g, ' ').slice(0, 110));
+  check('y el botón que lo resuelve está ahí mismo',
+    await cuantos('#respuesta [data-primero]') === 1);
+  await p.tap('#respuesta [data-primero]'); await p.waitForTimeout(500);
+  check('que abre el alta sin mandarte a buscarla',
+    await visible('#modal') && /Nuevo perfume/.test(await p.textContent('#modalTitulo')));
+  await p.evaluate(() => { document.querySelector('#modal').hidden = true; });
+  await ir('hoy');
+
+  check('se puede probar con los de ejemplo de un toque',
+    await cuantos('#respuesta [data-ejemplos]') === 1);
+  check('y cargar la del autor si el build la trae',
+    await cuantos('#respuesta [data-semilla]') === (enElBuild > 0 ? 1 : 0));
+
+  // con uno solo contesta igual, pero avisa que no alcanza para comparar
+  await p.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    st.perfumes = [{ id:'u1', creado:'2026-01-01', nombre:'Único', casa:'P', familia:'amaderada',
+      conc:'EDP', ml:100, mlRestante:100, precio:0, comprado:null, longevidad:7, estela:3,
+      estaciones:['verano','invierno','otono','primavera'], ocasiones:['casual'],
+      momento:'ambos', rating:0, nota:'', salida:['Bergamota'], corazon:['Rosa'], fondo:['Cedro'] }];
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+  });
+  await p.reload(); await p.waitForTimeout(1500);
+  check('con uno solo contesta igual, no te bloquea',
+    await cuantos('#respuesta .hero') === 1);
+  check('pero avisa que con uno no hay nada que comparar',
+    /no hay mucho para comparar/.test(await p.textContent('#respuesta')),
+    (await p.textContent('#respuesta')).replace(/\s+/g, ' ').slice(0, 100));
+
+  // y a partir de tres el aviso desaparece (con uno cargado la pantalla ya es
+  // la respuesta, así que los de ejemplo se piden desde Ajustes)
+  await p.tap('#btnSettings'); await p.waitForTimeout(250);
+  await p.tap('#btnEjemplos'); await p.waitForTimeout(900);
+  await ir('hoy');
+  check('con tres o más el aviso se va solo',
+    !/no hay mucho para comparar/.test(await p.textContent('#respuesta')) &&
+    (await db()).perfumes.length >= 3, String((await db()).perfumes.length));
+
+  // de acá en adelante las pruebas necesitan la colección completa
+  await p.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    st.perfumes = []; st.usos = [];
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+  });
+  await p.reload(); await p.waitForTimeout(600);
+  await p.tap('#respuesta [data-semilla]'); await p.waitForTimeout(900);
+  check('la colección del autor entra entera cuando la pedís',
+    enElBuild > 0 && (await db()).perfumes.length === enElBuild,
+    `${(await db()).perfumes.length} de ${enElBuild}`);
+  check('y ahí sí sugiere',
+    await cuantos('#respuesta .hero') === 1 && await cuantos('#sugerencias .otra') === 2);
 
   /* candado: un perfume sin familia, sin estaciones o sin ocasiones no se puede
      puntuar bien —queda "sin clasificar" y compite con la temperatura por
@@ -220,7 +282,10 @@ const check = (n, c, d = '') => {
 
   console.log('\nB · Primer arranque');
   check('abre en Hoy', await visible('#view-hoy') && (await p.getAttribute('#view-hoy', 'class')).includes('active'));
-  check('avisa que la colección está vacía', /Todav[íi]a no cargaste/.test(await p.textContent('#respuesta')));
+  check('avisa que no hay nada que elegir, y ofrece la salida',
+    /Todav[íi]a no hay nada que elegir/.test(await p.textContent('#respuesta')) &&
+    await cuantos('#respuesta [data-primero]') === 1,
+    (await p.textContent('#respuesta')).replace(/\s+/g, ' ').slice(0, 80));
   check('sin datos no molesta con la copia', !(await visible('#avisoCopia')));
   check('el subtítulo lo dice', /vac[íi]a/i.test(await p.textContent('#topbarSub')));
 
@@ -917,12 +982,14 @@ const check = (n, c, d = '') => {
   await p.tap('#btnConfirmarBorrado'); await p.waitForTimeout(400);
   d = await db();
   check('borra todo', d.perfumes.length === 0 && d.usos.length === 0);
-  check('y vuelve al estado inicial', /Todav[íi]a no cargaste/.test(await p.textContent('#respuesta')));
+  check('y vuelve al estado inicial, con la pantalla del primer día',
+    /Todav[íi]a no hay nada que elegir/.test(await p.textContent('#respuesta')) &&
+    await cuantos('#respuesta [data-primero]') === 1,
+    (await p.textContent('#respuesta')).replace(/\s+/g, ' ').slice(0, 80));
 
   console.log('\nT · Miniatura y foto del frasco');
   /* se vuelve a cargar la colección: la sección anterior borra todo */
-  await p.evaluate(() => localStorage.removeItem('perfumario_v1'));
-  await p.reload(); await p.waitForTimeout(1500);
+  await desdeCero(1500);
   await ir('coleccion');
 
   /* cada fila muestra algo: la foto propia si la hay, el dibujo si no. Se
@@ -1001,8 +1068,7 @@ const check = (n, c, d = '') => {
   await p.waitForTimeout(200);
 
   console.log('\nV · Al aire libre o adentro');
-  await p.evaluate(() => localStorage.removeItem('perfumario_v1'));
-  await p.reload(); await p.waitForTimeout(1500);
+  await desdeCero(1500);
 
   const tocarAire = async v => { await p.tap(`#ctxAire .chip[data-val="${v}"]`); await p.waitForTimeout(450); };
   const puesto = () => p.evaluate(() =>
@@ -1184,8 +1250,7 @@ const check = (n, c, d = '') => {
     await cuantos('#compraUso .par-barra') === await cuantos('#compraUso .par') * 2);
 
   console.log('\nAA · Mezclar dos');
-  await p.evaluate(() => localStorage.removeItem('perfumario_v1'));
-  await p.reload(); await p.waitForTimeout(1600);
+  await desdeCero(1600);
   await ir('coleccion');
   await p.fill('#busca', 'Layton'); await p.waitForTimeout(300);
   await p.tap('#view-coleccion .pf'); await p.waitForTimeout(500);
@@ -1365,7 +1430,7 @@ const check = (n, c, d = '') => {
         ocasion:'evento', sprays:3, temp:20, nota:'' }
     ];
     localStorage.setItem('perfumario_v1', JSON.stringify(st));
-  }, { hoy: new Date().toISOString().slice(0, 10), hace2: haceHoras(2.5) });
+  }, { hoy: new Date().toISOString().slice(0, 10), hace2: haceHoras(4.5) });
   await p.reload(); await p.waitForTimeout(1600);
   await ir('hoy');
   await p.tap('#ctxOcasion .chip[data-val="evento"]'); await p.waitForTimeout(400);
@@ -1374,28 +1439,41 @@ const check = (n, c, d = '') => {
     await cuantos('#hoyUsos .chip[data-controlval]') === 3,
     await p.textContent('#hoyUsos'));
   check('y dice hace cuánto te lo pusiste',
-    /Hace 2,5 h que lo tenés puesto/.test(await p.textContent('#hoyUsos')),
+    /Hace 4,5 h que lo tenés puesto/.test(await p.textContent('#hoyUsos')),
     (await p.textContent('#hoyUsos')).replace(/\s+/g, ' ').slice(0, 120));
-  check('antes de las dos horas no molesta', await p.evaluate(h => {
+  check('antes de la hora que elegiste no molesta', await p.evaluate(h => {
     const st = JSON.parse(localStorage.getItem('perfumario_v1'));
     st.usos.find(u => u.id === 'h1').ts = h;
     localStorage.setItem('perfumario_v1', JSON.stringify(st));
     return true;
-  }, haceHoras(1)) && true);
+  }, haceHoras(2)) && true);
   await p.reload(); await p.waitForTimeout(1500);
   check('— comprobado', await cuantos('#hoyUsos .chip[data-controlval]') === 0);
 
-  // volver a ponerlo en 2,5 h y contestar de verdad
+  // volver a ponerlo pasada la hora elegida y contestar de verdad
   await p.evaluate(h => {
     const st = JSON.parse(localStorage.getItem('perfumario_v1'));
     st.usos.find(u => u.id === 'h1').ts = h;
     localStorage.setItem('perfumario_v1', JSON.stringify(st));
-  }, haceHoras(2.5));
+  }, haceHoras(4.5));
   await p.reload(); await p.waitForTimeout(1500);
   await p.tap('#hoyUsos .chip[data-controlval="no"]'); await p.waitForTimeout(500);
   check('contestar "ya no está" deja la medición cerrada',
-    /Te duró 1,5 h · medido|Te duró 1 h · medido/.test(await p.textContent('#hoyUsos')),
+    /Te duró 2,5 h · medido|Te duró 2 h · medido/.test(await p.textContent('#hoyUsos')),
     (await p.textContent('#hoyUsos')).replace(/\s+/g, ' ').slice(0, 140));
+
+  // el ajuste: apagarlo deja de preguntar, y la app lo dice sin promesas falsas
+  await p.tap('#btnSettings'); await p.waitForTimeout(250);
+  check('el ajuste viene en 4 horas',
+    (await p.evaluate(() => document.querySelector('#setRecordar').value)) === '4');
+  check('y avisa que la notificación sola llega con la versión nativa',
+    /no puede programar avisos sin un servidor/.test(await p.textContent('#avisoRecordar')),
+    await p.textContent('#avisoRecordar'));
+  await p.selectOption('#setRecordar', '0'); await p.waitForTimeout(400);
+  await ir('hoy');
+  check('apagado no pregunta nada', await cuantos('#hoyUsos .chip[data-controlval]') === 0);
+  await p.tap('#btnSettings'); await p.waitForTimeout(250);
+  await p.selectOption('#setRecordar', '4'); await p.waitForTimeout(400);
 
   await ir('uso');
   const piel = await p.textContent('#listaPiel');
@@ -1418,8 +1496,7 @@ const check = (n, c, d = '') => {
 
   console.log('\nAB · Modo ciego');
   await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
-  await p.evaluate(() => localStorage.removeItem('perfumario_v1'));
-  await p.reload(); await p.waitForTimeout(1600);
+  await desdeCero(1600);
   await ir('uso');
   check('arranca explicando para qué sirve', /sin nombre ni marca/i.test(await p.textContent('#ciegoSub')));
 
@@ -1454,8 +1531,7 @@ const check = (n, c, d = '') => {
     await cuantos('#ciegoTabla .bar-row') >= 2, await p.textContent('#ciegoSub'));
 
   console.log('\nX · Imaginar otra estación');
-  await p.evaluate(() => localStorage.removeItem('perfumario_v1'));
-  await p.reload(); await p.waitForTimeout(1500);
+  await desdeCero(1500);
   await abrirContexto();
 
   const estacionPuesta = () => p.evaluate(() =>

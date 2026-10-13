@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-13.1';
+const VERSION = '2026-10-13.2';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -56,7 +56,13 @@ const DEFAULTS = {
                  //  precio,comprado,longevidad,estela,estaciones[],ocasiones[],momento,rating,nota,creado}
   usos: [],      // {id,fecha,perfumeId,sprays,ocasion,momento,temp,nota}
   ciego: [],
-  ajustes: { mlSpray: 0.1, moneda: '$', hemisferio: 'sur', aprender: true, clima: false, ocasion: 'casual' },
+  ajustes: { mlSpray: 0.1, moneda: '$', hemisferio: 'sur', aprender: true, clima: false,
+             ocasion: 'casual',
+             /* A las cuántas horas de ponértelo conviene preguntarte cómo va.
+                0 = no avisar. Hoy decide cuándo la app te lo pone adelante al
+                abrirla; cuando exista la versión de tienda, es la hora a la que
+                llega la notificación. La política no cambia, cambia el canal. */
+             recordar: 4 },
   meta: { version: 1, ultimaCopia: null,
           lugar: null,   // {nombre, lat, lon} elegido una vez en Ajustes
           clima: null }  // último dato traído: {temp, humedad, codigo, lugar, ts}
@@ -78,13 +84,15 @@ function cargar() {
     return;
   }
 
-  /* Primer arranque en este navegador: si el build trae una colección, entra
-     sola. Se guarda en el acto, así queda la marca de que la app ya arrancó:
-     si después borrás todo, no resucita. */
-  const semilla = window.PERFUMARIO_COLECCION;
-  if (semilla && Array.isArray(semilla.perfumes) && semilla.perfumes.length) {
-    S.perfumes = clonar(semilla.perfumes);
-  }
+  /* Primer arranque en este navegador: vacío.
+
+     Hasta acá la colección del autor entraba sola, porque la app tenía un solo
+     usuario. Para publicarla eso no va: nadie quiere abrir una app y
+     encontrarse los 25 frascos de otro. La semilla sigue estando —si el build
+     la trae, se carga desde Ajustes con un toque— pero ya no se impone.
+
+     Se guarda igual, para que quede la marca de que la app ya arrancó: si
+     después borrás todo, no resucita nada. */
   guardar();
 }
 
@@ -896,12 +904,11 @@ function renderHoy() {
   const lista = S.perfumes.length ? sugerir(3, modelo) : [];
 
   if (!lista.length) {
-    $('#respuesta').innerHTML = `<div class="vacio">Todavía no cargaste ningún perfume.<br>
-      Andá a <b>Colección → Agregar</b>, o cargá los de ejemplo desde Ajustes.</div>`;
+    $('#respuesta').innerHTML = pantallaVacia();
     $('#sugerencias').innerHTML = '';
     $('#otras').hidden = true;
   } else {
-    $('#respuesta').innerHTML = fichaPrincipal(lista[0], lista[1], contextoActual());
+    $('#respuesta').innerHTML = avisoArranque() + fichaPrincipal(lista[0], lista[1], contextoActual());
     $('#sugerencias').innerHTML = lista.slice(1).map(x => fichaSugerencia(x)).join('');
     $('#otras').hidden = lista.length < 2;
     const t = $('#otrasTitulo');
@@ -948,12 +955,14 @@ function devolucionChips(u) {
    propios motivos. Si nunca abrís la app esa tarde, no se mide y listo — es
    preferible a perseguir al usuario con avisos que termina apagando.
 
-   Antes de las dos horas no pregunta: a esa altura todos los perfumes están
-   puestos y la respuesta no distingue nada. */
+   Antes de la hora elegida no pregunta: a las dos horas todos los perfumes
+   están puestos y la respuesta no distingue nada. Cuatro es el valor por
+   defecto porque es donde empiezan a separarse los que duran de los que no. */
 function controlChips(u) {
   if (!u.ts) return '';
   const h = horasEntre(u.ts, new Date().toISOString());
-  if (h < 2) return '';
+  const desde = S.ajustes.recordar || 0;
+  if (!desde || h < desde) return '';
   const m = medicionDe(u);
   if (m && m.cerrada) return `<div class="devolucion">
     <span class="devolucion-pre">Te duró <b>${fmtHoras(m.horas)}</b> · medido</span></div>`;
@@ -1061,6 +1070,47 @@ function lineaMezcla(p) {
   return `<p class="hero-alt"><b>Mezclar:</b>
     <button class="link" data-mezcla="${p.id}">${esc(mejor.abajo.nombre)} abajo,
     ${esc(mejor.arriba.nombre)} encima</button>${porque ? ', ' + esc(porque) : ''}.</p>`;
+}
+
+/* El primer día.
+
+   Una app que aprende de tu uso no tiene nada que mostrar el día que la abrís:
+   es el arranque en frío, y es el único día que tenés para convencer a alguien.
+   Hasta acá la pantalla vacía decía "andá a Colección → Agregar", que es mandar
+   al usuario a otra pantalla a resolver un problema que vos le creaste.
+
+   Ahora dice qué hace la app, y el botón que lo resuelve está acá mismo. */
+function pantallaVacia() {
+  const hayEjemplos = true;
+  const haySemilla = !!(window.PERFUMARIO_COLECCION &&
+    (window.PERFUMARIO_COLECCION.perfumes || []).length);
+  return `<section class="card arranque">
+    <h2>Todavía no hay nada que elegir</h2>
+    <p class="arranque-txt">Perfumario elige por vos entre los perfumes que
+      <b>ya tenés</b>, por la temperatura de hoy, la ocasión y lo que aprende de
+      tu uso. Para empezar necesita al menos uno.</p>
+    <div class="btn-row">
+      <button class="btn btn-accent" data-primero="1">Agregar mi primer perfume</button>
+    </div>
+    ${hayEjemplos ? `<div class="btn-row">
+      <button class="btn" data-ejemplos="1">Probar con 6 de ejemplo</button>
+      ${haySemilla ? `<button class="btn" data-semilla="1">Cargar la colección del autor</button>` : ''}
+    </div>` : ''}
+    <p class="hint">Todo queda en este teléfono: no hay cuenta, ni servidor, ni
+      datos que salgan de acá.</p>
+  </section>`;
+}
+
+/* Con uno o dos cargados la app ya contesta, pero contestar entre dos no es
+   elegir. En vez de bloquear —que sería mentir sobre lo que puede hacer—
+   responde igual y dice cuánto le falta para que la respuesta valga. */
+function avisoArranque() {
+  const n = S.perfumes.length;
+  if (n === 0 || n >= 3) return '';
+  const faltan = 3 - n;
+  return `<button class="aviso" data-primero="1">Con ${n === 1 ? 'uno solo' : 'dos'}
+    no hay mucho para comparar. ${faltan === 1 ? 'Cargá uno más' : `Cargá ${faltan} más`}
+    y las sugerencias empiezan a valer. <b>Agregar →</b></button>`;
 }
 
 function fichaPrincipal(s, alternativa, c) {
@@ -3303,6 +3353,12 @@ function renderAjustes() {
   $('#setHemisferio').value = S.ajustes.hemisferio;
   $('#setAprender').checked = S.ajustes.aprender !== false;
   $('#setClima').checked = !!S.ajustes.clima;
+  $('#setRecordar').value = String(S.ajustes.recordar || 0);
+  /* Decir qué puede y qué no puede hacer la app es parte del producto: una
+     opción que promete una notificación que nunca llega es peor que no tenerla. */
+  $('#avisoRecordar').textContent = S.ajustes.recordar
+    ? `Por ahora la pregunta aparece en Hoy, sobre el uso del día, cuando abrís la app pasadas las ${S.ajustes.recordar} horas. La notificación que te avisa sola llega con la versión de la tienda: una web no puede programar avisos sin un servidor.`
+    : 'Sin esto, la duración real no se puede medir y la app sigue usando la que dice la caja.';
   const ver = $('#versionApp');
   if (ver) ver.textContent = 'Versión ' + VERSION;
   const c = S.meta.clima;
@@ -3564,6 +3620,10 @@ function conectar() {
     S.ajustes.aprender = e.target.checked; guardar();
     toast(e.target.checked ? 'Vuelvo a mirar tu historial' : 'Sugerencias solo por reglas fijas');
   });
+  $('#setRecordar').addEventListener('change', e => {
+    S.ajustes.recordar = +e.target.value || 0; guardar(); render();
+    toast(S.ajustes.recordar ? `Te pregunto a las ${S.ajustes.recordar} horas` : 'No te pregunto más');
+  });
   $('#setHemisferio').addEventListener('change', e => {
     S.ajustes.hemisferio = e.target.value; guardar(); toast(`Ahora estás en ${nombreEstacion(estacionHoy())}`);
   });
@@ -3656,6 +3716,10 @@ function conectar() {
       }
       return;
     }
+
+    if (e.target.closest('[data-primero]')) { ir('coleccion'); abrirFormulario(null); return; }
+    if (e.target.closest('[data-ejemplos]')) { cargarEjemplos(); return; }
+    if (e.target.closest('[data-semilla]')) { cargarMiColeccion(); return; }
 
     const ct = e.target.closest('[data-control]');
     if (ct) {
