@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-11.9';
+const VERSION = '2026-10-13.1';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -635,9 +635,31 @@ function puntuar(p, m, c) {
   const pct = porcRestante(p);
   if (p.ml > 0 && pct <= 10) { score -= 8; razones.push({ txt: `Queda ${pct} %: guardalo para algo que valga`, bien: false }); }
 
+  /* La duración: la medida en tu piel si existe, la de la caja si no. Esta es
+     la única parte del puntaje donde un dato propio reemplaza al declarado, y
+     por eso vale decirlo en la razón: un número que contradice la etiqueta sin
+     explicar de dónde sale parece un error. */
+  const dd = duracionDe(p);
+
+  /* Y cuando los dos números existen y no coinciden, el aviso es el producto:
+     "dice ocho horas y en tu piel dura cuatro" no lo sabe ninguna etiqueta.
+     Sólo pesa para lo que es largo; para el día a día da igual. */
+  if (dd.medida && p.longevidad && Math.abs(p.longevidad - dd.horas) >= 2 &&
+      ['salida', 'cita', 'evento'].includes(c.ocasion)) {
+    if (dd.horas < p.longevidad) {
+      score -= 12;
+      razones.push({ txt: `Dice ${p.longevidad} h pero en tu piel te duró ${fmtHoras(dd.horas)}`,
+                     bien: false, aprendido: true });
+    } else {
+      score += 8;
+      razones.push({ txt: `En tu piel te dura ${fmtHoras(dd.horas)}, más de lo que dice la caja`,
+                     bien: true, aprendido: true });
+    }
+  }
+
   // lluvia: los frescos livianos no sobreviven al agua
   if (c.lluvia) {
-    const dur = p.longevidad || 0;
+    const dur = dd.horas;
     if (dur >= 8) { score += 6; razones.push({ txt: 'Llueve y este aguanta', bien: true, clima: true }); }
     else if (dur && dur <= 5) { score -= 6; razones.push({ txt: 'Con lluvia, uno tan liviano se va enseguida', bien: false, clima: true }); }
   }
@@ -647,7 +669,7 @@ function puntuar(p, m, c) {
      con aire seco se evapora antes, y con viento la estela liviana no llega a
      ningún lado. Venían en la respuesta del clima y no se usaban. */
   const estelaP = p.estela || 3;
-  const duraP = p.longevidad || 0;
+  const duraP = dd.horas;
 
   /* Dónde vas a estar. Es el dato de contexto que más cambia cómo se comporta
      un perfume y el único que la app no puede deducir sola.
@@ -756,6 +778,70 @@ function devolucionesDe(id) {
   };
 }
 
+/* --------------- cuánto dura DE VERDAD, en tu piel -------------------
+   Todas las apps de la categoría te dejan escribir que un perfume dura ocho
+   horas. Ese número sale de la caja o de un foro: es la duración declarada, y
+   es la misma para vos que para cualquiera. En la piel de cada uno dura otra
+   cosa, y eso no se puede deducir de nada. Hay que medirlo.
+
+   Se mide sin pedirle nada al usuario de más: cuando abrís la app y hay un uso
+   de hoy registrado hace rato, te pregunta si todavía lo sentís. Un toque. De
+   esas respuestas sale la duración real.
+
+   No hace falta precisión de laboratorio: alcanza con saber si el frasco que
+   dice 8 h en tu piel dura 4, porque eso cambia para qué sirve. */
+const CONTROLES = {
+  si:     { txt: 'Lo sigo sintiendo', vivo: true },
+  apenas: { txt: 'Apenas',            vivo: true },
+  no:     { txt: 'Ya no está',        vivo: false }
+};
+
+/* Horas transcurridas entre el registro del uso y un control. */
+const horasEntre = (desde, hasta) => (new Date(hasta) - new Date(desde)) / 3600000;
+
+/* De un uso, qué nos dejó medido: un número cerrado cuando llegó a apagarse, o
+   una cota inferior ("duró AL MENOS tanto") cuando la última respuesta todavía
+   decía que estaba. Las dos cosas sirven, pero no son lo mismo y no se mezclan. */
+function medicionDe(u) {
+  if (!u.ts || !u.controles || !u.controles.length) return null;
+  const cs = u.controles.slice().sort((a, b) => a.h - b.h);
+  const muerto = cs.find(c => !CONTROLES[c.estado].vivo);
+  const ultimoVivo = cs.filter(c => CONTROLES[c.estado].vivo).slice(-1)[0];
+  if (muerto) {
+    /* Entre el último "todavía está" y el primer "ya no", la verdad está en el
+       medio: tomar el extremo sería decidir por el usuario algo que no dijo. */
+    const desde = ultimoVivo && ultimoVivo.h < muerto.h ? ultimoVivo.h : 0;
+    return { horas: (desde + muerto.h) / 2, cerrada: true };
+  }
+  return { horas: ultimoVivo.h, cerrada: false };
+}
+
+/* La duración medida de un perfume. Hacen falta dos mediciones cerradas: una
+   sola tarde puede ser la ducha, el abrigo o la nariz acostumbrada. Con una
+   sola, o con puras cotas, devuelve lo que sabe pero avisa que es parcial. */
+function longevidadReal(id) {
+  const ms = S.usos.filter(u => u.perfumeId === id).map(medicionDe).filter(Boolean);
+  if (!ms.length) return null;
+  const cerradas = ms.filter(m => m.cerrada).map(m => m.horas).sort((a, b) => a - b);
+  if (cerradas.length) {
+    const h = cerradas.length % 2
+      ? cerradas[(cerradas.length - 1) / 2]
+      : (cerradas[cerradas.length / 2 - 1] + cerradas[cerradas.length / 2]) / 2;
+    return { horas: h, n: cerradas.length, firme: cerradas.length >= 2, cota: false };
+  }
+  // ninguna llegó a apagarse: lo único cierto es que duró al menos lo máximo visto
+  const max = Math.max.apply(null, ms.map(m => m.horas));
+  return { horas: max, n: ms.length, firme: false, cota: true };
+}
+
+/* La que usa el motor para decidir. Si hay medición firme, manda la medición:
+   el dato propio le gana al de la caja, que es todo el punto. */
+function duracionDe(p) {
+  const r = longevidadReal(p.id);
+  if (r && r.firme && !r.cota) return { horas: r.horas, medida: true, n: r.n };
+  return { horas: p.longevidad || 0, medida: false, n: 0 };
+}
+
 function sugerir(n, m) {
   m = m || modeloAprendido();
   const cuantos = n || 3;
@@ -835,7 +921,7 @@ function renderHoy() {
         <div class="it-sub">${u.sprays} aplicaciones · ${OCASIONES[u.ocasion] || '—'} · tocá para corregir</div>
       </div>
       <div class="it-act"><button data-borrar-uso="${u.id}" aria-label="Borrar uso">${ico('basura')}</button></div></div>
-      ${devolucionChips(u)}</div>`;
+      ${devolucionChips(u)}${controlChips(u)}</div>`;
   }).join('');
 
   renderClima();
@@ -855,6 +941,39 @@ function devolucionChips(u) {
       `<button class="chip chip-sec${u.resultado === k ? ' on' : ''}" data-dev="${u.id}" data-devval="${k}"
         >${DEVOLUCIONES[k].txt}</button>`).join('')}</div>
   </div>`;
+}
+
+/* La pregunta que mide la duración. No es una notificación ni un recordatorio:
+   aparece sobre el uso que ya está en pantalla, cuando abrís la app por tus
+   propios motivos. Si nunca abrís la app esa tarde, no se mide y listo — es
+   preferible a perseguir al usuario con avisos que termina apagando.
+
+   Antes de las dos horas no pregunta: a esa altura todos los perfumes están
+   puestos y la respuesta no distingue nada. */
+function controlChips(u) {
+  if (!u.ts) return '';
+  const h = horasEntre(u.ts, new Date().toISOString());
+  if (h < 2) return '';
+  const m = medicionDe(u);
+  if (m && m.cerrada) return `<div class="devolucion">
+    <span class="devolucion-pre">Te duró <b>${fmtHoras(m.horas)}</b> · medido</span></div>`;
+  const ultimo = (u.controles || []).slice(-1)[0];
+  // ya contestó hace poco: no preguntar de nuevo hasta que pase otra hora
+  if (ultimo && h - ultimo.h < 1) return `<div class="devolucion">
+    <span class="devolucion-pre">Anotado: a las ${fmtHoras(ultimo.h)} todavía estaba</span></div>`;
+  return `<div class="devolucion">
+    <span class="devolucion-pre">Hace ${fmtHoras(h)} que lo tenés puesto · ¿lo seguís sintiendo?</span>
+    <div class="chips">${Object.keys(CONTROLES).map(k =>
+      `<button class="chip chip-sec" data-control="${u.id}" data-controlval="${k}"
+        >${CONTROLES[k].txt}</button>`).join('')}</div>
+  </div>`;
+}
+
+/* "4,5 h" y no "4.5 h" ni "4 h 30 m": es una medición aproximada y escribirla
+   con minutos le daría una precisión que no tiene. */
+function fmtHoras(h) {
+  const r = Math.round(h * 2) / 2;
+  return (r % 1 ? String(r).replace('.', ',') : String(r)) + ' h';
 }
 
 function dosis(p, c) {
@@ -1949,6 +2068,15 @@ function abrirFicha(id) {
       <div class="linea"><span>Ocasiones</span><b>${(p.ocasiones || []).map(o => OCASIONES[o]).join(', ') || '—'}</b></div>
       <div class="linea"><span>Momento</span><b>${MOMENTOS[p.momento || 'ambos']}</b></div>
       <div class="linea"><span>Duración / estela</span><b>${p.longevidad || '?'} h · ${'▮'.repeat(p.estela || 0)}${'▯'.repeat(5 - (p.estela || 0))}</b></div>
+      ${(() => {
+        const r = longevidadReal(p.id);
+        if (!r) return '';
+        return `<div class="linea"><span>Medida en tu piel</span><b class="medido"
+          >${r.cota ? 'más de ' : ''}${fmtHoras(r.horas)}</b></div>
+          <p class="hint" style="margin:0">${r.firme
+            ? `Mediana de ${r.n} ${r.n === 1 ? 'medición' : 'mediciones'}. Es la que usa la app para decidir.`
+            : `${r.n === 1 ? 'Una sola medición' : `${r.n} mediciones`} por ahora: con dos cerradas empieza a pesar en el puntaje.`}</p>`;
+      })()}
     </section>
 
     ${p.nota ? `<section class="card"><h2>Tus notas</h2><p class="hint" style="margin-top:6px">${esc(p.nota)}</p></section>` : ''}
@@ -2733,9 +2861,15 @@ function abrirUso(id, usoId) {
       editando.nota = $('#uNota').value.trim();
       aplicarMl(destinoId, sprays, -1);
     } else {
+      const fecha = $('#uFecha').value || today();
       S.usos.push({
         id: uid(),
-        fecha: $('#uFecha').value || today(),
+        fecha,
+        /* La hora exacta, sólo si lo estás registrando hoy: para un uso que
+           cargás de memoria tres días después, la hora sería inventada y la
+           medición de duración saldría de un dato falso. Sin ts no se mide, y
+           está bien que así sea. */
+        ts: fecha === today() ? new Date().toISOString() : null,
         perfumeId: p.id,
         sprays,
         ocasion: oc ? oc.val : ctx.ocasion,
@@ -3058,8 +3192,46 @@ function renderParecidos() {
 }
 
 /* =============================== USO ================================ */
+/* La tabla que ninguna otra app puede mostrar, porque el dato no existe en
+   ninguna base: cuánto dice que dura cada frasco y cuánto duró en tu piel.
+   Ordenada por la diferencia, que es donde está la noticia. */
+function renderPiel() {
+  const filas = S.perfumes.map(p => {
+    const r = longevidadReal(p.id);
+    if (!r) return null;
+    const dif = p.longevidad ? r.horas - p.longevidad : null;
+    return { p, r, dif };
+  }).filter(Boolean).sort((a, b) =>
+    Math.abs(b.dif == null ? 0 : b.dif) - Math.abs(a.dif == null ? 0 : a.dif));
+
+  $('#cardPiel').hidden = !filas.length;
+  if (!filas.length) return;
+
+  const firmes = filas.filter(x => x.r.firme).length;
+  $('#pielSub').textContent = firmes
+    ? `${firmes} de ${filas.length} ya tienen suficientes mediciones como para que la app las use al decidir.`
+    : 'Todavía ninguna llegó a dos mediciones cerradas: hacen falta dos para que pese en el puntaje.';
+
+  $('#listaPiel').innerHTML = filas.map(x => {
+    const d = x.dif;
+    const signo = d == null ? '' : (d < 0 ? 'menos' : 'mas');
+    return `<div class="item" data-ficha="${x.p.id}" role="button" tabindex="0">
+      <div class="it-main">
+        <div class="it-name">${esc(x.p.nombre)}</div>
+        <div class="it-sub">${x.p.longevidad ? `dice ${x.p.longevidad} h` : 'sin duración declarada'} ·
+          ${x.r.n} ${x.r.n === 1 ? 'medición' : 'mediciones'}${x.r.firme ? '' : ' (parcial)'}</div>
+      </div>
+      <div class="pf-right">
+        <div class="pf-score ${signo}">${x.r.cota ? '+' : ''}${fmtHoras(x.r.horas)}</div>
+        ${d == null ? '' : `<div class="pf-score-cap">${d < 0 ? '' : '+'}${fmtHoras(d).replace('-', '−')}</div>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function renderUso() {
   renderAprendizaje(modeloAprendido());
+  renderPiel();
   const hoyISO = today();
   const desdeMes = hoyISO.slice(0, 7);
   const delMes = S.usos.filter(u => u.fecha.slice(0, 7) === desdeMes);
@@ -3481,6 +3653,20 @@ function conectar() {
         u.resultado = (u.resultado === dv.dataset.devval) ? null : dv.dataset.devval;
         guardar(); render();
         if (u.resultado) toast('Anotado: lo voy a tener en cuenta');
+      }
+      return;
+    }
+
+    const ct = e.target.closest('[data-control]');
+    if (ct) {
+      e.stopPropagation();
+      const u = S.usos.find(x => x.id === ct.dataset.control);
+      if (u && u.ts) {
+        u.controles = (u.controles || []).concat([{
+          h: horasEntre(u.ts, new Date().toISOString()), estado: ct.dataset.controlval }]);
+        guardar(); render();
+        const m = medicionDe(u);
+        toast(m && m.cerrada ? `Medido: te duró ${fmtHoras(m.horas)}` : 'Anotado');
       }
       return;
     }

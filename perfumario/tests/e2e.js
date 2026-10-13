@@ -1335,6 +1335,87 @@ const check = (n, c, d = '') => {
     'modal ' + (await visible('#modal')));
   await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
 
+  console.log('\nAC · Cuánto dura de verdad, en tu piel');
+  /* Los usos se arman con ts a mano: esperar seis horas reales no es una prueba,
+     es una siesta. Lo que se verifica es la aritmética y qué hace el motor con
+     ella, no el reloj del navegador. */
+  await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+  const haceHoras = h => new Date(Date.now() - h * 3600000).toISOString();
+  await p.evaluate(({ hoy, hace2 }) => {
+    const base = { conc:'EDP', ml:100, mlRestante:100, precio:0, comprado:null, rating:0, nota:'',
+      ocasiones:['evento'], momento:'ambos', estaciones:['verano','invierno','otono','primavera'],
+      estela:3, salida:['Bergamota'], corazon:['Rosa'], fondo:['Vainilla'] };
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    st.perfumes = [
+      Object.assign({ id:'mentiroso', creado:'2026-01-01', nombre:'Mentiroso', casa:'P',
+        familia:'amaderada', longevidad:10 }, base),
+      Object.assign({ id:'honesto', creado:'2026-01-01', nombre:'Honesto', casa:'P',
+        familia:'amaderada', longevidad:5 }, base)
+    ];
+    // el Mentiroso dice 10 h; medido dos veces, se apagó cerca de las 4
+    st.usos = [
+      { id:'m1', perfumeId:'mentiroso', fecha:'2026-01-02', ts:'2026-01-02T09:00:00.000Z',
+        ocasion:'evento', sprays:3, temp:20, nota:'',
+        controles:[{h:3,estado:'si'},{h:5,estado:'no'}] },
+      { id:'m2', perfumeId:'mentiroso', fecha:'2026-01-03', ts:'2026-01-03T09:00:00.000Z',
+        ocasion:'evento', sprays:3, temp:20, nota:'',
+        controles:[{h:3,estado:'apenas'},{h:5,estado:'no'}] },
+      // el uso de hoy, puesto hace dos horas: tiene que preguntar
+      { id:'h1', perfumeId:'honesto', fecha:hoy, ts:hace2,
+        ocasion:'evento', sprays:3, temp:20, nota:'' }
+    ];
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+  }, { hoy: new Date().toISOString().slice(0, 10), hace2: haceHoras(2.5) });
+  await p.reload(); await p.waitForTimeout(1600);
+  await ir('hoy');
+  await p.tap('#ctxOcasion .chip[data-val="evento"]'); await p.waitForTimeout(400);
+
+  check('pregunta si todavía lo sentís, sobre el uso de hoy',
+    await cuantos('#hoyUsos .chip[data-controlval]') === 3,
+    await p.textContent('#hoyUsos'));
+  check('y dice hace cuánto te lo pusiste',
+    /Hace 2,5 h que lo tenés puesto/.test(await p.textContent('#hoyUsos')),
+    (await p.textContent('#hoyUsos')).replace(/\s+/g, ' ').slice(0, 120));
+  check('antes de las dos horas no molesta', await p.evaluate(h => {
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    st.usos.find(u => u.id === 'h1').ts = h;
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+    return true;
+  }, haceHoras(1)) && true);
+  await p.reload(); await p.waitForTimeout(1500);
+  check('— comprobado', await cuantos('#hoyUsos .chip[data-controlval]') === 0);
+
+  // volver a ponerlo en 2,5 h y contestar de verdad
+  await p.evaluate(h => {
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    st.usos.find(u => u.id === 'h1').ts = h;
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+  }, haceHoras(2.5));
+  await p.reload(); await p.waitForTimeout(1500);
+  await p.tap('#hoyUsos .chip[data-controlval="no"]'); await p.waitForTimeout(500);
+  check('contestar "ya no está" deja la medición cerrada',
+    /Te duró 1,5 h · medido|Te duró 1 h · medido/.test(await p.textContent('#hoyUsos')),
+    (await p.textContent('#hoyUsos')).replace(/\s+/g, ' ').slice(0, 140));
+
+  await ir('uso');
+  const piel = await p.textContent('#listaPiel');
+  check('la tarjeta compara lo que dice la caja con lo que midió',
+    /Mentiroso/.test(piel) && /dice 10 h/.test(piel) && /4 h/.test(piel),
+    piel.replace(/\s+/g, ' ').slice(0, 160));
+  check('y ordena por la diferencia, que es donde está la noticia',
+    (await p.evaluate(() => document.querySelector('#listaPiel .it-name').textContent.trim())) === 'Mentiroso');
+  check('avisa cuántas ya pesan en el puntaje',
+    /1 de 2 ya tienen suficientes mediciones/.test(await p.textContent('#pielSub')),
+    await p.textContent('#pielSub'));
+
+  await ir('hoy');
+  const porQueMentiroso = await razonesFicha('Mentiroso');
+  check('y el motor lo usa: avisa que la caja miente para algo largo',
+    /Dice 10 h pero en tu piel te duró 4 h/.test(porQueMentiroso),
+    porQueMentiroso.slice(0, 160));
+  check('con dos mediciones el honesto no recibe ese aviso',
+    !/pero en tu piel/.test(await razonesFicha('Honesto')), '');
+
   console.log('\nAB · Modo ciego');
   await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
   await p.evaluate(() => localStorage.removeItem('perfumario_v1'));

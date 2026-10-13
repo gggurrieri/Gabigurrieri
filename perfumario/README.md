@@ -481,6 +481,68 @@ Dos decisiones que la sostienen:
 - **La razón que muestra es a favor**, usando el mismo `contras` que la lista
   usa al revés.
 
+## Cuánto dura de verdad, en tu piel
+
+Todas las apps de la categoría te dejan escribir que un perfume dura ocho
+horas. Ese número sale de la caja o de un foro: es la duración **declarada**, y
+es la misma para vos que para cualquiera. En la piel de cada uno dura otra
+cosa, y eso no se puede deducir de ningún otro dato. Hay que medirlo.
+
+### Cómo mide sin molestarte
+
+No hay notificaciones ni recordatorios. Cuando abrís la app por tus propios
+motivos y hay un uso de hoy registrado hace más de dos horas, aparece debajo:
+*"Hace 2,5 h que lo tenés puesto · ¿lo seguís sintiendo?"*, con tres botones
+—**Lo sigo sintiendo / Apenas / Ya no está**—. Un toque. Si esa tarde no abrís
+la app, no se mide y listo.
+
+Es una decisión deliberada contra la alternativa obvia, que era avisarte a las
+4, 6 y 8 horas. Mediría más, y en tres días tendrías las notificaciones
+apagadas, y con ellas la app. Mejor medir menos y seguir existiendo: la
+diferencia entre un dato que el producto extrae y uno que recoge.
+
+Antes de las dos horas no pregunta: a esa altura todos los perfumes están
+puestos y la respuesta no distingue nada.
+
+### Las tres reglas de la aritmética
+
+1. **La hora sólo se guarda si registrás el uso hoy.** Para un uso que cargás
+   de memoria tres días después, la hora sería inventada y la medición saldría
+   de un dato falso. Sin `ts` no se mide.
+2. **Entre el último "todavía está" y el primer "ya no", la verdad está en el
+   medio.** Si a las 3 h decís que está y a las 5 h que no, se anota 4 h. Tomar
+   cualquiera de los dos extremos sería decidir por el usuario algo que no dijo.
+3. **Hacen falta dos mediciones cerradas** para que pese en el puntaje: una
+   sola tarde puede ser la ducha, el abrigo o la nariz acostumbrada. Es el
+   mismo umbral que el ciclo de devoluciones. Cuando una sesión termina sin que
+   el perfume se apague, lo que queda no es una medición sino una **cota
+   inferior** ("duró al menos tanto"), y se guarda aparte: las dos cosas sirven
+   pero no son lo mismo y no se promedian juntas.
+
+### Qué cambia en las decisiones
+
+`duracionDe(p)` devuelve la medida cuando es firme y la declarada cuando no, y
+es la que usan las reglas de lluvia, de aire libre y de humedad. Es la única
+parte del puntaje donde un dato propio reemplaza al de la etiqueta, y por eso
+la razón lo dice: un número que contradice la caja sin explicar de dónde sale
+parece un error.
+
+Y cuando los dos números existen y difieren en 2 h o más, para **salida, cita o
+evento**:
+
+- mide menos que lo declarado → **−12** y lo dice con las dos cifras: *"Dice 10
+  h pero en tu piel te duró 4 h"*;
+- mide más → **+8**, *"En tu piel te dura 9 h, más de lo que dice la caja"*.
+
+Para el día a día no pesa, porque ahí da igual. Mismo criterio que "duró poco":
+un defecto no condena el frasco, lo descalifica para algo largo.
+
+### La tarjeta
+
+En **Uso** está *"La caja y tu piel"*, ordenada por la diferencia, que es donde
+está la noticia. Es el dato que ninguna otra app puede mostrar, porque no está
+en ninguna base que se pueda copiar: lo genera el uso.
+
 ## Modo ciego
 
 Puntuar del 1 al 5 es casi imposible: unos ponen todo 4 y otros todo 2, y la

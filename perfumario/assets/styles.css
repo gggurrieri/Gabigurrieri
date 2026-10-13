@@ -434,6 +434,11 @@ details[open]>summary .chev{transform:rotate(-135deg);margin:4px 3px 0 0}
 .mezcla-flojo .mezcla-paso b{background:var(--muted);color:var(--card)}
 .mezcla-flojo .mezcla-score{color:var(--muted);font-size:var(--t-4)}
 
+/* la caja contra tu piel: el número medido se distingue del declarado */
+.medido{color:var(--accent)}
+.pf-score.menos{color:var(--danger)}
+.pf-score.mas{color:var(--good)}
+
 /* modo ciego: dos fichas sin nombre, una al lado de la otra */
 .ciego-par{display:flex;gap:var(--sp-3);margin-bottom:var(--sp-4)}
 .ciego-ficha{flex:1;min-width:0;text-align:left;background:var(--card-2);border:0;
