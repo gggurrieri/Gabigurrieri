@@ -1020,13 +1020,33 @@ En una Mac con Xcode y CocoaPods:
 cd perfumario/nativo
 npm install
 npx cap add ios          # sólo la primera vez
+npm run iconos           # genera el juego de iconos y la pantalla de carga
 npm run sync             # arma www y copia todo al proyecto de Xcode
 npx cap open ios         # abre Xcode para firmar y compilar
 ```
 
 `ios/`, `www/` y `node_modules/` no se versionan: se regeneran con esos
-comandos. El `appId` (`ar.gurrieri.perfumario`) hay que hacerlo coincidir con el
-Bundle ID que se cree en la cuenta de desarrollador.
+comandos. Lo que sí está versionado es `nativo/assets/`, con el icono a
+1024×1024 y la pantalla de carga a 2732×2732, rendidos del logo vectorial:
+sin ellos la app sale con el icono por defecto de Capacitor y un flash blanco
+al abrir, que en una app de tema oscuro se nota.
+
+El `appId` (`ar.gurrieri.perfumario`) tiene que coincidir con el Bundle ID de
+la cuenta de desarrollador.
+
+### Probarla en un iPhone propio, sin pagar nada
+
+Con una cuenta de Apple común —lo que Xcode llama *Personal Team*— se instala
+en el teléfono propio sin la membresía de US$99. Los límites que publica Apple:
+el perfil **caduca a los 7 días** y hay que recompilar, hasta 10 App IDs, 3
+dispositivos y 3 apps por dispositivo, y no hay TestFlight ni distribución.
+
+Para lo que hace falta probar acá alcanza: la notificación es **local**, la
+agenda el propio teléfono, y no necesita ningún *entitlement* que requiera
+membresía —a diferencia de las push—. Lo único que no se puede probar por esta
+vía es el widget, porque compartir el dato entre la app y la extensión necesita
+un App Group, que se administra en Certificates, Identifiers & Profiles y
+requiere cuenta paga.
 
 Falta todavía, y es código Swift y no JavaScript: el **widget de pantalla de
 inicio** con la elección del día —que necesita un App Group para compartir el

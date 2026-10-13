@@ -5,6 +5,7 @@
   "description": "Envoltorio iOS de Perfumario: la misma app, con notificaciones locales.",
   "scripts": {
     "www": "bash ../tools/build-nativo.sh",
+    "iconos": "npx @capacitor/assets generate --ios --assetPath assets",
     "sync": "npm run www && npx cap sync ios",
     "ios": "npm run sync && npx cap open ios"
   },
@@ -14,6 +15,7 @@
     "@capacitor/local-notifications": "8.3.1"
   },
   "devDependencies": {
+    "@capacitor/assets": "3.0.5",
     "@capacitor/cli": "8.5.3"
   }
 }
