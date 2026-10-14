@@ -1014,7 +1014,9 @@ publicada en la tienda.
 
 ### Cómo se compila
 
-En una Mac con Xcode y CocoaPods:
+En una Mac con Xcode. **No hace falta CocoaPods**: Capacitor 8 usa Swift
+Package Manager, el gestor de dependencias de Apple, así que los plugins entran
+por un `Package.swift` y no hay `Podfile` ni `Pods/`.
 
 ```
 cd perfumario/nativo
@@ -1024,6 +1026,12 @@ npm run iconos           # genera el juego de iconos y la pantalla de carga
 npm run sync             # arma www y copia todo al proyecto de Xcode
 npx cap open ios         # abre Xcode para firmar y compilar
 ```
+
+Se abre **`ios/App/App.xcodeproj`**. En proyectos con CocoaPods había que abrir
+un `.xcworkspace` en su lugar —si no, Xcode compilaba sin los plugins y fallaba
+con *"No such module 'Capacitor'"*—; con SPM ese archivo no existe y el
+`.xcodeproj` es el correcto. La primera compilación tarda más porque SPM
+resuelve los paquetes.
 
 `ios/`, `www/` y `node_modules/` no se versionan: se regeneran con esos
 comandos. Lo que sí está versionado es `nativo/assets/`, con el icono a
