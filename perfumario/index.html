@@ -402,12 +402,17 @@
           <button class="btn" id="btnExportar">Exportar copia</button>
           <button class="btn" id="btnImportar">Importar copia</button>
         </div>
+        <!-- Sólo aparece si hay algo para deshacer. Un botón que casi siempre
+             no hace nada enseña a ignorarlo. -->
+        <div class="btn-row" id="filaDeshacer" hidden>
+          <button class="btn" id="btnDeshacerImp">Deshacer la última importación</button>
+        </div>
         <div class="btn-row">
           <button class="btn" id="btnMiColeccion">Cargar mi colección</button>
           <button class="btn" id="btnEjemplos">Cargar 6 de ejemplo</button>
           <button class="btn btn-danger" id="btnBorrar">Borrar todo</button>
         </div>
-        <p class="hint">Todo vive en este navegador (<code>localStorage</code>). Si lo limpiás o cambiás de teléfono, se pierde: exportá cada tanto.</p>
+        <p class="hint" id="dondeViven">—</p>
       </section>
 
       <section class="card">

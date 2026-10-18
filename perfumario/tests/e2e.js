@@ -955,6 +955,15 @@ const check = (n, c, d = '') => {
     elegidoCmp);
 
   console.log('\nR · Copia y borrado');
+  /* Una sección anterior descargó un archivo de verdad, así que a esta altura
+     SÍ hay una copia anotada. Se borra la marca para que lo que sigue mida lo
+     que dice medir y no el residuo de otra prueba. */
+  await p.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    delete st.meta.copia; delete st.meta.ultimaCopia;
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+  });
+  await p.reload(); await p.waitForTimeout(900);
   await p.tap('#btnSettings'); await p.waitForTimeout(250);
   await p.tap('#btnExportar'); await p.waitForTimeout(300);
   check('exporta un JSON legible', await p.evaluate(() => {
@@ -962,8 +971,18 @@ const check = (n, c, d = '') => {
     catch (e) { return false; }
   }));
   await p.tap('[data-close]'); await p.waitForTimeout(250);
-  check('anota la fecha de la copia', !!(await db()).meta.ultimaCopia);
-  check('el estado lo refleja', /hoy/.test(await p.textContent('#copiaEstado')));
+  /* Estas dos pruebas afirmaban lo contrario: que abrir el diálogo y cerrarlo
+     ya contaba como copia. Estaban fijando un bug —la app se quedaba callada
+     sin que existiera ninguna copia— y por eso una prueba que describe el
+     comportamiento equivocado es peor que no tenerla: impide el arreglo. */
+  check('cerrar sin copiar no anota ninguna copia', !(await db()).meta.copia);
+  check('y el estado lo dice', /Nunca exportaste/.test(await p.textContent('#copiaEstado')),
+    await p.textContent('#copiaEstado'));
+  await p.evaluate(() => window.PERFUMARIO_DEBUG.marcarCopia());
+  await p.waitForTimeout(300);
+  check('copiar de verdad sí queda anotado', !!(await db()).meta.copia);
+  check('y entonces el estado dice que está al día',
+    /Al día/.test(await p.textContent('#copiaEstado')), await p.textContent('#copiaEstado'));
   await ir('hoy');
   check('el aviso de copia desaparece', !(await visible('#avisoCopia')));
 
@@ -1399,6 +1418,104 @@ const check = (n, c, d = '') => {
     }),
     'modal ' + (await visible('#modal')));
   await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+
+  console.log('\nAG · Que los datos sobrevivan');
+  /* Todo vive en localStorage. Eso tiene dos enemigos distintos: que el
+     usuario limpie el navegador, y que el navegador borre solo. Contra el
+     primero sólo hay copias; contra el segundo, pedir permiso y decir la
+     verdad sobre la respuesta. Y hay una tercera forma de perder los datos
+     que no es ninguna de esas dos: importar encima. */
+  await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+  await desdeCero();
+  const antesDe = await db();
+  check('arranca con la colección cargada', antesDe.perfumes.length > 0);
+
+  // 1. el aviso mira cambios, no días
+  await ir('hoy');
+  check('con datos sin copiar, avisa', await visible('#avisoCopia'));
+  check('y dice qué es lo que no está copiado',
+    /Nunca hiciste una copia/.test(await p.textContent('#avisoCopia')),
+    await p.textContent('#avisoCopia'));
+
+  /* El bug que tenía: marcaba "ya copiaste" al ABRIR el diálogo. Abrir y
+     cerrar sin copiar nada dejaba a la app creyendo que estabas respaldado. */
+  await p.tap('#btnSettings'); await p.waitForTimeout(250);
+  await p.tap('#btnExportar'); await p.waitForTimeout(400);
+  await p.evaluate(() => { document.querySelector('#modal').hidden = true; });
+  await ir('hoy'); await p.waitForTimeout(300);
+  check('abrir el diálogo y cerrarlo NO cuenta como copia',
+    await visible('#avisoCopia'), 'el aviso desapareció sin que se copiara nada');
+
+  // copiar de verdad sí lo apaga
+  await p.evaluate(() => { window.PERFUMARIO_DEBUG.marcarCopia(); });
+  await p.waitForTimeout(300);
+  await ir('hoy');
+  check('copiar de verdad sí apaga el aviso', !(await visible('#avisoCopia')));
+
+  // y vuelve a encenderse cuando hay algo nuevo sin copiar
+  await p.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('perfumario_v1'));
+    st.usos.push({ id: 'nuevo1', perfumeId: st.perfumes[0].id, fecha: new Date().toISOString().slice(0,10),
+                   ocasion: 'casual', sprays: 3, temp: 20, nota: '', ts: null });
+    localStorage.setItem('perfumario_v1', JSON.stringify(st));
+  });
+  await p.reload(); await p.waitForTimeout(1200);
+  check('un uso nuevo vuelve a encender el aviso', await visible('#avisoCopia'));
+  check('y dice cuántos son',
+    /1 uso sin copiar/.test(await p.textContent('#avisoCopia')),
+    await p.textContent('#avisoCopia'));
+
+  // 2. importar: la operación más destructiva de la app
+  const cuantosAntes = (await db()).perfumes.length;
+  await p.tap('#btnSettings'); await p.waitForTimeout(250);
+  await p.tap('#btnImportar'); await p.waitForTimeout(400);
+  await p.fill('#modalText', JSON.stringify({ perfumes: [{ id:'x1', nombre:'Importado', casa:'P',
+    familia:'amaderada', conc:'EDP', ml:100, mlRestante:100, precio:0, comprado:null, longevidad:7,
+    estela:3, estaciones:['verano'], ocasiones:['casual'], momento:'ambos', rating:0, nota:'',
+    salida:['Bergamota'], corazon:[], fondo:[], creado:'2026-01-01' }], usos: [] }));
+  await p.tap('#btnConfirmarImp'); await p.waitForTimeout(400);
+  check('no importa de una: primero muestra qué se pierde',
+    (await db()).perfumes.length === cuantosAntes,
+    'importó sin confirmar');
+  const resumenImp = (await p.textContent('#impResumen')).replace(/\s+/g, ' ');
+  check('y dice los números de los dos lados',
+    new RegExp(`${cuantosAntes} perfumes`).test(resumenImp) && /La copia trae/.test(resumenImp), resumenImp.slice(0, 130));
+  check('avisa que vas a terminar con menos',
+    /Vas a terminar con menos/.test(resumenImp), resumenImp.slice(0, 160));
+
+  await p.tap('#btnConfirmarImp'); await p.waitForTimeout(600);
+  check('el segundo toque sí importa', (await db()).perfumes.length === 1);
+
+  // 3. y se puede volver atrás, que es lo que de verdad protege
+  /* `visible()` sólo mira el atributo hidden del propio elemento, y eso no
+     alcanza: si la vista que lo contiene no está activa, el elemento "no está
+     oculto" y aun así no se ve. Acá se mide lo que importa, que es si ocupa
+     lugar en la pantalla. */
+  const seVe = async sel => p.evaluate(x => {
+    const e = document.querySelector(x);
+    return !!e && e.getBoundingClientRect().height > 0;
+  }, sel);
+  await ir('hoy'); await p.waitForTimeout(200);
+  await p.tap('#btnSettings'); await p.waitForTimeout(400);
+  check('aparece el botón de deshacer', await seVe('#filaDeshacer'),
+    'vista activa: ' + await p.evaluate(() =>
+      (document.querySelector('.view.active') || {}).id || 'ninguna'));
+  await p.tap('#btnDeshacerImp'); await p.waitForTimeout(600);
+  const trasDeshacer = await db();
+  check('deshacer devuelve exactamente lo que había',
+    trasDeshacer.perfumes.length === cuantosAntes && trasDeshacer.usos.length === antesDe.usos.length + 1,
+    `${trasDeshacer.perfumes.length} perfumes, ${trasDeshacer.usos.length} usos`);
+  await ir('hoy'); await p.waitForTimeout(200);
+  await p.tap('#btnSettings'); await p.waitForTimeout(400);
+  check('y el botón se va, porque ya no hay nada que deshacer',
+    !(await seVe('#filaDeshacer')));
+
+  // 4. decir la verdad sobre dónde viven los datos
+  const donde = await p.textContent('#dondeViven');
+  check('la pantalla explica qué puede borrar los datos',
+    /7 días sin visitarlo/.test(donde) && /pantalla de inicio/.test(donde), donde.slice(0, 140));
+
+  await desdeCero();
 
   console.log('\nAF · Claro y oscuro');
   /* La app era sólo oscura. En un teléfono eso se nota: el sistema tiene un
@@ -1994,6 +2111,23 @@ const check = (n, c, d = '') => {
   });
   check('los botones principales llegan a los 44px recomendados',
     alturas.btn >= 44 && alturas.link >= 44, JSON.stringify(alturas));
+
+  console.log('\nAH · El archivo de pruebas, revisado por sí mismo');
+  /* Cinco veces en este proyecto una sección nueva eligió un nombre de
+     variable que ya existía doscientas líneas más arriba. Todo el recorrido
+     vive en una sola función, así que el choque rompe el archivo entero y el
+     error —"ya fue declarado"— aparece lejos de donde está el problema.
+     Revisarlo acá cuesta diez líneas y lo caza antes de que moleste. */
+  const fuentePruebas = require('fs').readFileSync(__filename, 'utf8');
+  const declaradasAqui = (fuentePruebas.match(/^  (?:const|let)\s+[A-Za-z_$][\w$]*\s*=/gm) || [])
+    .map(x => x.replace(/^  (?:const|let)\s+/, '').replace(/\s*=$/, ''));
+  const yaVistasAqui = {}, duplicadasAqui = [];
+  declaradasAqui.forEach(n => {
+    if (yaVistasAqui[n] && duplicadasAqui.indexOf(n) < 0) duplicadasAqui.push(n);
+    yaVistasAqui[n] = 1;
+  });
+  check('ningún nombre de variable se declara dos veces en el recorrido',
+    duplicadasAqui.length === 0, duplicadasAqui.join(', '));
 
   console.log('\nS · Sin errores');
   check('la consola quedó limpia', errs.length === 0, errs.slice(0, 3).join(' | '));

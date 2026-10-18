@@ -841,6 +841,55 @@ entra en los parecidos ni en el perfil.
 
 Opcional, separado con barras: `Nombre | ml | precio`.
 
+## Que los datos sobrevivan
+
+Todo vive en `localStorage`, y eso tiene tres enemigos distintos. Conviene
+separarlos porque cada uno se defiende de otra forma.
+
+### 1. Que el navegador los borre solo
+
+**Safari borra el almacenamiento de un sitio tras siete días sin visitarlo.**
+Agregada a la pantalla de inicio queda exenta, y adentro del envoltorio nativo
+la regla no corre.
+
+La app pide `navigator.storage.persist()` al arrancar —es gratis preguntarlo— y
+**dice en Ajustes cuál fue la respuesta**, sin maquillarla. El texto cambia
+según dónde estés corriendo: app instalada, pantalla de inicio, o pestaña del
+navegador, que es el único caso en riesgo y el único donde aparece la
+recomendación de instalarla.
+
+### 2. Que vos limpies el navegador o cambies de teléfono
+
+Contra eso sólo hay copias afuera, y el aviso tenía un bug que lo volvía
+inútil: **`exportar()` marcaba "ya tenés copia" en el momento de abrir el
+diálogo**, antes de copiar o descargar nada. Abrir y cerrar dejaba a la app
+creyendo que estabas respaldado. Ahora la marca se pone sólo cuando el texto
+llegó al portapapeles o el archivo se descargó; si el portapapeles falla, no se
+marca, porque marcarla sería mentir.
+
+Y el aviso dejó de contar días para contar **cambios**. Antes aparecía a los
+siete días aunque no hubieras tocado nada, y una alarma que suena sin motivo
+enseña a ignorarla. Ahora compara una huella de los datos contra la de la
+última copia y dice qué falta: *"3 perfumes y 1 uso sin copiar, desde hace 4
+días"*. Es una huella y no un contador a propósito: un contador hay que
+acordarse de incrementarlo en cada lugar que toca algo, y el día que aparece
+una pantalla nueva alguien se olvida.
+
+### 3. Importar encima
+
+Era la operación más destructiva de la app y **la única sin confirmación ni
+vuelta atrás**: pegar una copia vieja, o media copia mal seleccionada, borraba
+todo en un toque.
+
+Ahora el botón dice *Revisar* y muestra los números de los dos lados —"ahora
+tenés 25 perfumes y 14 usos; la copia trae 3 y 0"—, avisa explícitamente si vas
+a terminar con menos, y recién el segundo toque reemplaza. Antes de pisar nada
+guarda lo que había en una llave aparte, y en Ajustes aparece **Deshacer la
+última importación**, que sólo se muestra si hay algo que deshacer.
+
+Una confirmación evita el error distraído; **sólo el respaldo evita el error
+convencido**.
+
 ## Claro y oscuro
 
 La app era sólo oscura. En un teléfono eso se nota: el sistema tiene un ajuste

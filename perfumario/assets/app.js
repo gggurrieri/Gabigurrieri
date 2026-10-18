@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-18.1';
+const VERSION = '2026-10-18.2';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -1438,16 +1438,78 @@ function renderAprendizaje(m) {
   $('#aprendizajeReglas').innerHTML = reglas.join('');
 }
 
+/* ------------------- que los datos sobrevivan ------------------------
+   Todo vive en localStorage, y eso tiene dos enemigos distintos:
+
+   1. Que el usuario limpie el navegador o cambie de teléfono. Contra eso la
+      única defensa es una copia afuera, y la app tiene que insistir.
+   2. Que el navegador lo borre SOLO. Safari borra el almacenamiento de un
+      sitio después de siete días sin visitarlo. Agregada a la pantalla de
+      inicio queda exenta, y adentro del envoltorio nativo no corre la regla.
+
+   Contra lo segundo se puede pedir permiso para no ser borrado. Es gratis
+   pedirlo y el navegador contesta que sí o que no; lo que no se puede es
+   mentir sobre la respuesta, así que la pantalla dice cuál fue. */
+let persistencia = null;   // true, false, o null si el navegador no opina
+
+async function pedirPersistencia() {
+  if (!navigator.storage || !navigator.storage.persist) { persistencia = null; return null; }
+  try {
+    persistencia = (await navigator.storage.persisted()) || (await navigator.storage.persist());
+  } catch (e) { persistencia = null; }
+  return persistencia;
+}
+
+/* Una huella de los datos, no un contador. Un contador hay que acordarse de
+   incrementarlo en cada lugar que toca algo —y el día que alguien agrega una
+   pantalla nueva se olvida—; la huella se calcula de lo que hay. */
+function huellaDatos() {
+  const txt = JSON.stringify({ p: S.perfumes, u: S.usos, c: S.ciego || [] });
+  let h = 0;
+  for (let i = 0; i < txt.length; i++) h = (h * 31 + txt.charCodeAt(i)) % 2147483647;
+  return { p: S.perfumes.length, u: S.usos.length, h };
+}
+
+/* Qué cambió desde la última copia de verdad. */
+function sinCopiar() {
+  const c = S.meta.copia;
+  const ahora = huellaDatos();
+  if (!c) return { hay: S.perfumes.length > 0, perfumes: ahora.p, usos: ahora.u, dias: null, nunca: true };
+  return {
+    hay: c.h !== ahora.h,
+    perfumes: ahora.p - c.p,
+    usos: ahora.u - c.u,
+    dias: daysBetween(c.fecha, today()),
+    nunca: false
+  };
+}
+
+/* Se llama SÓLO cuando la copia salió de verdad: el texto llegó al
+   portapapeles o el archivo se descargó. Antes se marcaba al abrir el
+   diálogo, así que abrir y cerrar sin copiar nada dejaba a la app creyendo
+   que estabas respaldado —y callada justo cuando más tenía que hablar. */
+function marcarCopia() {
+  S.meta.copia = Object.assign({ fecha: today() }, huellaDatos());
+  S.meta.ultimaCopia = today();   // el nombre viejo, para copias ya guardadas
+  guardar(); renderAjustes(); avisoCopia();
+}
+
 function avisoCopia() {
   const av = $('#avisoCopia');
-  const hayDatos = S.perfumes.length > 0;
-  const ult = S.meta.ultimaCopia;
-  const viejo = ult ? daysBetween(ult, today()) >= 7 : true;
-  if (!hayDatos || !viejo) { av.hidden = true; return; }
+  if (!S.perfumes.length) { av.hidden = true; return; }
+  const c = sinCopiar();
+  /* El aviso mira si hay algo sin copiar, no cuántos días pasaron. Antes
+     aparecía a los siete días aunque no hubieras tocado nada —y entonces se
+     aprende a ignorarlo, que es lo peor que le puede pasar a una alarma. */
+  if (!c.hay) { av.hidden = true; return; }
+  const piezas = [];
+  if (c.perfumes > 0) piezas.push(`${c.perfumes} perfume${c.perfumes === 1 ? '' : 's'}`);
+  if (c.usos > 0) piezas.push(`${c.usos} uso${c.usos === 1 ? '' : 's'}`);
+  const que = piezas.length ? piezas.join(' y ') + ' sin copiar' : 'cambios sin copiar';
   av.hidden = false;
-  av.innerHTML = ult
-    ? `Hace ${daysBetween(ult, today())} días que no exportás una copia. Si limpiás el navegador, se pierde todo. <b>Exportar ahora →</b>`
-    : `No tenés ninguna copia de tus datos. Si limpiás el navegador, se pierde todo. <b>Exportar ahora →</b>`;
+  av.innerHTML = c.nunca
+    ? `Nunca hiciste una copia. Si limpiás el navegador o cambiás de teléfono, se pierde todo. <b>Exportar ahora →</b>`
+    : `${que[0].toUpperCase() + que.slice(1)}${c.dias ? `, desde hace ${c.dias} día${c.dias === 1 ? '' : 's'}` : ''}. <b>Exportar ahora →</b>`;
 }
 
 /* ============================== VIAJE ===============================
@@ -3538,10 +3600,25 @@ function renderAjustes() {
     : 'Sin ubicación: la temperatura se carga a mano.';
   const hay = !!(window.PERFUMARIO_COLECCION && (window.PERFUMARIO_COLECCION.perfumes || []).length);
   $('#btnMiColeccion').hidden = !hay;
-  const u = S.meta.ultimaCopia;
-  $('#copiaEstado').textContent = u
-    ? `Última copia: ${fmtHace(u)} (${fmtFecha(u)}).`
-    : 'Nunca exportaste una copia.';
+  const copia = sinCopiar();
+  const kb = Math.round(JSON.stringify(S).length / 1024);
+  $('#copiaEstado').textContent = copia.nunca
+    ? `${S.perfumes.length} perfumes y ${S.usos.length} usos, ${kb} KB. Nunca exportaste una copia.`
+    : copia.hay
+      ? `Última copia hace ${copia.dias === 0 ? 'hoy' : copia.dias + (copia.dias === 1 ? ' día' : ' días')}, y desde entonces hay cambios sin copiar.`
+      : `Al día: la última copia tiene todo lo que hay ahora (${S.perfumes.length} perfumes, ${S.usos.length} usos).`;
+
+  $('#filaDeshacer').hidden = !hayDeshacer();
+
+  /* Dónde viven los datos, sin eufemismos. Lo importante no es el nombre de la
+     tecnología sino qué los borra, que es distinto en cada caso. */
+  const enApp = Nativo.disponible();
+  const instalada = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+  $('#dondeViven').innerHTML = enApp
+    ? 'Estás en la app instalada: los datos viven con ella y sobreviven a cerrar y reabrir. Se van sólo si borrás la app. Aun así, exportá cada tanto: una copia afuera es lo único que sobrevive a cambiar de teléfono.'
+    : instalada
+      ? 'Agregada a la pantalla de inicio, el navegador no borra sola tu colección. Exportá igual cada tanto: una copia afuera es lo único que sobrevive a cambiar de teléfono.'
+      : `Todo vive en este navegador (<code>localStorage</code>)${persistencia === true ? ', y el navegador aceptó no borrarlo solo' : persistencia === false ? ', y el navegador <b>no garantizó</b> conservarlo' : ''}. <b>Safari borra el almacenamiento de un sitio tras 7 días sin visitarlo.</b> Agregala a la pantalla de inicio —compartir → Agregar a inicio— y esa regla deja de correr. Y exportá cada tanto igual.`;
 }
 
 function exportar() {
@@ -3566,13 +3643,14 @@ function exportar() {
     try {
       await navigator.clipboard.writeText(ta.value);
       toast('Copiado');
+      marcarCopia();
     } catch (e) {
+      /* Si el portapapeles falla no hay copia, y marcarla sería mentir: la
+         app se quedaría callada justo cuando más tiene que hablar. */
       ta.removeAttribute('readonly'); ta.select();
       toast('Seleccionalo y copialo a mano');
     }
-    S.meta.ultimaCopia = today(); guardar(); renderAjustes(); avisoCopia();
   });
-  S.meta.ultimaCopia = today(); guardar(); renderAjustes();
 }
 
 /* Copiar y pegar un JSON largo desde el teléfono es incómodo; un archivo se
@@ -3586,10 +3664,7 @@ function descargarCopia() {
   const nombre = `perfumario-${today()}.json`;
   const texto = JSON.stringify(S, null, 2);
 
-  const anotarCopia = () => {
-    S.meta.ultimaCopia = today(); guardar(); renderAjustes(); avisoCopia();
-    toast('Copia descargada');
-  };
+  const anotarCopia = () => { marcarCopia(); toast('Copia descargada'); };
 
   const porElAnfitrion = () => {
     if (!(window.claude && typeof window.claude.use === 'function')) return Promise.resolve(false);
@@ -3616,21 +3691,77 @@ function descargarCopia() {
   });
 }
 
+/* Importar reemplaza TODO. Era la operación más destructiva de la app y la
+   única sin confirmación ni vuelta atrás: pegar una copia vieja, o media copia
+   mal seleccionada, borraba años de uso en un toque y sin aviso.
+
+   Dos defensas, y la segunda es la que vale:
+   1. Decir qué se pierde ANTES, con los números de los dos lados.
+   2. Guardar lo que había en una llave aparte antes de pisar nada, para poder
+      deshacer. Una confirmación evita el error distraído; sólo el respaldo
+      evita el error convencido. */
+const LLAVE_ANTES = KEY + '_antes';
+
+function guardarAntesDeImportar() {
+  try { localStorage.setItem(LLAVE_ANTES, JSON.stringify({ fecha: new Date().toISOString(), datos: S })); return true; }
+  catch (e) { return false; }
+}
+
+function hayDeshacer() {
+  try { return !!localStorage.getItem(LLAVE_ANTES); } catch (e) { return false; }
+}
+
+function deshacerImportacion() {
+  let guardado;
+  try { guardado = JSON.parse(localStorage.getItem(LLAVE_ANTES) || 'null'); } catch (e) { guardado = null; }
+  if (!guardado || !guardado.datos) { toast('No hay nada para deshacer'); return; }
+  S = Object.assign(clonar(DEFAULTS), guardado.datos);
+  S.ajustes = Object.assign(clonar(DEFAULTS.ajustes), guardado.datos.ajustes || {});
+  S.meta = Object.assign(clonar(DEFAULTS.meta), guardado.datos.meta || {});
+  try { localStorage.removeItem(LLAVE_ANTES); } catch (e) { /* ya no está */ }
+  guardar(); cerrarModal(); render();
+  toast(`Volviste a ${S.perfumes.length} perfumes y ${S.usos.length} usos`);
+}
+
 function importar() {
   abrirModal('Importar copia', `
-    <p class="sub">Pegá acá el texto de una copia. Reemplaza todo lo que tengas guardado ahora.</p>
-    <label class="field"><textarea id="modalText" placeholder='{"perfumes": …}' style="min-height:180px;font-family:ui-monospace,monospace;font-size:11px"></textarea></label>
-    <div class="btn-row"><button class="btn btn-accent" id="btnConfirmarImp">Importar</button></div>`);
-  $('#btnConfirmarImp').addEventListener('click', () => {
+    <p class="sub">Pegá acá el texto de una copia.</p>
+    <label class="field"><textarea id="modalText" placeholder='{"perfumes": …}' style="min-height:160px;font-family:ui-monospace,monospace;font-size:11px"></textarea></label>
+    <div id="impResumen"></div>
+    <div class="btn-row"><button class="btn btn-accent" id="btnConfirmarImp">Revisar</button></div>`);
+
+  let listos = null;
+  const ta = $('#modalText');
+  const btn = $('#btnConfirmarImp');
+
+  btn.addEventListener('click', () => {
+    if (listos) {   // segundo toque: ya vio el resumen
+      guardarAntesDeImportar();
+      S = Object.assign(clonar(DEFAULTS), listos);
+      S.ajustes = Object.assign(clonar(DEFAULTS.ajustes), listos.ajustes || {});
+      S.meta = Object.assign(clonar(DEFAULTS.meta), listos.meta || {});
+      guardar(); cerrarModal(); render();
+      toast(`Importados ${S.perfumes.length} perfumes. Se puede deshacer desde Ajustes`);
+      return;
+    }
     let datos;
-    try { datos = JSON.parse($('#modalText').value); }
+    try { datos = JSON.parse(ta.value); }
     catch (e) { toast('Ese texto no es una copia válida'); return; }
     if (!datos || !Array.isArray(datos.perfumes)) { toast('A la copia le faltan los perfumes'); return; }
-    S = Object.assign(clonar(DEFAULTS), datos);
-    S.ajustes = Object.assign(clonar(DEFAULTS.ajustes), datos.ajustes || {});
-    S.meta = Object.assign(clonar(DEFAULTS.meta), datos.meta || {});
-    guardar(); cerrarModal(); render();
-    toast(`Importados ${S.perfumes.length} perfumes y ${S.usos.length} usos`);
+
+    listos = datos;
+    const hoyP = S.perfumes.length, hoyU = S.usos.length;
+    const nueP = datos.perfumes.length, nueU = (datos.usos || []).length;
+    const pierde = hoyP > 0 || hoyU > 0;
+    $('#impResumen').innerHTML = `<div class="aviso" style="cursor:default">
+      ${pierde
+        ? `Ahora tenés <b>${hoyP} perfume${hoyP === 1 ? '' : 's'} y ${hoyU} uso${hoyU === 1 ? '' : 's'}</b>.
+           La copia trae <b>${nueP} y ${nueU}</b>. Importar <b>reemplaza todo</b>, no suma.
+           ${nueP < hoyP || nueU < hoyU ? '<br>Vas a terminar con menos de lo que tenés ahora.' : ''}
+           <br>Se guarda lo de ahora por si querés volver.`
+        : `La copia trae <b>${nueP} perfume${nueP === 1 ? '' : 's'} y ${nueU} uso${nueU === 1 ? '' : 's'}</b>.`}
+    </div>`;
+    btn.textContent = pierde ? 'Sí, reemplazar todo' : 'Importar';
   });
 }
 
@@ -3849,6 +3980,7 @@ function conectar() {
 
   $('#btnExportar').addEventListener('click', exportar);
   $('#btnImportar').addEventListener('click', importar);
+  $('#btnDeshacerImp').addEventListener('click', deshacerImportacion);
   $('#btnBorrar').addEventListener('click', borrarTodo);
   $('#btnEjemplos').addEventListener('click', cargarEjemplos);
   $('#btnMiColeccion').addEventListener('click', cargarMiColeccion);
@@ -4015,13 +4147,20 @@ function confirmarBorrado(id) {
 window.PERFUMARIO_DEBUG = {
   avisosPendientes: a => avisosPendientes(a),
   idNumerico: x => idNumerico(x),
-  nativoDisponible: () => Nativo.disponible()
+  nativoDisponible: () => Nativo.disponible(),
+  marcarCopia: () => marcarCopia(),
+  sinCopiar: () => sinCopiar()
 };
 
 cargar();
 aplicarTema();
 conectar();
 ir('hoy');
+
+/* Pedirle al navegador que no borre los datos solo. Es gratis preguntarlo y
+   la respuesta se muestra tal cual en Ajustes: prometer que están a salvo sin
+   saberlo sería peor que no decir nada. */
+pedirPersistencia().then(() => { if (vistaActual === 'ajustes') renderAjustes(); });
 
 /* Tocar la notificación tiene que dejarte donde está la pregunta, no en la
    última pantalla que hayas visto: el aviso prometió una cosa y la app tiene
