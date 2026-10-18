@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-13.5';
+const VERSION = '2026-10-18.1';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -58,6 +58,7 @@ const DEFAULTS = {
   ciego: [],
   ajustes: { mlSpray: 0.1, moneda: '$', hemisferio: 'sur', aprender: true, clima: false,
              ocasion: 'casual',
+             tema: 'sistema',   // 'sistema' | 'claro' | 'oscuro'
              /* A las cuántas horas de ponértelo conviene preguntarte cómo va.
                 0 = no avisar. Hoy decide cuándo la app te lo pone adelante al
                 abrirla; cuando exista la versión de tienda, es la hora a la que
@@ -398,6 +399,29 @@ function avisoUbicacion(txt) {
 
 /* --------------------------- navegación ---------------------------- */
 let vistaActual = 'hoy';
+
+/* El mismo cálculo que hace el script del <head>, acá para cuando el ajuste
+   cambia en caliente. Vive en los dos lados a propósito: el del <head> corre
+   antes de que exista este archivo, y es la única forma de que no haya
+   destello. */
+function aplicarTema() {
+  const elegido = S.ajustes.tema || 'sistema';
+  const t = elegido === 'sistema'
+    ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'claro' : 'oscuro')
+    : elegido;
+  document.documentElement.dataset.tema = t;
+  const m = $('#metaTema');
+  if (m) m.setAttribute('content', t === 'claro' ? '#FAF8FB' : '#121014');
+}
+
+/* Si está en "como el sistema", seguirlo también mientras la app está abierta:
+   quien tiene el teléfono en automático ve cambiar el tema al anochecer. */
+if (window.matchMedia) {
+  const consulta = window.matchMedia('(prefers-color-scheme: light)');
+  const alCambiar = () => { if ((S.ajustes.tema || 'sistema') === 'sistema') aplicarTema(); };
+  if (consulta.addEventListener) consulta.addEventListener('change', alCambiar);
+  else if (consulta.addListener) consulta.addListener(alCambiar);
+}
 
 function ir(v) {
   vistaActual = v;
@@ -2066,7 +2090,11 @@ function ico(nombre, clase) {
 
 /* El color de la familia, como un punto. Dice lo mismo que el emoji —de qué
    familia es— sin traer una ilustración ajena a la pantalla. */
-const punto = f => `<i class="punto" style="background:${f.color}"></i>`;
+/* El color de la familia sale del tema, no del dato: el mismo tono necesita
+   más luz sobre fondo oscuro que sobre papel. El hex de datos.js queda como
+   respaldo por si aparece una familia sin variable definida. */
+const colorFamilia = f => `var(--fam-${f.id || 'nada'}, ${f.color})`;
+const punto = f => `<i class="punto" style="background:${colorFamilia(f)}"></i>`;
 
 /* --------------------------- miniatura ------------------------------
    Cada perfume muestra un frasco. El que viene de fábrica está dibujado acá,
@@ -2078,7 +2106,7 @@ const punto = f => `<i class="punto" style="background:${f.color}"></i>`;
    así la lista muestra el nivel de cada frasco sin leer un solo número. */
 
 /* el color del líquido: el que trajo la ficha, si no el de la familia */
-const jugo = p => p.juice || familia(p.familia).color || '#8a8396';
+const jugo = p => p.juice || colorFamilia(familia(p.familia));
 
 /* Cuatro siluetas. Cuál toca sale del id, así un perfume se dibuja siempre
    igual y la lista no queda toda igual tampoco. */
@@ -2190,7 +2218,7 @@ function fichaLista(p) {
       <div class="pf-name">${esc(p.nombre)}</div>
       <div class="pf-house">${esc(p.casa)}${p.conc ? ' · ' + esc(p.conc) : ''}</div>
       <div class="pf-meta">
-        <span class="pill fam" style="border-color:${f.color}55">${etiquetaFamilia(p, f)}</span>
+        <span class="pill fam" style="border-color:${colorFamilia(f)}">${etiquetaFamilia(p, f)}</span>
         <span class="pill">${n} uso${n === 1 ? '' : 's'}</span>
         <span class="pill">${ult ? fmtHace(ult) : 'sin estrenar'}</span>
         ${cpu != null ? `<span class="pill">${S.ajustes.moneda}${Math.round(cpu).toLocaleString('es-AR')}/uso</span>` : ''}
@@ -3101,7 +3129,7 @@ function renderNotas() {
     $('#perfilFamilias').innerHTML = porFam.map(x => barra(
       x.f.nombre,
       `${x.tiene} en la colección · ${x.usos} uso${x.usos === 1 ? '' : 's'}`,
-      total ? (x.tiene / total) * 100 : 0, x.f.color, punto(x.f))).join('');
+      total ? (x.tiene / total) * 100 : 0, colorFamilia(x.f), punto(x.f))).join('');
     $('#perfilNotas').innerHTML = contarNotas(S.perfumes).slice(0, 12)
       .map(x => `<span class="tag" data-nota="${esc(x.n)}"><b>${esc(x.n)}</b> ${x.c}</span>`).join('');
   }
@@ -3120,7 +3148,7 @@ function renderNotas() {
     const f = familia(n.f);
     const mios = S.perfumes.filter(p => notasDe(p).some(x => x.toLowerCase() === n.n.toLowerCase()));
     return `<article class="nota-item">
-      <h3><i class="fam-dot" style="background:${f.color}"></i>${esc(n.n)}
+      <h3><i class="fam-dot" style="background:${colorFamilia(f)}"></i>${esc(n.n)}
         <span style="font-weight:400;color:var(--muted);font-size:12px">${esc(f.nombre)}</span></h3>
       <p>${esc(n.d)}</p>
       ${mios.length ? `<div class="mios">En tu colección: ${mios.map(p => esc(p.nombre)).join(' · ')}</div>` : ''}
@@ -3284,7 +3312,7 @@ function renderCiego() {
   }
   $('#ciegoSub').textContent = titular;
   $('#ciegoTabla').innerHTML = t.filter(x => x.jugó >= 2).slice(0, 8)
-    .map(x => barra(x.p.nombre, `${x.ganó} de ${x.jugó}`, x.pct, familia(x.p.familia).color)).join('');
+    .map(x => barra(x.p.nombre, `${x.ganó} de ${x.jugó}`, x.pct, colorFamilia(familia(x.p.familia)))).join('');
 }
 
 function compraContraUso() {
@@ -3322,7 +3350,7 @@ function compraContraUso() {
       <div class="par-dif${dif > 0 ? ' mas' : dif < 0 ? ' menos' : ''}">${dif > 0 ? '+' : ''}${dif}</div>
       <div class="par-barras">
         <div class="par-barra"><i style="width:${clamp(x.tengo, 1, 100)}%;background:var(--muted)"></i></div>
-        <div class="par-barra"><i style="width:${clamp(x.uso, 1, 100)}%;background:${x.f.color}"></i></div>
+        <div class="par-barra"><i style="width:${clamp(x.uso, 1, 100)}%;background:${colorFamilia(x.f)}"></i></div>
       </div>
     </div>`;
   }).join('') +
@@ -3446,7 +3474,7 @@ function renderUso() {
     : 'Todavía no registraste ningún uso.';
   $('#rotacion').innerHTML = ranking.slice(0, 10).map(x => barra(
     x.p.nombre, `${x.c} uso${x.c === 1 ? '' : 's'} · ${Math.round((x.c / totalR) * 100)} %`,
-    (x.c / ranking[0].c) * 100, familia(x.p.familia).color)).join('');
+    (x.c / ranking[0].c) * 100, colorFamilia(familia(x.p.familia)))).join('');
 
   renderCiego();
   compraContraUso();
@@ -3490,6 +3518,7 @@ function renderAjustes() {
   $('#setHemisferio').value = S.ajustes.hemisferio;
   $('#setAprender').checked = S.ajustes.aprender !== false;
   $('#setClima').checked = !!S.ajustes.clima;
+  $$('#setTema .chip').forEach(c => c.classList.toggle('on', c.dataset.val === (S.ajustes.tema || 'sistema')));
   $('#setRecordar').value = String(S.ajustes.recordar || 0);
   /* Decir qué puede y qué no puede hacer la app es parte del producto: una
      opción que promete una notificación que nunca llega es peor que no tenerla. */
@@ -3761,6 +3790,11 @@ function conectar() {
     S.ajustes.aprender = e.target.checked; guardar();
     toast(e.target.checked ? 'Vuelvo a mirar tu historial' : 'Sugerencias solo por reglas fijas');
   });
+  $('#setTema').addEventListener('click', e => {
+    const c = e.target.closest('.chip');
+    if (!c) return;
+    S.ajustes.tema = c.dataset.val; guardar(); aplicarTema(); render();
+  });
   $('#setRecordar').addEventListener('change', e => {
     S.ajustes.recordar = +e.target.value || 0; guardar();
     if (S.ajustes.recordar && Nativo.disponible()) {
@@ -3985,6 +4019,7 @@ window.PERFUMARIO_DEBUG = {
 };
 
 cargar();
+aplicarTema();
 conectar();
 ir('hoy');
 

@@ -1400,6 +1400,85 @@ const check = (n, c, d = '') => {
     'modal ' + (await visible('#modal')));
   await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
 
+  console.log('\nAF · Claro y oscuro');
+  /* La app era sólo oscura. En un teléfono eso se nota: el sistema tiene un
+     ajuste y la app lo ignoraba. Lo que se prueba acá no es que "se vea
+     lindo" —eso es opinión— sino lo que sí es verificable: que el tema salga
+     del sistema, que el ajuste mande sobre el sistema, que sobreviva al
+     reinicio, y que el texto tenga contraste suficiente en los dos. */
+  await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+  await p.evaluate(() => localStorage.removeItem('perfumario_v1'));
+  await p.emulateMedia({ colorScheme: 'light' });
+  await p.reload(); await p.waitForTimeout(900);
+  check('sin ajuste, el tema lo decide el sistema',
+    (await p.evaluate(() => document.documentElement.dataset.tema)) === 'claro');
+  check('y la barra del navegador acompaña',
+    (await p.evaluate(() => document.querySelector('#metaTema').content)) === '#FAF8FB');
+
+  await p.emulateMedia({ colorScheme: 'dark' });
+  await p.waitForTimeout(400);
+  check('si el sistema cambia con la app abierta, cambia sola',
+    (await p.evaluate(() => document.documentElement.dataset.tema)) === 'oscuro');
+
+  /* El contraste, medido sobre lo que el navegador realmente pintó: no sobre
+     los valores que yo escribí, que es donde uno se engaña solo. */
+  const contraste = async () => p.evaluate(() => {
+    const rgb = s => (s.match(/\d+/g) || [0, 0, 0]).slice(0, 3).map(Number).map(v => v / 255);
+    const lum = c => { const f = v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+      const [r, g, b] = c.map(f); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const ct = (a, b) => { const la = lum(rgb(a)), lb = lum(rgb(b));
+      return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05); };
+    const fondoDe = el => {
+      for (let e = el; e; e = e.parentElement) {
+        const c = getComputedStyle(e).backgroundColor;
+        if (c && !/rgba\(0, 0, 0, 0\)|transparent/.test(c)) return c;
+      }
+      return getComputedStyle(document.body).backgroundColor;
+    };
+    const mirar = ['.hero-name', '.hero-texto', '.hero-alt', '.contexto-linea', '.chip.on', '.sub'];
+    return mirar.map(sel => {
+      const e = document.querySelector(sel);
+      if (!e) return null;
+      return { sel, c: +ct(getComputedStyle(e).color, fondoDe(e)).toFixed(2) };
+    }).filter(Boolean);
+  });
+
+  await p.evaluate(() => { const d = document.querySelector('#respuesta [data-semilla]'); if (d) d.click(); });
+  await p.waitForTimeout(800);
+  const cOsc = await contraste();
+  check('en oscuro todo el texto pasa el mínimo de WCAG (4.5)',
+    cOsc.every(x => x.c >= 4.5), cOsc.map(x => `${x.sel} ${x.c}`).join(' · '));
+
+  // ahora el ajuste, que tiene que ganarle al sistema
+  await p.tap('#btnSettings'); await p.waitForTimeout(300);
+  await p.tap('#setTema .chip[data-val="claro"]'); await p.waitForTimeout(400);
+  check('el ajuste le gana al sistema',
+    (await p.evaluate(() => document.documentElement.dataset.tema)) === 'claro');
+  await ir('hoy'); await p.waitForTimeout(300);
+  const cCla = await contraste();
+  check('y en claro también pasa',
+    cCla.every(x => x.c >= 4.5), cCla.map(x => `${x.sel} ${x.c}`).join(' · '));
+
+  await p.reload(); await p.waitForTimeout(900);
+  check('el tema elegido sobrevive al reinicio, sin destello',
+    (await p.evaluate(() => document.documentElement.dataset.tema)) === 'claro');
+
+  /* Candado: el color de familia tiene que salir del tema. Si vuelve a
+     escribirse el hex a mano, el punto queda ilegible en uno de los dos. */
+  const puntos = await p.evaluate(() => Array.from(document.querySelectorAll('.punto, .fam-dot'))
+    .map(e => e.getAttribute('style') || ''));
+  check('los puntos de familia salen del tema, no de un hex a mano',
+    puntos.length > 0 && puntos.every(x => x.includes('var(--fam-')),
+    puntos.slice(0, 2).join(' | '));
+
+  await p.tap('#btnSettings'); await p.waitForTimeout(300);
+  await p.tap('#setTema .chip[data-val="sistema"]'); await p.waitForTimeout(300);
+  await p.emulateMedia({ colorScheme: 'dark' });
+  await p.waitForTimeout(400);
+  check('volver a "como el sistema" devuelve el control al teléfono',
+    (await p.evaluate(() => document.documentElement.dataset.tema)) === 'oscuro');
+  await desdeCero();
+
   console.log('\nAE · El aviso a las N horas');
   /* El canal de entrega no se puede probar acá: no hay teléfono ni hay cuatro
      horas. Lo que sí se prueba es la política, que es donde están las
@@ -1846,8 +1925,13 @@ const check = (n, c, d = '') => {
   /* candado: ningún color escrito a mano fuera del bloque de tokens. Es por
      donde se escapan siempre: el token no tiene la variante que hace falta y
      alguien pega el valor. */
-  const fuera = css.slice(css.indexOf('}', css.indexOf(':root')))
+  /* Los tokens ya no viven en un bloque sino en tres —escalas, tema oscuro y
+     tema claro—, así que el candado saca TODOS los bloques que arrancan en
+     :root y revisa lo que queda. Antes cortaba en la primera llave y el día
+     que apareciera un segundo bloque de tokens habría dado falsos positivos. */
+  const fuera = css
     .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/:root[^{]*\{[^}]*\}/g, '')
     .match(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g) || [];
   check('ningún color escrito a mano fuera de los tokens',
     fuera.length === 0, fuera.join(', '));

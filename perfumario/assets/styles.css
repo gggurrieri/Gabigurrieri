@@ -1,25 +1,20 @@
 /* =====================================================================
    Perfumario · hoja de estilos
-   Móvil primero, tema oscuro, tipografía del sistema.
+   Móvil primero, claro y oscuro, tipografía del sistema.
+   ===================================================================== */
+/* =====================================================================
+   Tokens.
+
+   Los colores viven en dos bloques —uno por tema— y las escalas en uno solo,
+   porque un espaciado no cambia con la luz del ambiente. El tema lo pone un
+   script de tres líneas en el <head>, antes de que se pinte nada: así no hay
+   un destello oscuro para quien usa el teléfono en claro.
    ===================================================================== */
 :root{
-  --bg:#0B0A0B;
-  --bg-soft:#0B0A0B;
-  --card:#141315;
-  --card-2:#1C1A1D;
-  --line:#232126;
-  --txt:#F2EFEA;
-  --muted:#8C8792;
-  --accent:#D9A85C;
-  --accent-ink:#17120A;
-  --accent-dim:#6B5227;
-  --good:#6fd08c;
-  --danger:#f08a80;
   /* Escalas. Antes había 19 valores de espaciado, 16 tamaños de letra y 7
      radios: nadie elige 11px ni 13.5px, salen de mover un número hasta que se
-     ve bien y dejarlo ahí. Estos son los valores que de verdad sostenían el
-     diseño; los demás se redondearon al más cercano. Los nombres son pasos de
-     una escala, no medidas: así se elige "el siguiente" en vez de inventar. */
+     ve bien y dejarlo ahí. Los nombres son pasos de una escala, no medidas:
+     así se elige "el siguiente" en vez de inventar. */
   --sp-0:2px;  --sp-1:4px;  --sp-2:6px;  --sp-3:8px;   --sp-4:10px;
   --sp-5:12px; --sp-6:14px; --sp-7:16px; --sp-8:24px;  --sp-9:32px;
 
@@ -31,20 +26,88 @@
   --radius:var(--r-lg);   /* el nombre viejo, para no romper lo que ya lo usa */
   --sp:var(--sp-6);
 
-  /* Colores con transparencia. Estaban escritos a mano en nueve lugares, que
-     es lo que pasa siempre que un token no tiene la variante que hace falta:
-     alguien copia el valor y sigue. El nombre dice para qué sirve, no cómo se
-     ve, así el día que el dorado deje de ser dorado el nombre siga sirviendo. */
-  --fondo-barra:rgba(11,10,11,.82);      /* barras de arriba y abajo, con blur detrás */
-  --fondo-velo:rgba(11,10,11,0);       /* el degradé con el que se corta el contenido */
-  --realce-sutil:rgba(217,168,92,.10);   /* la pestaña activa */
-  --realce:rgba(217,168,92,.08);         /* tarjeta destacada */
-  --realce-fuerte:rgba(217,168,92,.16);  /* el chip que elegiste */
-  --linea-peligro:rgba(240,138,128,.35); /* borde del botón de borrar */
-  --velo-modal:rgba(0,0,0,.6);           /* lo que oscurece la app detrás del modal */
-  --sombra-flotante:0 8px 24px rgba(0,0,0,.45);
   --body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   --display:"Georgia","Times New Roman",serif;
+}
+
+/* ---------------------------- tema oscuro ---------------------------
+   El negro puro se fue: #121014 es un gris carbón con una pizca de violeta.
+   Negro absoluto contra texto blanco cansa la vista y aplasta las sombras,
+   que dejan de existir porque no hay nada más oscuro abajo.
+
+   El acento dejó de ser dorado. Las ocho apps de la categoría son negro y oro,
+   y además el dorado se parecía demasiado a cuatro de las once familias: el
+   color que decía "esto se toca" competía con el que decía "esto es ámbar". */
+:root, :root[data-tema="oscuro"]{
+  color-scheme:dark;
+  --bg:#121014;
+  --bg-soft:#121014;
+  --card:#1B1820;
+  --card-2:#262130;
+  --line:#2E2838;
+  --txt:#F3F0F7;
+  --muted:#9C94AA;
+  --accent:#C9A4E8;
+  --accent-ink:#1E1226;
+  --accent-dim:#6E4E8C;
+  --good:#6FD08C;
+  --danger:#F08A80;
+
+  --fondo-barra:rgba(18,16,20,.82);
+  --fondo-velo:rgba(18,16,20,0);
+  --realce-sutil:rgba(201,164,232,.12);
+  --realce:rgba(201,164,232,.09);
+  --realce-fuerte:rgba(201,164,232,.20);
+  --linea-peligro:rgba(240,138,128,.35);
+  --velo-modal:rgba(0,0,0,.6);
+  --sombra-flotante:0 8px 24px rgba(0,0,0,.45);
+  /* En oscuro la tarjeta se separa del fondo por ser MÁS clara, así que no
+     necesita sombra. En claro es blanca sobre casi blanco y sin esto flota
+     sin bordes: se ve una mancha, no una tarjeta. */
+  --sombra-tarjeta:none;
+
+  /* Las once familias, brillantes sobre fondo oscuro. Mismo tono que en el
+     tema claro; sólo cambia la luz, porque el tono es la identidad de la
+     familia y la luz es lo que la hace visible. */
+  --fam-cuero:#CE877E;     --fam-ambar:#D48754;      --fam-amaderada:#BB9068;
+  --fam-gourmand:#D09B39;  --fam-citrica:#DDB92C;    --fam-chipre:#9EB159;
+  --fam-verde:#61BF4A;     --fam-aromatica:#47C291;  --fam-acuatica:#41A2D2;
+  --fam-almizclada:#A292C4;--fam-floral:#DD78AB;     --fam-nada:#8A8396;
+}
+
+/* ----------------------------- tema claro ---------------------------
+   No es el oscuro invertido: el papel es apenas cálido (#FAF8FB) y las
+   tarjetas son blancas, así la jerarquía se lee al revés que en el oscuro
+   —ahí la tarjeta es más clara que el fondo, acá es más blanca—. */
+:root[data-tema="claro"]{
+  color-scheme:light;
+  --bg:#FAF8FB;
+  --bg-soft:#FAF8FB;
+  --card:#FFFFFF;
+  --card-2:#F1EEF6;
+  --line:#E4DFEC;
+  --txt:#1A161F;
+  --muted:#645C70;
+  --accent:#6B3F96;
+  --accent-ink:#FFFFFF;
+  --accent-dim:#C3ADD8;
+  --good:#1C7A42;
+  --danger:#B3261E;
+
+  --fondo-barra:rgba(250,248,251,.86);
+  --fondo-velo:rgba(250,248,251,0);
+  --realce-sutil:rgba(107,63,150,.10);
+  --realce:rgba(107,63,150,.07);
+  --realce-fuerte:rgba(107,63,150,.14);
+  --linea-peligro:rgba(179,38,30,.30);
+  --velo-modal:rgba(26,22,31,.4);
+  --sombra-flotante:0 8px 24px rgba(26,22,31,.14);
+  --sombra-tarjeta:0 1px 2px rgba(26,22,31,.07), 0 2px 8px rgba(26,22,31,.05);
+
+  --fam-cuero:#BC5A4E;     --fam-ambar:#CD7337;      --fam-amaderada:#B28053;
+  --fam-gourmand:#B2822A;  --fam-citrica:#A2871A;    --fam-chipre:#819245;
+  --fam-verde:#4A9B36;     --fam-aromatica:#339970;  --fam-acuatica:#2F94C6;
+  --fam-almizclada:#7760A9;--fam-floral:#CE3B85;     --fam-nada:#6B6478;
 }
 
 *{box-sizing:border-box}
@@ -158,6 +221,7 @@ main{flex:1;padding:var(--sp-5) var(--sp-7) calc(env(safe-area-inset-bottom) + 8
 .card{
   background:var(--card);border:0;border-radius:var(--radius);
   padding:var(--sp-7);margin-bottom:var(--sp-5);
+  box-shadow:var(--sombra-tarjeta);
 }
 .card h2{font-size:var(--t-2);font-weight:600;letter-spacing:.08em;text-transform:uppercase;
   color:var(--muted);margin-bottom:var(--sp-3)}
@@ -254,6 +318,7 @@ button.item{width:100%;text-align:left;cursor:pointer;font:inherit}
 .hero{
   background:var(--card);border:0;border-radius:var(--r-xl);
   padding:var(--sp-8) var(--sp-7);margin:var(--sp-6) 0 var(--sp-5);
+  box-shadow:var(--sombra-tarjeta);
 }
 .hero-eyebrow{font-size:var(--t-1);color:var(--muted);letter-spacing:.09em;text-transform:uppercase}
 .hero-name{font-family:var(--display);font-size:var(--t-7);line-height:1.08;letter-spacing:-.02em;
@@ -286,6 +351,7 @@ button.item{width:100%;text-align:left;cursor:pointer;font:inherit}
 #otras{
   background:var(--card);border-radius:var(--radius);
   margin-bottom:var(--sp-5);overflow:hidden;
+  box-shadow:var(--sombra-tarjeta);
 }
 #otras summary{
   display:flex;align-items:center;justify-content:space-between;
@@ -340,6 +406,7 @@ details[open]>summary .chev{transform:rotate(-135deg);margin:4px 3px 0 0}
   display:flex;gap:var(--sp-5);align-items:flex-start;width:100%;text-align:left;
   background:var(--card);border:0;border-radius:var(--radius);
   padding:var(--sp-5);cursor:pointer;color:var(--txt);
+  box-shadow:var(--sombra-tarjeta);
 }
 .pf:active{background:var(--card-2)}
 /* La miniatura: frasco dibujado o foto propia, siempre en el mismo hueco.
@@ -515,7 +582,8 @@ details[open]>summary .chev{transform:rotate(-135deg);margin:4px 3px 0 0}
 
 /* ------------------------------ datos ------------------------------ */
 .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--sp-4);margin-bottom:var(--sp)}
-.kpi{background:var(--card);border:0;border-radius:var(--radius);padding:var(--sp-5)}
+.kpi{background:var(--card);border:0;border-radius:var(--radius);padding:var(--sp-5);
+  box-shadow:var(--sombra-tarjeta)}
 .kpi b{display:block;font-family:var(--display);font-size:var(--t-7);color:var(--accent);line-height:1.1}
 .kpi span{font-size:var(--t-2);color:var(--muted)}
 
@@ -569,6 +637,7 @@ details[open]>summary .chev{transform:rotate(-135deg);margin:4px 3px 0 0}
 .item{
   display:flex;justify-content:space-between;align-items:center;gap:var(--sp-4);
   background:var(--card);border:0;border-radius:var(--r-md);padding:var(--sp-4) var(--sp-5);
+  box-shadow:var(--sombra-tarjeta);
 }
 .item .it-main{min-width:0}
 .item .it-name{font-size:var(--t-4);font-weight:500}
@@ -576,7 +645,8 @@ details[open]>summary .chev{transform:rotate(-135deg);margin:4px 3px 0 0}
 .item .it-act{flex:none;display:flex;gap:var(--sp-2)}
 .item button{background:none;border:0;color:var(--muted);font-size:var(--t-4);cursor:pointer;padding:var(--sp-1)}
 
-.nota-item{background:var(--card);border:0;border-radius:var(--r-md);padding:var(--sp-5) var(--sp-5)}
+.nota-item{background:var(--card);border:0;border-radius:var(--r-md);padding:var(--sp-5) var(--sp-5);
+  box-shadow:var(--sombra-tarjeta)}
 .nota-item h3{font-size:var(--t-4);font-weight:600;display:flex;align-items:center;gap:var(--sp-3)}
 .nota-item p{margin:var(--sp-1) 0 0;font-size:var(--t-3);color:var(--muted);line-height:1.5}
 .nota-item .mios{margin-top:var(--sp-3);font-size:var(--t-2);color:var(--accent)}

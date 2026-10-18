@@ -3,14 +3,34 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0E0B12">
+<meta name="theme-color" content="#121014" id="metaTema">
+<!-- El tema se decide ANTES de pintar nada. Si esto viviera en app.js, quien
+     usa el teléfono en claro vería un destello oscuro en cada arranque: el
+     navegador pinta con la hoja de estilos mucho antes de ejecutar el script
+     del final del documento. Son seis líneas y van acá por eso. -->
+<script>
+(function () {
+  var t = 'sistema';
+  try {
+    var d = JSON.parse(localStorage.getItem('perfumario_v1') || '{}');
+    if (d && d.ajustes && d.ajustes.tema) t = d.ajustes.tema;
+  } catch (e) { /* sin datos guardados, manda el sistema */ }
+  if (t === 'sistema') {
+    t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches)
+      ? 'claro' : 'oscuro';
+  }
+  document.documentElement.dataset.tema = t;
+  var m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.setAttribute('content', t === 'claro' ? '#FAF8FB' : '#121014');
+})();
+</script>
 <title>Perfumario</title>
 <link rel="manifest" href="manifest.json">
 <!-- iOS ignora los íconos del manifest: para "Agregar a inicio" necesita
      un apple-touch-icon en PNG y sus propios meta. -->
 <link rel="apple-touch-icon" href="assets/icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Perfumario">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="assets/styles.css">
@@ -23,7 +43,7 @@
   <svg viewBox="0 0 220 260" class="splash-frasco">
     <defs>
       <linearGradient id="spGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-        <stop offset="0%" stop-color="#8A5A2B"/><stop offset="100%" stop-color="#F2D9A0"/>
+        <stop offset="0%" stop-color="var(--accent-dim)"/><stop offset="100%" stop-color="var(--accent)"/>
       </linearGradient>
     </defs>
     <g class="vapor">
@@ -31,10 +51,10 @@
       <circle cx="98" cy="28" r="2.5"/><circle cx="122" cy="26" r="2.5"/>
     </g>
     <rect class="tapa" x="94" y="34" width="32" height="26" rx="6" fill="url(#spGrad)"/>
-    <rect class="cuello" x="82" y="58" width="56" height="18" rx="7" fill="#F2D9A0"/>
+    <rect class="cuello" x="82" y="58" width="56" height="18" rx="7" fill="var(--accent)"/>
     <path class="cuerpo" d="M62 92 q48 -20 96 0 v96 q0 34 -35 34 h-26 q-35 0 -35 -34 z"
           fill="none" stroke="url(#spGrad)" stroke-width="13" stroke-linejoin="round"/>
-    <circle class="gota" cx="110" cy="152" r="11" fill="#F2D9A0"/>
+    <circle class="gota" cx="110" cy="152" r="11" fill="var(--accent)"/>
   </svg>
   <p class="splash-nombre">Perfumario</p>
 </div>
@@ -43,18 +63,21 @@
 
   <header class="topbar">
     <div class="brand">
+      <!-- El frasco toma los colores del tema: el cuadrado de fondo era negro
+           fijo y en tema claro quedaba un parche oscuro en la barra. -->
       <svg viewBox="0 0 1024 1024" class="logo-mark" aria-hidden="true">
         <defs>
           <linearGradient id="pfGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#8A5A2B"/><stop offset="100%" stop-color="#F2D9A0"/>
+            <stop offset="0%" stop-color="var(--accent-dim)"/>
+            <stop offset="100%" stop-color="var(--accent)"/>
           </linearGradient>
         </defs>
-        <rect width="1024" height="1024" fill="#0E0B12"/>
+        <rect width="1024" height="1024" rx="190" fill="var(--card-2)"/>
         <rect x="446" y="196" width="132" height="96" rx="18" fill="url(#pfGrad)"/>
-        <rect x="398" y="284" width="228" height="72" rx="24" fill="#F2D9A0"/>
+        <rect x="398" y="284" width="228" height="72" rx="24" fill="var(--accent)"/>
         <path d="M362 420 q150 -64 300 0 v300 q0 108 -110 108 h-80 q-110 0 -110 -108 z" fill="none" stroke="url(#pfGrad)" stroke-width="46" stroke-linejoin="round"/>
-        <circle cx="512" cy="614" r="74" fill="#F2D9A0" opacity="0.22"/>
-        <circle cx="512" cy="614" r="34" fill="#F2D9A0"/>
+        <circle cx="512" cy="614" r="74" fill="var(--accent)" opacity="0.22"/>
+        <circle cx="512" cy="614" r="34" fill="var(--accent)"/>
       </svg>
       <div>
         <h1>Perfumario</h1>
@@ -298,6 +321,16 @@
 
     <!-- ========================== AJUSTES ========================== -->
     <section class="view" id="view-ajustes">
+      <section class="card">
+        <h2>Aspecto</h2>
+        <div class="chips" id="setTema" role="group" aria-label="Tema">
+          <button class="chip" data-val="sistema">Como el sistema</button>
+          <button class="chip" data-val="claro">Claro</button>
+          <button class="chip" data-val="oscuro">Oscuro</button>
+        </div>
+        <p class="hint">Con "como el sistema" sigue lo que tenga el teléfono, y cambia solo al anochecer si lo tenés automático.</p>
+      </section>
+
       <section class="card">
         <h2>Preferencias</h2>
         <div class="field-row">

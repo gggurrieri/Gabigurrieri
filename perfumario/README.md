@@ -841,6 +841,71 @@ entra en los parecidos ni en el perfil.
 
 Opcional, separado con barras: `Nombre | ml | precio`.
 
+## Claro y oscuro
+
+La app era sólo oscura. En un teléfono eso se nota: el sistema tiene un ajuste
+de apariencia y la app lo ignoraba.
+
+**El tema lo decide un script de seis líneas en el `<head>`**, antes de que se
+pinte nada. Si viviera en `app.js` —que carga al final del documento— quien usa
+el teléfono en claro vería un destello oscuro en cada arranque, porque el
+navegador aplica la hoja de estilos mucho antes de ejecutar ese script. Lee el
+ajuste guardado; si dice "sistema", pregunta a `prefers-color-scheme`.
+
+En Ajustes hay tres opciones: **como el sistema**, claro y oscuro. Con la
+primera, la app también cambia sola mientras está abierta, para quien tiene el
+teléfono en automático al anochecer.
+
+### Qué cambió de color, y por qué
+
+**El negro puro se fue.** El fondo es `#121014`: un carbón con una pizca de
+violeta. Negro absoluto contra texto blanco cansa la vista y además aplasta las
+sombras, que dejan de existir porque no hay nada más oscuro debajo.
+
+**El dorado se fue.** Dos motivos, y el segundo es el que importa:
+
+1. Las ocho apps de la categoría son negro y oro. Era el color de todos.
+2. **Competía con los datos.** El acento decía "esto se toca" y a la vez cuatro
+   de las once familias olfativas eran del mismo tono dorado-ámbar. El mismo
+   color significaba dos cosas distintas en la misma pantalla.
+
+El acento es ahora una ciruela: `#C9A4E8` sobre oscuro, `#6B3F96` sobre claro.
+Deja libres el verde y el rojo para lo que ya significaban —bien y peligro— y
+no choca con ninguna familia.
+
+### Las once familias, medidas
+
+Las familias se distinguían por un punto de color. Midiendo los once tonos
+apareció el problema: **cinco de once caían entre 17° y 47°**, y tres de ellos
+—Amaderada, Gourmand y Chipre— tenían **el mismo tono exacto (33°)**,
+diferenciándose sólo en saturación. El punto que debía decir de qué familia era
+un perfume no podía distinguir entre tres de ellas.
+
+La paleta nueva reparte los tonos con **5° de separación mínima** y baja a tres
+las familias en la franja cálida. Chipre pasó de marrón a **musgo**, que además
+es más fiel: el chipre se construye sobre musgo de roble.
+
+Y cada familia tiene **dos valores, uno por tema**. No es capricho: un solo
+color no puede tener contraste suficiente contra un fondo casi negro *y* contra
+blanco; es física, no gusto. El tono es la identidad de la familia y se mantiene;
+lo que cambia es la luz, que es lo que la hace visible. Los valores se
+calcularon buscando la luminosidad mínima que alcanza el objetivo de contraste
+en cada fondo, no eligiéndolos a ojo.
+
+### Cómo se verifica
+
+Nueve pruebas nuevas, y ninguna opina sobre si se ve lindo. Verifican lo que sí
+es verificable: que el tema salga del sistema, que el ajuste le gane al sistema,
+que sobreviva al reinicio, que cambie en caliente, que los puntos de familia
+salgan del tema y no de un hex escrito a mano, y —la que más vale— **que el
+contraste del texto pase 4.5 en los dos temas, medido sobre lo que el navegador
+realmente pintó**, no sobre los valores escritos en la hoja de estilos, que es
+donde uno se engaña solo.
+
+El candado viejo de "ningún color fuera de los tokens" se actualizó: los tokens
+ya no son un bloque sino tres, así que ahora saca todos los que arrancan en
+`:root` y revisa el resto.
+
 ## El sistema de diseño
 
 No usa Material, Carbon ni Polaris. Los tres son librerías de React o web
