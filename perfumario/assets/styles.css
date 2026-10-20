@@ -18,8 +18,13 @@
   --sp-0:2px;  --sp-1:4px;  --sp-2:6px;  --sp-3:8px;   --sp-4:10px;
   --sp-5:12px; --sp-6:14px; --sp-7:16px; --sp-8:24px;  --sp-9:32px;
 
-  --t-0:10px;  --t-1:11px;  --t-2:12px;  --t-3:13px;  --t-4:15px;
-  --t-5:17px;  --t-6:20px;  --t-7:26px;
+  /* En rem y no en px: un tamaño en px ignora el ajuste de texto del sistema,
+     y quien lo tiene subido no ve ninguna diferencia. Con la raíz en los 16px
+     de siempre estos valores dan exactamente los mismos píxeles que antes
+     —10, 11, 12, 13, 15, 17, 20, 26— así que el cambio es invisible salvo
+     para quien lo necesita. */
+  --t-0:0.625rem;  --t-1:0.6875rem; --t-2:0.75rem;   --t-3:0.8125rem;
+  --t-4:0.9375rem; --t-5:1.0625rem; --t-6:1.25rem;   --t-7:1.625rem;
 
   --r-sm:9px;  --r-md:12px; --r-lg:16px; --r-xl:20px; --r-pill:999px;
 
@@ -173,10 +178,18 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em;colo
 @keyframes entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* quien pide menos movimiento no ve nada de esto */
+/* Quien pide menos movimiento no ve nada de esto. Antes se apagaban tres
+   animaciones por nombre, y cada vez que se agregaba una —el chevron que
+   gira, el panel que sube— quedaba afuera de la lista. Apagar todo de una vez
+   no se olvida de ninguna. */
 @media (prefers-reduced-motion:reduce){
+  *, *::before, *::after{
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+    scroll-behavior:auto !important;
+  }
   #splash{display:none}
-  #respuesta .hero{animation:none}
-  .view.active{animation:none}
 }
 
 /* ------------------------------ layout ----------------------------- */
@@ -248,7 +261,7 @@ main{flex:1;padding:var(--sp-5) var(--sp-7) calc(env(safe-area-inset-bottom) + 8
 .btn-row .btn{flex:1;min-width:130px}
 .icon-btn{
   background:var(--card-2);border:0;color:var(--txt);
-  width:38px;height:38px;border-radius:var(--r-md);cursor:pointer;flex:none;font-size:var(--t-4);
+  width:44px;height:44px;border-radius:var(--r-md);cursor:pointer;flex:none;font-size:var(--t-4);
 }
 
 .toolbar{display:flex;gap:var(--sp-3);margin-bottom:var(--sp-4);align-items:end}
@@ -266,10 +279,13 @@ main{flex:1;padding:var(--sp-5) var(--sp-7) calc(env(safe-area-inset-bottom) + 8
 }
 .field textarea{min-height:74px;resize:vertical}
 .field.mini{margin:0}
-.field.mini select{padding:var(--sp-3) var(--sp-4);font-size:var(--t-3)}
+.field.mini select{padding:var(--sp-3) var(--sp-4);font-size:var(--t-3);min-height:44px}
 .field-row{display:flex;gap:var(--sp-4)}
 .field-row>*{flex:1;min-width:0}
-.check{display:flex;align-items:center;gap:var(--sp-3);font-size:var(--t-3);color:var(--muted)}
+/* La cajita mide 17px y agrandarla se veria mal, pero el toque entra por la
+   etiqueta entera: es ella la que tiene que llegar a 44. */
+.check{display:flex;align-items:center;gap:var(--sp-3);font-size:var(--t-3);color:var(--muted);
+  min-height:44px;cursor:pointer}
 .check input{width:17px;height:17px;accent-color:var(--accent)}
 
 .clima{
@@ -297,7 +313,14 @@ button.item{width:100%;text-align:left;cursor:pointer;font:inherit}
 .chips{display:flex;flex-wrap:wrap;gap:var(--sp-3)}
 .chips.scroll-x{flex-wrap:nowrap;overflow-x:auto;padding-bottom:var(--sp-2);margin-bottom:var(--sp-3);-webkit-overflow-scrolling:touch}
 .chips.scroll-x::-webkit-scrollbar{display:none}
+/* 44px de alto. Median 35 -y los secundarios 31- y son el control que mas se
+   toca de toda la app: el selector de ocasion en Hoy y los filtros de familia
+   en Coleccion. Apple pide 44pt y esta app se usa con una mano y caminando,
+   asi que el argumento no es el cumplimiento sino el pulgar. El texto no
+   crecio: crecieron el alto y el area que recibe el toque. */
 .chip{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-height:44px;
   background:var(--card-2);border:0;color:var(--muted);
   border-radius:var(--r-pill);padding:var(--sp-3) var(--sp-5);font-size:var(--t-3);cursor:pointer;white-space:nowrap;flex:none;
 }
@@ -534,7 +557,7 @@ details[open]>summary .chev{transform:rotate(-135deg);margin:4px 3px 0 0}
 .ciego-elegir{margin-top:var(--sp-3);text-align:center;background:var(--accent);
   color:var(--accent-ink);border-radius:var(--r-pill);padding:var(--sp-3);
   font-size:var(--t-2);font-weight:600}
-.chip-sec{font-size:var(--t-3);padding:var(--sp-2) var(--sp-5);opacity:.75}
+.chip-sec{font-size:var(--t-3);padding:var(--sp-2) var(--sp-5);opacity:.75;min-height:44px}
 .chip-sec.on{opacity:1}
 
 .ident-crudo pre{

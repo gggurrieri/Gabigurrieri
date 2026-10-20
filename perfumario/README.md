@@ -841,6 +841,60 @@ entra en los parecidos ni en el perfil.
 
 Opcional, separado con barras: `Nombre | ml | precio`.
 
+## La auditoría de ui-ux-pro-max
+
+El skill `ui-ux-pro-max` (en `.claude/skills/`) trae una lista de pre-entrega
+canónica para UI de app. Se corrió **midiendo**, sobre las cuatro vistas, los
+dos temas, a 375px y en horizontal.
+
+### Lo que la medición corrigió primero fue la medición
+
+La primera pasada denunció **8 fallas de contraste** y 2 controles sin nombre.
+Ninguna era real:
+
+- El contraste salía de leer `rgba(201,164,232,.09)` como si fuera opaco. Un
+  color con alfa **no es el color que se ve**: hay que componerlo sobre lo que
+  tiene debajo. Es exactamente lo que la lista pide —*"measure the composed
+  result"*— y yo lo estaba incumpliendo en la herramienta con la que iba a
+  juzgar la app.
+- Los "controles sin nombre" salían de usar `innerText`, que devuelve vacío
+  para lo que no está renderizado —como el contenido de un `<details>`
+  cerrado—. Con `textContent` el nombre está.
+
+Con la sonda arreglada: **contraste 0 fallas, nombres 0 fallas**. El trabajo de
+temas se sostuvo.
+
+### Lo que sí había
+
+**27 objetivos táctiles por debajo de 44×44.** Los chips medían 35px de alto y
+los secundarios 31 — y son el control que más se toca de toda la app: el
+selector de ocasión en Hoy y los filtros de familia en Colección. Ahora todos
+llegan a 44. El texto no creció; crecieron el alto y el área que recibe el
+dedo. La casilla de "ocultar vacíos" mide 17px y agrandarla se vería mal, así
+que el objetivo pasó a ser su etiqueta entera.
+
+**4 iconos decorativos visibles para el lector de pantalla**: el punto de
+familia, el chevron, los rellenos de las barras. Ahora llevan `aria-hidden`.
+
+**Los tamaños de letra estaban en `px`**, así que ignoraban el ajuste de texto
+del sistema: quien lo tiene subido no veía ninguna diferencia. Pasaron a `rem`.
+Con la raíz en los 16px de siempre dan **exactamente los mismos píxeles**
+—10, 11, 12, 13, 15, 17, 20, 26—, así que el cambio es invisible salvo para
+quien lo necesita. Verificado: con la raíz en 22px el cuerpo pasa de 15 a 21px
+y nada se sale de la pantalla.
+
+**El bloque de movimiento reducido apagaba tres animaciones por nombre**, y
+cada vez que se agregaba una —el chevron que gira, el panel que sube— quedaba
+afuera de la lista. Ahora apaga todo de una vez. Y el `scrollIntoView` con
+`behavior:'smooth'` **no lo apaga ninguna consulta de medios**: hay que
+preguntarlo a mano, y ahora se pregunta.
+
+### Nueve pruebas nuevas
+
+Todos los puntos medibles de la lista quedaron fijados en la suite, corridos
+sobre las cuatro vistas y los dos temas: lo que se verifica una vez a mano se
+degrada solo.
+
 ## Que los datos sobrevivan
 
 Todo vive en `localStorage`, y eso tiene tres enemigos distintos. Conviene

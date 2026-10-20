@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-18.2';
+const VERSION = '2026-10-20.1';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -422,6 +422,17 @@ if (window.matchMedia) {
   if (consulta.addEventListener) consulta.addEventListener('change', alCambiar);
   else if (consulta.addListener) consulta.addListener(alCambiar);
 }
+
+/* El scroll suave pedido desde JavaScript no lo apaga la consulta de medios:
+   `behavior:'smooth'` se respeta igual aunque el sistema pida menos
+   movimiento. Hay que preguntarlo a mano. */
+const menosMovimiento = () =>
+  !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+const irHasta = (el, bloque) => {
+  if (!el || !el.scrollIntoView) return;
+  el.scrollIntoView({ block: bloque || 'nearest',
+                      behavior: menosMovimiento() ? 'auto' : 'smooth' });
+};
 
 function ir(v) {
   vistaActual = v;
@@ -2156,7 +2167,7 @@ function ico(nombre, clase) {
    más luz sobre fondo oscuro que sobre papel. El hex de datos.js queda como
    respaldo por si aparece una familia sin variable definida. */
 const colorFamilia = f => `var(--fam-${f.id || 'nada'}, ${f.color})`;
-const punto = f => `<i class="punto" style="background:${colorFamilia(f)}"></i>`;
+const punto = f => `<i class="punto" aria-hidden="true" style="background:${colorFamilia(f)}"></i>`;
 
 /* --------------------------- miniatura ------------------------------
    Cada perfume muestra un frasco. El que viene de fábrica está dibujado acá,
@@ -2285,7 +2296,7 @@ function fichaLista(p) {
         <span class="pill">${ult ? fmtHace(ult) : 'sin estrenar'}</span>
         ${cpu != null ? `<span class="pill">${S.ajustes.moneda}${Math.round(cpu).toLocaleString('es-AR')}/uso</span>` : ''}
       </div>
-      ${p.ml > 0 ? `<div class="pf-bar"><i style="width:${pct}%"></i></div>` : ''}
+      ${p.ml > 0 ? `<div class="pf-bar"><i aria-hidden="true" style="width:${pct}%"></i></div>` : ''}
     </div>
     <div class="pf-right">
       <div class="stars">${estrellas(p.rating)}</div>
@@ -2427,7 +2438,7 @@ function bloqueMezclas(p) {
          llega a estar buena. La mejor es ${esc(todas[0].p.nombre)} y aun así
          ${esc(todas[0].razones[0])}.</p>`}
     ${no.length ? `<details class="mezcla-no">
-      <summary>${no.length === 1 ? 'La otra' : `Las otras ${no.length}`}<i class="chev"></i></summary>
+      <summary>${no.length === 1 ? 'La otra' : `Las otras ${no.length}`}<i class="chev" aria-hidden="true"></i></summary>
       <div class="stack-sm">${no.map(fila).join('')}</div>
     </details>` : ''}
     <p class="hint">Probalo primero en la muñeca, con una aplicación de cada uno.</p>
@@ -3210,7 +3221,7 @@ function renderNotas() {
     const f = familia(n.f);
     const mios = S.perfumes.filter(p => notasDe(p).some(x => x.toLowerCase() === n.n.toLowerCase()));
     return `<article class="nota-item">
-      <h3><i class="fam-dot" style="background:${colorFamilia(f)}"></i>${esc(n.n)}
+      <h3><i class="fam-dot" aria-hidden="true" style="background:${colorFamilia(f)}"></i>${esc(n.n)}
         <span style="font-weight:400;color:var(--muted);font-size:12px">${esc(f.nombre)}</span></h3>
       <p>${esc(n.d)}</p>
       ${mios.length ? `<div class="mios">En tu colección: ${mios.map(p => esc(p.nombre)).join(' · ')}</div>` : ''}
@@ -3411,12 +3422,12 @@ function compraContraUso() {
       <div class="par-lbl">${punto(x.f)}${esc(x.f.nombre)}</div>
       <div class="par-dif${dif > 0 ? ' mas' : dif < 0 ? ' menos' : ''}">${dif > 0 ? '+' : ''}${dif}</div>
       <div class="par-barras">
-        <div class="par-barra"><i style="width:${clamp(x.tengo, 1, 100)}%;background:var(--muted)"></i></div>
-        <div class="par-barra"><i style="width:${clamp(x.uso, 1, 100)}%;background:${colorFamilia(x.f)}"></i></div>
+        <div class="par-barra"><i aria-hidden="true" style="width:${clamp(x.tengo, 1, 100)}%;background:var(--muted)"></i></div>
+        <div class="par-barra"><i aria-hidden="true" style="width:${clamp(x.uso, 1, 100)}%;background:${colorFamilia(x.f)}"></i></div>
       </div>
     </div>`;
   }).join('') +
-  '<p class="hint par-ref"><i class="ref ref-tengo"></i> lo que tenés &nbsp; <i class="ref ref-uso"></i> lo que usás</p>';
+  '<p class="hint par-ref"><i class="ref ref-tengo" aria-hidden="true"></i> lo que tenés &nbsp; <i class="ref ref-uso" aria-hidden="true"></i> lo que usás</p>';
 }
 
 /* `marca` es el único trozo de HTML que entra sin escapar, y lo arma la app
@@ -3425,7 +3436,7 @@ function compraContraUso() {
 function barra(lbl, val, pct, color, marca) {
   return `<div class="bar-row">
     <div class="bar-lbl">${marca || ''}${esc(lbl)}</div><div class="bar-val">${esc(val)}</div>
-    <div class="bar-track"><i style="width:${clamp(pct, 2, 100)}%${color ? `;background:${color}` : ''}"></i></div>
+    <div class="bar-track"><i aria-hidden="true" style="width:${clamp(pct, 2, 100)}%${color ? `;background:${color}` : ''}"></i></div>
   </div>`;
 }
 
@@ -3883,7 +3894,7 @@ function conectar() {
     if (!e.target.closest('#btnAjustarContexto')) return;
     const card = $('#cardContexto');
     card.hidden = !card.hidden;
-    if (!card.hidden) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (!card.hidden) irHasta(card, 'nearest');
   });
   $('#btnViaje').addEventListener('click', abrirViaje);
 
@@ -4012,7 +4023,7 @@ function conectar() {
       comparando.b = rival ? rival.x.id : null;
       cerrarModal(); ir('notas');
       const card = $('#cardComparar');
-      if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      irHasta(card, 'start');
       return;
     }
 
@@ -4097,7 +4108,7 @@ function conectar() {
     if (mez) {
       abrirFicha(mez.dataset.mezcla);
       const b = $('#bloqueMezclar');
-      if (b) b.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      irHasta(b, 'start');
       return;
     }
 

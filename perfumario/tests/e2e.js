@@ -2101,7 +2101,7 @@ const check = (n, c, d = '') => {
     .map(e => ({ q: e.className + ' ' + e.textContent.trim().slice(0, 14),
                  alto: Math.round(e.getBoundingClientRect().height) }))
     .filter(x => x.alto < 24));
-  check('nada de lo que se toca baja del mínimo de WCAG (24px)',
+  check('nada de lo que se toca baja del mínimo de WCAG (24px) [AI lo sube a 44]',
     chicos.length === 0, chicos.map(x => `${x.q} ${x.alto}px`).join(' · '));
   const alturas = await p.evaluate(() => {
     const l = document.querySelector('#btnAjustarContexto');
@@ -2111,6 +2111,160 @@ const check = (n, c, d = '') => {
   });
   check('los botones principales llegan a los 44px recomendados',
     alturas.btn >= 44 && alturas.link >= 44, JSON.stringify(alturas));
+
+  console.log('\nAI · La lista de pre-entrega de ui-ux-pro-max');
+  /* El skill ui-ux-pro-max trae una lista canónica para UI de app nativa.
+     Acá quedan fijados sus puntos medibles, corridos sobre las cuatro vistas
+     y los dos temas: lo que se verificó una vez a mano se degrada solo. */
+  await p.evaluate(() => { const m = document.querySelector('#modal'); if (m) m.hidden = true; });
+  await desdeCero();
+
+  const sondaUI = () => {
+    /* Un color con alfa NO es el color que se ve: hay que componerlo sobre lo
+       que tiene debajo, que es lo que la propia lista pide ("measure the
+       composed result"). Leerlo como opaco inventa fallas que no existen. */
+    const trozos = x => (x.match(/[\d.]+/g) || [0, 0, 0, 1]).map(Number);
+    const rgba = x => { const q = trozos(x);
+      return [q[0] / 255, q[1] / 255, q[2] / 255, q.length > 3 ? q[3] : 1]; };
+    const encima = (f, atras) => f.slice(0, 3).map((v, i) => v * f[3] + atras[i] * (1 - f[3]));
+    const luz = c => { const g = v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+      const [r, gg, b] = c.map(g); return 0.2126 * r + 0.7152 * gg + 0.0722 * b; };
+    const razon = (a, b) => { const la = luz(a), lb = luz(b);
+      return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05); };
+    const fondoReal = el => {
+      const capas = [];
+      for (let e = el; e; e = e.parentElement) {
+        const c = rgba(getComputedStyle(e).backgroundColor);
+        if (c[3] === 0) continue;
+        capas.push(c);
+        if (c[3] === 1) break;
+      }
+      if (!capas.length || capas[capas.length - 1][3] < 1)
+        capas.push(rgba(getComputedStyle(document.body).backgroundColor));
+      let base = capas.pop().slice(0, 3);
+      while (capas.length) base = encima(capas.pop(), base);
+      return base;
+    };
+    const seVe = e => { const c = e.getBoundingClientRect();
+      return c.width > 0 && c.height > 0 && getComputedStyle(e).visibility !== 'hidden'; };
+    const quien = e => e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') +
+      (typeof e.className === 'string' && e.className.trim()
+        ? '.' + e.className.trim().split(/\s+/).slice(0, 2).join('.') : '');
+
+    const sal = { toque: [], anonimos: [], decorativos: [], contraste: [] };
+
+    document.querySelectorAll('button, a, [role="button"], input, select, summary').forEach(e => {
+      if (!seVe(e)) return;
+      // una casilla chica adentro de una etiqueta se toca por la etiqueta
+      const caja = (e.closest('label') || e).getBoundingClientRect();
+      if (caja.height < 43.5 || caja.width < 43.5)
+        sal.toque.push(quien(e) + ' ' + Math.round(caja.width) + 'x' + Math.round(caja.height));
+    });
+
+    document.querySelectorAll('button, [role="button"]').forEach(e => {
+      if (!seVe(e)) return;
+      if (!(e.textContent || '').trim() && !e.getAttribute('aria-label') && !e.getAttribute('title'))
+        sal.anonimos.push(quien(e));
+    });
+
+    document.querySelectorAll('svg, i').forEach(e => {
+      if (!seVe(e)) return;
+      if (e.getAttribute('aria-hidden') === 'true') return;
+      if (e.getAttribute('role') === 'img' && e.getAttribute('aria-label')) return;
+      sal.decorativos.push(quien(e));
+    });
+
+    document.querySelectorAll('*').forEach(e => {
+      if (!seVe(e)) return;
+      const propio = Array.from(e.childNodes).filter(n => n.nodeType === 3 && n.textContent.trim().length > 1);
+      if (!propio.length) return;
+      const cs = getComputedStyle(e);
+      const px = parseFloat(cs.fontSize);
+      const grande = px >= 24 || (px >= 18.66 && +cs.fontWeight >= 700);
+      const fondo = fondoReal(e);
+      const c = razon(encima(rgba(cs.color), fondo), fondo);
+      if (c < (grande ? 3 : 4.5))
+        sal.contraste.push(quien(e) + ' ' + c.toFixed(2));
+    });
+    return sal;
+  };
+
+  const recorrerUI = async () => {
+    const junta = { toque: [], anonimos: [], decorativos: [], contraste: [] };
+    for (const v of ['hoy', 'coleccion', 'notas', 'uso']) {
+      await p.evaluate(x => {
+        const m = document.querySelector('#modal'); if (m) m.hidden = true;
+        document.querySelector(`.tab[data-view="${x}"]`).click();
+      }, v);
+      await p.waitForTimeout(400);
+      const r = await p.evaluate(sondaUI);
+      Object.keys(junta).forEach(k => r[k].forEach(x => {
+        if (junta[k].indexOf(x) < 0) junta[k].push(v + ': ' + x);
+      }));
+    }
+    return junta;
+  };
+
+  const uiOscuro = await recorrerUI();
+  check('nada de lo que se toca baja de 44x44, el mínimo de Apple',
+    uiOscuro.toque.length === 0, uiOscuro.toque.slice(0, 4).join(' | '));
+  check('ningún control queda sin nombre para el lector de pantalla',
+    uiOscuro.anonimos.length === 0, uiOscuro.anonimos.slice(0, 4).join(' | '));
+  check('los iconos decorativos están ocultos al lector de pantalla',
+    uiOscuro.decorativos.length === 0, uiOscuro.decorativos.slice(0, 4).join(' | '));
+  check('todo el texto pasa el contraste, con los fondos translúcidos compuestos',
+    uiOscuro.contraste.length === 0, uiOscuro.contraste.slice(0, 4).join(' | '));
+
+  await p.emulateMedia({ colorScheme: 'light' });
+  await p.reload(); await p.waitForTimeout(1200);
+  const uiClaro = await recorrerUI();
+  check('y lo mismo en tema claro, que nunca se hereda del oscuro',
+    uiClaro.toque.length === 0 && uiClaro.anonimos.length === 0 &&
+    uiClaro.decorativos.length === 0 && uiClaro.contraste.length === 0,
+    [uiClaro.toque[0], uiClaro.contraste[0]].filter(Boolean).join(' | '));
+  await p.emulateMedia({ colorScheme: 'dark' });
+
+  /* Dynamic Type: un tamaño en px ignora el ajuste de texto del sistema. */
+  await ir('hoy'); await p.waitForTimeout(300);
+  const escalaUI = await p.evaluate(() => {
+    const leer = () => ({
+      cuerpo: Math.round(parseFloat(getComputedStyle(document.querySelector('.hero-texto')).fontSize)),
+      desborde: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+      fuera: Array.from(document.querySelectorAll('#view-hoy *')).filter(e => {
+        const c = e.getBoundingClientRect();
+        if (!(c.width > 0 && c.right > window.innerWidth + 1)) return false;
+        // lo que está dentro de un carrusel horizontal se sale a propósito
+        for (let a = e.parentElement; a; a = a.parentElement) {
+          const ov = getComputedStyle(a).overflowX;
+          if (ov === 'auto' || ov === 'scroll') return false;
+        }
+        return true;
+      }).length
+    });
+    const antes = leer();
+    document.documentElement.style.fontSize = '22px';
+    const despuesG = leer();
+    document.documentElement.style.fontSize = '';
+    return { antes, despuesG };
+  });
+  check('el texto acompaña el ajuste de tamaño del sistema',
+    escalaUI.despuesG.cuerpo > escalaUI.antes.cuerpo,
+    `${escalaUI.antes.cuerpo}px → ${escalaUI.despuesG.cuerpo}px`);
+  check('y con el texto agrandado nada se sale de la pantalla',
+    escalaUI.despuesG.desborde === 0 && escalaUI.despuesG.fuera === 0,
+    JSON.stringify(escalaUI.despuesG));
+
+  /* Movimiento reducido: apagarlo por nombre se olvida de lo que se agrega
+     después, así que lo que se verifica es que no quede NADA con duración. */
+  const cssUI = require('fs').readFileSync(
+    path.resolve(__dirname, '..', 'assets', 'styles.css'), 'utf8');
+  check('el bloque de movimiento reducido apaga todo, no una lista de nombres',
+    /prefers-reduced-motion[\s\S]{0,200}\*,\s*\*::before/.test(cssUI));
+  check('y el scroll suave pedido desde JavaScript también lo respeta',
+    !/scrollIntoView\(\s*\{[^}]*behavior:\s*'smooth'/.test(
+      require('fs').readFileSync(path.resolve(__dirname, '..', 'assets', 'app.js'), 'utf8')));
+
+  await desdeCero();
 
   console.log('\nAH · El archivo de pruebas, revisado por sí mismo');
   /* Cinco veces en este proyecto una sección nueva eligió un nombre de
