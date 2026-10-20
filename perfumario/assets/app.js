@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-20.1';
+const VERSION = '2026-10-20.2';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -1296,7 +1296,7 @@ function fichaPrincipal(s, alternativa, c) {
     <div class="hero-pie">
       <button class="btn btn-accent" data-usar="${p.id}">Me lo pongo</button>
       <div class="hero-dato">
-        <div><b style="color:var(--accent)">${s.score}</b> de puntaje</div>
+        <div><b style="color:var(--accent-txt)">${s.score}</b> de puntaje</div>
         ${p.ml > 0 ? `<div>${pct} % del frasco</div>` : ''}
       </div>
     </div>
@@ -3535,11 +3535,14 @@ function renderUso() {
   const cpuProm = conCosto.length ? conCosto.reduce((a, b) => a + b, 0) / conCosto.length : null;
 
   $('#kpisUso').innerHTML = [
+    /* El orden lo manda la grilla: dos cifras cortas comparten fila y el
+       nombre del más puesto, que es texto largo, va solo. Antes quedaba
+       apretado en media columna y se cortaba. */
     ['Usos este mes', delMes.length],
     ['ml gastados', ml ? ml.toFixed(1) : '0'],
-    ['El más puesto', ranking.length ? ranking[0].p.nombre : '—'],
-    ['Costo por uso', cpuProm != null ? S.ajustes.moneda + Math.round(cpuProm).toLocaleString('es-AR') : '—']
-  ].map(([t, v]) => `<div class="kpi"><b style="${String(v).length > 9 ? 'font-size:14px' : ''}">${esc(String(v))}</b><span>${t}</span></div>`).join('');
+    ['Costo por uso', cpuProm != null ? S.ajustes.moneda + Math.round(cpuProm).toLocaleString('es-AR') : '—'],
+    ['El más puesto', ranking.length ? ranking[0].p.nombre : '—']
+  ].map(([t, v]) => `<div class="kpi"><b>${esc(String(v))}</b><span>${t}</span></div>`).join('');
 
   const totalR = ranking.reduce((a, x) => a + x.c, 0);
   $('#rotacionSub').textContent = ranking.length

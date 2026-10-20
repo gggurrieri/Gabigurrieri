@@ -841,6 +841,85 @@ entra en los parecidos ni en el perfil.
 
 Opcional, separado con barras: `Nombre | ml | precio`.
 
+## El rediseño: un instrumento, no una perfumería
+
+La app se describe a sí misma como *"te muestro la cuenta"*. El lenguaje
+visual ahora sigue esa idea, y de ahí salen las decisiones; no son gusto.
+
+La dirección se buscó con `ui-ux-pro-max --design-system`. **La primera
+consulta vino mal encaminada**: devolvió *Brutalismo* con "no smooth
+transitions (instant), sharp corners" y un patrón de landing page con hero,
+features y footer. El propio skill manda verificar el resultado antes de
+aplicarlo y reintentar una vez con una consulta más angosta. La segunda dio
+**"Vibrant & Block-based"** —bloques, geometría, alto contraste, duotono,
+movimiento de 200-300 ms—, que sí encaja. De ahí se tomó la dirección y se
+descartó lo que no servía: la tipografía manuscrita que proponía no es limpia,
+y las fuentes remotas no son una opción en una app que anda sin conexión.
+
+### Las tres reglas
+
+**1. Duotono.** El acento es un lima eléctrico (`#C8FF2E`) y el resto es tinta
+sobre papel. Se fue el violeta, y antes el dorado.
+
+**2. El color es un dato.** Los únicos elementos con tono propio son las once
+familias olfativas, porque ahí el color **significa** algo. Un acento de color
+compite con ellas — que es exactamente lo que pasaba con el dorado, que era
+casi el mismo tono que cuatro familias.
+
+De esa regla salió una corrección: el lima estaba también en las 25 barras de
+nivel de frasco y en las estrellas de puntuación. Ninguna de las dos es una
+recomendación de la app ni algo que se pueda tocar, así que pasaron a neutro.
+**El lima marca lo que la app recomienda o lo que podés tocar, y nada más.**
+
+**3. Los números son el producto.** Puntajes, grados, horas y porcentajes van
+en monoespaciada con cifras de ancho fijo: no bailan al cambiar y se leen como
+la lectura de un aparato.
+
+### Lo que cambió de forma
+
+- **Los radios se cortaron casi a la mitad** (16px → 10px). El redondeo blando
+  era lo que más hacía ver la app como cualquier otra. Lo único redondo que
+  queda son los chips: el contraste entre módulos nítidos y chips de pastilla
+  es lo que ordena la pantalla.
+- **La serif se fue.** Los títulos son la misma sans del sistema, apretada
+  (`-.03em`) y en 700. Cambia el carácter entero sin pedir una fuente por la
+  red.
+- **Los módulos se ven**: borde fino en lugar de tarjetas que flotan sobre el
+  fondo. Es lo que el skill llama *visible grid*.
+- **Bento en los números de Uso.** Cuatro cifras del mismo tamaño se leen como
+  una planilla: no se sabe cuál mirar primero. Ahora la grilla tiene seis
+  columnas y cada módulo toma las que necesita — los usos del mes a todo lo
+  ancho, dos cifras cortas compartiendo fila, y el nombre del más puesto solo,
+  porque es texto y antes se cortaba en media columna.
+
+### El movimiento
+
+Hay **un tiempo por tipo de gesto**, no uno solo copiado a todo: `--vel-toque`
+90 ms para la respuesta al dedo, `--vel-cambio` 200 ms para un cambio de
+estado, `--vel-panel` 320 ms para algo que se despliega.
+
+- Los módulos de cada vista **entran en cascada**, 40 ms de diferencia entre
+  uno y otro. El ojo los lee en orden y entiende la jerarquía sin leer nada.
+  Seis pasos alcanzan: del séptimo en adelante ya no se percibe el retraso y
+  sólo se siente lentitud.
+- Los chips responden al toque encogiéndose, y **el encendido no es el mismo
+  chip en otro color**: cambia relleno, peso y borde. Si la diferencia fuera
+  sólo el tono, quien no distingue ese tono no vería cuál eligió.
+- El foco de teclado se ve. Sacarlo es el error de accesibilidad más repetido
+  que existe.
+
+Todo esto lo apaga el bloque de movimiento reducido, que desde la auditoría
+anterior apaga **todo** en vez de una lista de nombres — y por eso cubrió
+estas animaciones nuevas sin tocarlo.
+
+### Qué se verificó
+
+Las 329 pruebas siguen pasando, y la auditoría del skill vuelve a dar **cero**
+en las cinco categorías: objetivos táctiles, nombres accesibles, iconos
+decorativos, contraste en los dos temas y scroll horizontal. El contraste se
+midió otra vez con los fondos translúcidos compuestos, que es la única forma
+de medirlo bien.
+
 ## La auditoría de ui-ux-pro-max
 
 El skill `ui-ux-pro-max` (en `.claude/skills/`) trae una lista de pre-entrega
