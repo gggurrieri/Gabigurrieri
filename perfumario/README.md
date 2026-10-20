@@ -62,6 +62,68 @@ que hay que contar qué hace. Las tres tarjetas distintivas ahora se ven siempre
 sin datos, dicen para qué sirven. Es el mismo problema de *discoverability* que
 tuvo el bloque de mezclas, aplicado como regla en vez de caso por caso.
 
+## El diseño: tres entradas del catálogo, no una
+
+El encargo fue "exclusividad, alto perfil, limpio, minimalista". Eso no existe
+como un estilo solo en el catálogo del skill `ui-ux-pro-max`, y conviene que
+quede escrito por qué:
+
+- **Exaggerated Minimalism** es el único estilo cuyo *Best For* dice
+  literalmente *"luxury brands"*. Su *Do Not Use For* dice *"dashboards,
+  forms, data-heavy, complex apps"*. Perfumario es las cuatro cosas.
+- **Minimalism & Swiss Style** sí sirve para apps y no está vetado para lujo,
+  pero su *Best For* es *"enterprise apps, dashboards"*: no aporta el lujo.
+
+Así que está compuesto, y cada pieza viene de una entrada distinta del dataset:
+
+| De dónde | Qué aporta | Textual del dataset |
+|---|---|---|
+| Minimalism & Swiss Style | La estructura | `--border-radius: 0px`, `--shadow: none`, `--accent-color: single primary only` |
+| Paleta *Luxury/Premium Brand* | El color | `#1C1917` tinta, `#FAFAF9` papel, `#A16207` oro |
+| Par tipográfico *Classic Elegant* | La voz | Playfair Display + sans del sistema |
+
+**Nada se redondea y nada flota.** Los seis tokens de radio siguen existiendo
+—medio centenar de reglas los nombran— pero todos valen `0`. Lo que separa un
+módulo del siguiente es una línea de un píxel y el aire alrededor. Es la razón
+por la que los pasos grandes de la escala de espacio crecieron
+(`--sp-8` 24→32, `--sp-9` 32→48): sin sombra ni radio, el aire es la única
+jerarquía que queda.
+
+**El oro aparece tres veces por pantalla** —el puntaje, la acción principal, el
+chip activo— y en ningún lado más. Un acento que está en todas partes no es un
+acento, es un fondo. A diferencia del lima anterior, el oro rinde igual de
+relleno que de texto en los dos temas (9,4 sobre el fondo oscuro; 6,0 sobre el
+papel), así que `--accent` y `--accent-txt` por fin valen lo mismo en oscuro.
+
+**Playfair solo para lo que tiene nombre propio**: el perfume en la
+recomendación, el título de la ficha, la marca. Todo lo demás —chips, etiquetas,
+ayudas, formularios— va en la sans del sistema, que es la que sabe de densidad.
+El par que el dataset propone para apps de lujo (*Minimalist Monochrome
+Editorial*: Playfair + Source Serif 4) pone serif también en el cuerpo, y en una
+pantalla con esta cantidad de texto de interfaz eso se lee cansado.
+
+La fuente **viaja dentro de la app** (`assets/fuentes/playfair-latin.woff2`,
+38 KB, variable, [SIL OFL 1.1](assets/fuentes/OFL.txt)) y está en la precarga del
+service worker. No se pide a Google Fonts: esta app tiene que abrir sin conexión,
+y dentro del envoltorio nativo no hay garantía de red en el arranque.
+
+Lo que **no** cambió, porque no era decoración: los números siguen en
+monoespaciada con cifras de ancho fijo (no bailan al cambiar), los tamaños
+siguen en `rem` (para que el ajuste de texto de iOS funcione) y las once
+familias olfativas conservan su color propio, porque ahí el color es un dato.
+Eso sí, bajadas de saturación a 0,62 para que sean pigmentos sobre papel y no
+semáforos; mantienen la separación de matiz que las distingue entre sí.
+
+### Los dos colores del dataset que hubo que corregir
+
+Las paletas del catálogo son paletas de marca, no pares verificados de
+texto-sobre-fondo. Dos no pasaban:
+
+- El oro `#A16207` **como texto** sobre el papel da 4,71 — pasa raspando. Para
+  el puntaje, que es lo más importante de la pantalla, se usa `#8A5406` (6,0).
+- El negro del tema oscuro: `#000000` puro con una didona encima vibra. El fondo
+  es `#0C0A09`, un negro cálido.
+
 ## Preguntarme cómo va
 
 En Ajustes, de 3 a 6 horas, **4 por defecto**: es donde empiezan a separarse los

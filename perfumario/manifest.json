@@ -4,8 +4,8 @@
   "description": "Tu colección de perfumes, qué ponerte hoy y un diccionario de notas olfativas.",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#121014",
-  "theme_color": "#121014",
+  "background_color": "#0C0A09",
+  "theme_color": "#0C0A09",
   "lang": "es",
   "icons": [
     {

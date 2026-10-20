@@ -8,11 +8,12 @@
    Ahora es al revés: primero la red, y la caché queda como respaldo para
    cuando no hay señal. Se pierde algo de velocidad en el arranque y se gana
    que lo que ves sea siempre lo último publicado.                          */
-const VERSION = '2026-10-20.2';
+const VERSION = '2026-10-21.1';
 const CACHE = 'perfumario-' + VERSION;
 const ASSETS = ['./', './index.html', './assets/styles.css', './assets/app.js',
   './assets/datos.js', './assets/coleccion.js', './assets/icon.svg',
-  './assets/icon-180.png', './assets/icon-512.png', './manifest.json'];
+  './assets/icon-180.png', './assets/icon-512.png', './manifest.json',
+  './assets/fuentes/playfair-latin.woff2'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

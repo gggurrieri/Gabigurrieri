@@ -11,7 +11,7 @@ const D = window.PERFUMARIO_DATOS;
 /* Sirve para saber, mirando el teléfono, qué versión se está ejecutando.
    Sin esto, "no me aparece el cambio" es imposible de distinguir de
    "el cambio no funciona". Se actualiza junto con la del service worker. */
-const VERSION = '2026-10-20.2';
+const VERSION = '2026-10-21.1';
 
 /* ------------------------------ utils ------------------------------ */
 const $  = (s, r) => (r || document).querySelector(s);
@@ -411,7 +411,7 @@ function aplicarTema() {
     : elegido;
   document.documentElement.dataset.tema = t;
   const m = $('#metaTema');
-  if (m) m.setAttribute('content', t === 'claro' ? '#FAF8FB' : '#121014');
+  if (m) m.setAttribute('content', t === 'claro' ? '#FAFAF9' : '#0C0A09');
 }
 
 /* Si está en "como el sistema", seguirlo también mientras la app está abierta:

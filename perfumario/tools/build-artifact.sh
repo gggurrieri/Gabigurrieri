@@ -12,6 +12,18 @@ import re, sys, pathlib
 out   = pathlib.Path(sys.argv[1])
 html  = pathlib.Path('index.html').read_text(encoding='utf-8')
 css   = pathlib.Path('assets/styles.css').read_text(encoding='utf-8')
+
+# La fuente va embebida como data: URI. En la app servida, el @font-face
+# apunta a un archivo al lado del CSS; acá no hay "al lado", así que sin
+# esto el Artifact cae a la serif del navegador y cambia de cara.
+fuente = pathlib.Path('assets/fuentes/playfair-latin.woff2')
+if fuente.exists():
+    import base64
+    b64 = base64.b64encode(fuente.read_bytes()).decode('ascii')
+    css = css.replace("url('fuentes/playfair-latin.woff2')",
+                      f"url(data:font/woff2;base64,{b64})")
+else:
+    raise SystemExit('falta assets/fuentes/playfair-latin.woff2')
 datos = pathlib.Path('assets/datos.js').read_text(encoding='utf-8')
 semilla_f = pathlib.Path('assets/coleccion.js')
 semilla = semilla_f.read_text(encoding='utf-8') if semilla_f.exists() else ''

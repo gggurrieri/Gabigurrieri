@@ -1,129 +1,167 @@
 /* =====================================================================
    Perfumario · hoja de estilos
-   Móvil primero, claro y oscuro, tipografía del sistema.
+   Móvil primero, claro y oscuro.
    ===================================================================== */
 /* =====================================================================
    Tokens.
 
-   La app se describe a sí misma como "te muestro la cuenta". El lenguaje
-   visual sigue esa idea: un instrumento de medición, no una perfumería.
-   De ahí salen las tres decisiones que lo definen todo.
+   El encargo es "exclusividad, alto perfil, limpio, minimalista". Eso no
+   existe como un estilo solo en el catálogo del skill: el único que dice
+   "luxury brands" en su Best For —Exaggerated Minimalism— se veta a sí
+   mismo para "dashboards, forms, data-heavy, complex apps", que es
+   exactamente lo que esta app es. Así que está compuesto de tres entradas
+   del dataset, y cada una aporta una cosa:
 
-   1. DUOTONO. El acento es un lima eléctrico y el resto es tinta sobre
-      papel. Nada más lleva color.
-   2. EL COLOR ES UN DATO. Los únicos elementos con tono propio son las once
-      familias olfativas, porque ahí el color SIGNIFICA algo. Si el acento
-      también fuera de color, competiría con ellas — que es exactamente lo
-      que pasaba con el dorado.
-   3. LOS NÚMEROS SON EL PRODUCTO. Puntajes, grados, horas y porcentajes van
-      en monoespaciada y con cifras de ancho fijo: no bailan al cambiar, y
-      se leen como la lectura de un aparato.
+   · ESTRUCTURA — Minimalism & Swiss Style. De ahí salen literalmente sus
+     variables: --border-radius: 0px, --shadow: none, --accent-color:
+     single primary only. Nada se redondea y nada flota. Lo que separa un
+     módulo de otro es una línea de un píxel y el aire alrededor.
+   · COLOR — la paleta "Luxury/Premium Brand": tinta casi negra sobre papel
+     hueso y UN oro. El oro aparece tres veces por pantalla —el puntaje, la
+     acción principal, el chip activo— y en ningún lado más. Un acento que
+     está en todas partes no es un acento, es un fondo.
+   · TIPOGRAFÍA — el par "Classic Elegant": Playfair Display para lo que
+     tiene nombre propio, la sans del sistema para todo lo demás. La fuente
+     viaja con la app (38 KB, licencia OFL) y no se pide por la red: esto
+     abre sin conexión.
+
+   Tres cosas se mantienen de la versión anterior porque no eran decoración:
+   los números van en monoespaciada con cifras de ancho fijo —no bailan al
+   cambiar y se leen como la lectura de un aparato—, los tamaños van en rem
+   para que el ajuste de texto de iOS funcione, y las once familias
+   olfativas conservan su color propio, porque ahí el color es un dato.
+   Eso sí: bajadas de saturación a 0,62 para que sean pigmentos sobre papel
+   y no semáforos. Mantienen la separación de matiz que las distingue.
    ===================================================================== */
+
+/* Playfair Display · SIL Open Font License 1.1 · ver assets/fuentes/OFL.txt
+   Es una fuente variable: un solo archivo cubre todo el eje de peso. */
+@font-face{
+  font-family:'Playfair Display';
+  font-style:normal;
+  font-weight:400 700;
+  font-display:swap;
+  src:url('fuentes/playfair-latin.woff2') format('woff2');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,
+    U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,
+    U+2212,U+2215,U+FEFF,U+FFFD;
+}
+
 :root{
-  /* Escalas de espacio. Los nombres son pasos, no medidas. */
+  /* Escalas de espacio. Los nombres son pasos, no medidas. Los pasos
+     grandes crecieron: el aire es la mitad del encargo. */
   --sp-0:2px;  --sp-1:4px;  --sp-2:6px;  --sp-3:8px;   --sp-4:10px;
-  --sp-5:12px; --sp-6:14px; --sp-7:16px; --sp-8:24px;  --sp-9:32px;
+  --sp-5:12px; --sp-6:16px; --sp-7:20px; --sp-8:32px;  --sp-9:48px;
 
   /* En rem y no en px: un tamaño en px ignora el ajuste de texto del
-     sistema. Con la raíz en 16px dan los mismos píxeles de siempre. */
+     sistema. Con la raíz en 16px dan píxeles redondos. */
   --t-0:0.625rem;  --t-1:0.6875rem; --t-2:0.75rem;   --t-3:0.8125rem;
-  --t-4:0.9375rem; --t-5:1.0625rem; --t-6:1.25rem;   --t-7:1.625rem;
+  --t-4:0.9375rem; --t-5:1.0625rem; --t-6:1.375rem;  --t-7:2rem;
 
-  /* Radios cortados casi a la mitad. El redondeo blando de antes era lo que
-     más hacía ver la app como cualquier otra: ahora los módulos son nítidos
-     y lo único redondo son los chips. El contraste entre las dos formas es
-     el que ordena la pantalla. */
-  --r-sm:3px;  --r-md:6px;  --r-lg:10px; --r-xl:14px; --r-pill:999px;
+  /* Cero. Los seis tokens siguen existiendo porque medio centenar de
+     reglas los nombran, pero ahora todos valen lo mismo: en Swiss no hay
+     esquina blanda, ni siquiera en los chips. La forma la da la línea. */
+  --r-sm:0;  --r-md:0;  --r-lg:0; --r-xl:0; --r-pill:0;
 
-  --radius:var(--r-lg);
-  --sp:var(--sp-6);
+  --radius:0;
+  --sp:var(--sp-7);
 
   --body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  /* La serif se fue. Los títulos son la misma sans del sistema, apretada y
-     pesada: cambia el carácter entero sin pedir una fuente por la red, que
-     en una app que anda sin conexión no es una opción. */
-  --display:var(--body);
+  /* La serif vuelve, pero solo para lo que tiene nombre propio: el perfume
+     en la recomendación, el título de la ficha, la marca. Es la diferencia
+     entre una etiqueta de frasco y una etiqueta de inventario. */
+  --display:'Playfair Display',ui-serif,Georgia,'Times New Roman',serif;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
 
-  /* Tiempos. Uno por tipo de gesto, no uno para todo. */
+  /* Tiempos. Uno por tipo de gesto, no uno para todo. El dataset de Swiss
+     pide 200-250ms para los cambios: ni instantáneo ni blando. */
   --vel-toque:90ms;
-  --vel-cambio:200ms;
+  --vel-cambio:220ms;
   --vel-panel:320ms;
   --curva:cubic-bezier(.2,.8,.2,1);
   --curva-salida:cubic-bezier(.4,0,1,1);
 }
 
-/* ---------------------------- tema oscuro --------------------------- */
+/* --------------------------- tema oscuro ---------------------------
+   No es el claro invertido: es una vitrina de noche. El fondo es un negro
+   cálido (#0C0A09, no #000000) porque el negro puro con una serif de alto
+   contraste encima vibra. */
 :root, :root[data-tema="oscuro"]{
   color-scheme:dark;
-  --bg:#09090B;
-  --bg-soft:#09090B;
-  --card:#131316;
-  --card-2:#1F1F25;
-  --line:#2E2E36;
-  --txt:#FAFAFA;
-  --muted:#A1A1AA;
-  --accent:#C8FF2E;
-  --accent-txt:#C8FF2E;
-  --accent-ink:#09090B;
-  --accent-dim:#5A7314;
-  --good:#4ADE80;
-  --danger:#FB7185;
+  --bg:#0C0A09;
+  --bg-soft:#0C0A09;
+  --card:#15120F;
+  --card-2:#1C1917;
+  --line:#332E29;
+  --txt:#FAFAF9;
+  --muted:#A8A29E;
+  /* El oro rinde igual de relleno que de texto en los dos temas —9,4 sobre
+     el fondo oscuro, 6,0 sobre el papel—, así que acá no hacen falta dos
+     valores distintos como con el lima, que era ilegible sobre blanco. */
+  --accent:#D4AF37;
+  --accent-txt:#D4AF37;
+  --accent-ink:#0C0A09;
+  --accent-dim:#6B5720;
+  --good:#8FD9A8;
+  --danger:#E8A0A8;
 
-  --fondo-barra:rgba(9,9,11,.84);
-  --fondo-velo:rgba(9,9,11,0);
-  --realce-sutil:rgba(200,255,46,.10);
-  --realce:rgba(200,255,46,.07);
-  --realce-fuerte:rgba(200,255,46,.18);
-  --linea-peligro:rgba(251,113,133,.35);
-  --velo-modal:rgba(0,0,0,.66);
-  --sombra-flotante:0 8px 24px rgba(0,0,0,.5);
+  --fondo-barra:rgba(12,10,9,.86);
+  --fondo-velo:rgba(12,10,9,0);
+  --realce-sutil:rgba(212,175,55,.10);
+  --realce:rgba(212,175,55,.06);
+  --realce-fuerte:rgba(212,175,55,.16);
+  --linea-peligro:rgba(232,160,168,.32);
+  --velo-modal:rgba(0,0,0,.72);
+  --sombra-flotante:0 10px 40px rgba(0,0,0,.6);
   --sombra-tarjeta:none;
-  /* El borde fino es la estructura: módulos que se ven, no tarjetas que
-     flotan. Es lo que el skill llama "visible grid". */
+  /* La línea fina ES la estructura. Sin sombras y sin radios, es lo único
+     que separa un módulo del siguiente. */
   --borde-modulo:1px solid var(--line);
 
-  --fam-cuero:#CE877E;     --fam-ambar:#D48754;      --fam-amaderada:#BB9068;
-  --fam-gourmand:#D09B39;  --fam-citrica:#DDB92C;    --fam-chipre:#9EB159;
-  --fam-verde:#61BF4A;     --fam-aromatica:#47C291;  --fam-acuatica:#41A2D2;
-  --fam-almizclada:#A292C4;--fam-floral:#DD78AB;     --fam-nada:#8A8396;
+  --fam-cuero:#BF938D;     --fam-ambar:#BC8C6C;      --fam-amaderada:#AB9178;
+  --fam-gourmand:#B39256;  --fam-citrica:#BBA54E;    --fam-chipre:#94A06A;
+  --fam-verde:#6EA960;     --fam-aromatica:#5EAB8C;  --fam-acuatica:#5D99B6;
+  --fam-almizclada:#A59CBB;--fam-floral:#CA8BAB;     --fam-nada:#8B8792;
 }
 
-/* ----------------------------- tema claro --------------------------- */
+/* ---------------------------- tema claro ----------------------------
+   Papel hueso, no blanco de pantalla: #FAFAF9 es el valor que trae la
+   paleta Luxury/Premium Brand del dataset. La tarjeta sí es blanca pura,
+   y esa diferencia de un punto es la que hace que se despegue sin sombra. */
 :root[data-tema="claro"]{
   color-scheme:light;
-  --bg:#F6F6F3;
-  --bg-soft:#F6F6F3;
+  --bg:#FAFAF9;
+  --bg-soft:#FAFAF9;
   --card:#FFFFFF;
-  --card-2:#EDEDE8;
-  --line:#DFDFD7;
-  --txt:#09090B;
-  --muted:#57575F;
-  /* El lima rinde como RELLENO en los dos temas —16.9 de contraste con la
-     tinta negra encima— pero como TEXTO sobre papel da 1.09 y es ilegible.
-     Por eso hay dos tokens: uno para rellenar y otro para escribir. */
-  --accent:#C8FF2E;
-  --accent-txt:#557303;
-  --accent-ink:#09090B;
-  --accent-dim:#A8C94A;
-  --good:#15803D;
-  --danger:#BE123C;
+  --card-2:#F2F1EF;
+  --line:#D6D3D1;
+  --txt:#0C0A09;
+  --muted:#57534E;
+  /* De relleno el oro del dataset (#A16207, 4,9 con blanco encima); de
+     texto, un paso más oscuro, porque 4,71 sobre papel pasa raspando y
+     el puntaje es lo más importante de la pantalla. */
+  --accent:#A16207;
+  --accent-txt:#8A5406;
+  --accent-ink:#FFFFFF;
+  --accent-dim:#C9A86B;
+  --good:#166534;
+  --danger:#9F1239;
 
-  --fondo-barra:rgba(246,246,243,.88);
-  --fondo-velo:rgba(246,246,243,0);
-  --realce-sutil:rgba(85,115,3,.09);
-  --realce:rgba(85,115,3,.06);
-  --realce-fuerte:rgba(200,255,46,.45);
-  --linea-peligro:rgba(190,18,60,.3);
-  --velo-modal:rgba(9,9,11,.42);
-  --sombra-flotante:0 8px 24px rgba(9,9,11,.14);
+  --fondo-barra:rgba(250,250,249,.90);
+  --fondo-velo:rgba(250,250,249,0);
+  --realce-sutil:rgba(138,84,6,.08);
+  --realce:rgba(138,84,6,.05);
+  --realce-fuerte:rgba(161,98,7,.16);
+  --linea-peligro:rgba(159,18,57,.28);
+  --velo-modal:rgba(12,10,9,.46);
+  --sombra-flotante:0 10px 40px rgba(12,10,9,.16);
   --sombra-tarjeta:none;
   --borde-modulo:1px solid var(--line);
 
-  --fam-cuero:#BC5A4E;     --fam-ambar:#CD7336;      --fam-amaderada:#B28053;
-  --fam-gourmand:#B2822A;  --fam-citrica:#A2871A;    --fam-chipre:#819245;
-  --fam-verde:#4A9B36;     --fam-aromatica:#339970;  --fam-acuatica:#2F94C6;
-  --fam-almizclada:#7760A9;--fam-floral:#CE3B85;     --fam-nada:#6B6478;
+  --fam-cuero:#A76A63;     --fam-ambar:#B07953;      --fam-amaderada:#A08165;
+  --fam-gourmand:#987A44;  --fam-citrica:#887734;    --fam-chipre:#798354;
+  --fam-verde:#568849;     --fam-aromatica:#46866C;  --fam-acuatica:#4C8AA9;
+  --fam-almizclada:#7C6E9B;--fam-floral:#B25785;     --fam-nada:#6C6874;
 }
 
 *{box-sizing:border-box}
@@ -170,7 +208,7 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em;colo
 .splash-frasco .vapor circle:nth-child(4){animation-delay:.48s}
 .splash-frasco .vapor circle:nth-child(5){animation-delay:.52s}
 .splash-nombre{
-  margin:0;font-family:var(--display);font-size:var(--t-6);font-weight:700;letter-spacing:-.03em;color:var(--txt);
+  margin:0;font-family:var(--display);font-size:var(--t-6);font-weight:600;letter-spacing:-.01em;color:var(--txt);
   opacity:0;animation:aparecer .4s ease .38s forwards;
 }
 @keyframes dibujar{to{stroke-dashoffset:0}}
@@ -228,7 +266,7 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em;colo
 }
 .brand{display:flex;align-items:center;gap:var(--sp-4);min-width:0}
 .logo-mark{width:38px;height:38px;border-radius:var(--r-md);flex:none}
-.brand h1{font-family:var(--display);font-size:var(--t-5);font-weight:700;letter-spacing:-.03em}
+.brand h1{font-family:var(--display);font-size:var(--t-5);font-weight:600;letter-spacing:-.005em}
 .brand p{margin:0;font-size:var(--t-2);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 main{flex:1;padding:var(--sp-5) var(--sp-7) calc(env(safe-area-inset-bottom) + 88px);max-width:720px;width:100%;margin:0 auto}
@@ -381,8 +419,11 @@ button.item{width:100%;text-align:left;cursor:pointer;font:inherit}
   box-shadow:var(--sombra-tarjeta);
 }
 .hero-eyebrow{font-size:var(--t-1);color:var(--muted);letter-spacing:.09em;text-transform:uppercase}
-.hero-name{font-family:var(--display);font-size:var(--t-7);line-height:1.02;letter-spacing:-.04em;
-  margin-top:var(--sp-2);font-weight:700}
+/* Playfair es una didona: el peso 700 y el tracking cerrado que le
+   quedaban bien a la sans del sistema acá cierran los finos y la
+   ensucian. 500 y casi sin tracking es como se compone una etiqueta. */
+.hero-name{font-family:var(--display);font-size:var(--t-7);line-height:1.08;letter-spacing:-.015em;
+  margin-top:var(--sp-3);font-weight:500}
 .hero-house{color:var(--muted);font-size:var(--t-3);margin-top:var(--sp-0)}
 .hero-texto{margin-top:var(--sp-7);font-size:var(--t-4);line-height:1.6}
 .hero-alt{margin-top:var(--sp-3);font-size:var(--t-3);line-height:1.5;color:var(--muted)}
@@ -569,7 +610,7 @@ details[open]>summary .chev{transform:rotate(-135deg);margin:4px 3px 0 0}
 
 /* el primer día: la pantalla que ve alguien que todavía no cargó nada */
 .arranque{padding:var(--sp-8) var(--sp-7)}
-.arranque h2{font-family:var(--display);font-size:var(--t-6);font-weight:700;
+.arranque h2{font-family:var(--display);font-size:var(--t-6);font-weight:600;
   text-transform:none;letter-spacing:-.03em;color:var(--txt);margin-bottom:var(--sp-4)}
 .arranque-txt{margin:0;font-size:var(--t-4);line-height:1.6;color:var(--muted)}
 .arranque-txt b{color:var(--txt);font-weight:500}
@@ -752,7 +793,7 @@ details[open]>summary .chev{transform:rotate(-135deg);margin:4px 3px 0 0}
   display:flex;align-items:center;justify-content:space-between;gap:var(--sp-4);
   padding:var(--sp-6) var(--sp-7);border-bottom:1px solid var(--line);
 }
-.sheet-head h2{font-family:var(--display);font-size:var(--t-5);font-weight:700;letter-spacing:-.03em}
+.sheet-head h2{font-family:var(--display);font-size:var(--t-5);font-weight:600;letter-spacing:-.005em}
 .sheet-body{padding:var(--sp-7);padding-bottom:calc(env(safe-area-inset-bottom) + 20px);overflow-y:auto;-webkit-overflow-scrolling:touch}
 
 .toast{

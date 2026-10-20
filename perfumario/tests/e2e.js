@@ -910,7 +910,7 @@ const check = (n, c, d = '') => {
   const archivo = await descarga;
   check('baja un .json con la fecha', !!archivo && /^perfumario-\d{4}-\d{2}-\d{2}\.json$/.test(archivo.suggestedFilename()),
     archivo ? archivo.suggestedFilename() : 'no bajó nada');
-  await p.tap('[data-close]'); await p.waitForTimeout(250);
+  await p.tap('.sheet-head [data-close]'); await p.waitForTimeout(250);
   await ir('hoy');   // el engranaje alterna: si quedamos en Ajustes, la sección que sigue lo cierra
 
   console.log('\nQ · Comparar dos');
@@ -970,7 +970,7 @@ const check = (n, c, d = '') => {
     try { return !!JSON.parse(document.querySelector('#modalText').value).perfumes; }
     catch (e) { return false; }
   }));
-  await p.tap('[data-close]'); await p.waitForTimeout(250);
+  await p.tap('.sheet-head [data-close]'); await p.waitForTimeout(250);
   /* Estas dos pruebas afirmaban lo contrario: que abrir el diálogo y cerrarlo
      ya contaba como copia. Estaban fijando un bug —la app se quedaba callada
      sin que existiera ninguna copia— y por eso una prueba que describe el
@@ -1083,7 +1083,7 @@ const check = (n, c, d = '') => {
       const st = JSON.parse(localStorage.getItem('perfumario_v1'));
       return !st.perfumes.find(y => y.id === id).foto;
     }, nivel[0]));
-  await p.tap('#modal [data-close]').catch(() => {});
+  await p.tap('#modal .sheet-head [data-close]').catch(() => {});
   await p.waitForTimeout(200);
 
   console.log('\nV · Al aire libre o adentro');
@@ -1530,7 +1530,7 @@ const check = (n, c, d = '') => {
   check('sin ajuste, el tema lo decide el sistema',
     (await p.evaluate(() => document.documentElement.dataset.tema)) === 'claro');
   check('y la barra del navegador acompaña',
-    (await p.evaluate(() => document.querySelector('#metaTema').content)) === '#FAF8FB');
+    (await p.evaluate(() => document.querySelector('#metaTema').content)) === '#FAFAF9');
 
   await p.emulateMedia({ colorScheme: 'dark' });
   await p.waitForTimeout(400);
@@ -2056,9 +2056,15 @@ const check = (n, c, d = '') => {
   /* candado: las escalas. Un tamaño de letra o un radio escrito en px es un
      valor que alguien eligió a ojo, y así se llega a tener 13px, 13.5px y 14px
      haciendo el mismo trabajo. */
-  const letras = (css.match(/font-size:\s*[0-9.]+px/g) || []);
+  /* Sobre el CSS SIN comentarios, como los dos candados de arriba. El día que
+     un comentario citó textualmente la variable del dataset —"--border-radius:
+     0px"— este candado la leyó como una regla y falló contra su propia
+     documentación. Un candado que se traba con la prosa está mirando el
+     archivo equivocado. */
+  const reglas = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const letras = (reglas.match(/font-size:\s*[0-9.]+px/g) || []);
   check('ningún tamaño de letra escrito en px', letras.length === 0, letras.join(', '));
-  const radios = (css.match(/border-radius:\s*[0-9]+px/g) || []);
+  const radios = (reglas.match(/border-radius:\s*[0-9]+px/g) || []);
   check('ningún radio escrito en px', radios.length === 0, radios.join(', '));
 
   /* candado: nada de emojis a color en la interfaz. Son ilustraciones ajenas,
