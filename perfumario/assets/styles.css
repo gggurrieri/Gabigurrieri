@@ -437,6 +437,35 @@ button.item{width:100%;text-align:left;cursor:pointer;font:inherit}
 .hero-dato{font-size:var(--t-2);color:var(--muted);text-align:right;line-height:1.3}
 .hero-dato b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:var(--t-4)}
 .linea b,.par-dif,.dia-clima,.medido,.pf-score-cap{font-variant-numeric:tabular-nums}
+/* La marca de quién escribió la recomendación. Es una línea de etiqueta,
+   no una tarjeta: tiene que leerse si la buscás y desaparecer si no. */
+.marca-ia{
+  margin:0 0 var(--sp-4);font-size:var(--t-1);color:var(--muted);
+  letter-spacing:.09em;text-transform:uppercase;line-height:1.4;
+}
+.marca-ia::before{
+  content:"";display:inline-block;width:5px;height:5px;margin-right:var(--sp-2);
+  vertical-align:middle;background:var(--accent);
+}
+.marca-ia.pensando{color:var(--accent-txt)}
+.marca-ia.pensando::before{animation:latir 1.1s ease-in-out infinite}
+@keyframes latir{0%,100%{opacity:.25}50%{opacity:1}}
+/* Un fallo de esta capa no es un error: la app contestó igual. Se escribe
+   en el gris de siempre, sin rojo y sin alarma. */
+.marca-ia.fallo{text-transform:none;letter-spacing:0;font-size:var(--t-2)}
+.marca-ia.fallo::before{background:var(--line)}
+
+/* Las razones de Claude, en la ficha, separadas de las de la app por una
+   línea y un título. La separación es el punto: una se puede auditar y la
+   otra no. */
+.porque-ia{margin-top:var(--sp-6);padding-top:var(--sp-5);border-top:1px solid var(--line)}
+.porque-ia h3{
+  font-size:var(--t-1);color:var(--muted);letter-spacing:.09em;
+  text-transform:uppercase;margin:0 0 var(--sp-4);font-weight:600;
+}
+.porque-ia .razones li{color:var(--muted)}
+.porque-ia .razones li b{color:var(--txt);font-weight:400}
+
 .empate{margin:0 0 var(--sp-5);font-size:var(--t-3);color:var(--muted);line-height:1.5}
 
 /* ---- la pregunta: contexto y chips, en un bloque propio ---- */

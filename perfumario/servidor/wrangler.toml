@@ -1,0 +1,31 @@
+# Cloudflare Worker: el único lugar donde vive la API key de Anthropic.
+#
+# La app es estática —GitHub Pages y el envoltorio de iOS— y en los dos casos
+# el JavaScript viaja al dispositivo. Una key ahí adentro se la lleva cualquiera
+# que abra las herramientas de desarrollo. Por eso existe este archivo.
+
+name = "perfumario-ia"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# El modelo. Cambiarlo acá y volver a desplegar es todo lo que hace falta.
+# claude-opus-5-5  → el mejor, ~US$ 0,011 por recomendación
+# claude-haiku-5-5 → ~US$ 0,0004 por recomendación (40 veces más barato)
+MODELO = "claude-opus-5-5"
+
+# Qué orígenes pueden llamar. Coma entre uno y otro, sin espacios.
+# "capacitor://localhost" es la app dentro del iPhone; sin eso el envoltorio
+# nativo recibe un CORS rechazado y nunca llega a preguntar.
+ORIGENES = "https://gggurrieri.github.io,capacitor://localhost,http://localhost:8000"
+
+# Cuántas consultas por dispositivo y por día. Es el freno de gasto.
+TOPE_DIARIO = "40"
+
+# El espacio donde se cuentan las consultas por dispositivo. Crealo con:
+#   npx wrangler kv namespace create LIMITES
+# y pegá acá el id que te devuelve.
+[[kv_namespaces]]
+binding = "LIMITES"
+id = "PEGAR_EL_ID_ACA"

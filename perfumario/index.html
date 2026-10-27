@@ -151,6 +151,10 @@
 
       </section>
 
+      <!-- Quién escribió lo que estás leyendo. Va afuera de #respuesta
+           porque esa caja se repinta entera cuando Claude contesta. -->
+      <p class="marca-ia" id="marcaIA" hidden></p>
+
       <div id="respuesta"></div>
 
       <!-- Las alternativas son alternativas: filas compactas, no tarjetas del
@@ -355,6 +359,32 @@
           <input type="checkbox" id="setAprender"> Aprender de mis elecciones
         </label>
         <p class="hint">Con esto prendido, las sugerencias se corrigen según lo que realmente usás en cada ocasión. Apagalo y vuelve a recomendar solo por las reglas fijas.</p>
+      </section>
+
+      <!-- Claude. Apagado de fábrica porque no alcanza con encenderlo: hace
+           falta un intermediario propio que guarde la clave. Ver el README
+           de perfumario/servidor/. -->
+      <section class="card">
+        <h2>Recomendar con Claude</h2>
+        <p class="sub">La app calcula sola y te contesta al instante. Con esto encendido,
+          además le pregunta a Claude, que puede reordenar las tres opciones y reescribir
+          el texto. Lo que ya estaba en pantalla no se borra: se reemplaza cuando contesta.</p>
+        <label class="check"><input type="checkbox" id="setIA"> Preguntarle a Claude</label>
+        <label class="field">
+          <span>Dirección de tu intermediario</span>
+          <input type="url" id="setIAUrl" inputmode="url" autocomplete="off"
+                 spellcheck="false" placeholder="https://perfumario-ia.tu-cuenta.workers.dev">
+        </label>
+        <p class="hint">Tiene que empezar con <code>https://</code>. La clave de Anthropic vive
+          ahí y nunca en la app: Perfumario se publica como archivos estáticos y se empaqueta
+          en un .ipa, así que todo su código está en el teléfono de quien la usa. Una clave
+          adentro es una clave pública.</p>
+        <p class="hint">Sin conexión, sin intermediario o con el tope diario agotado, la app
+          sigue recomendando sola. Esa es la respuesta completa; Claude es una capa encima.</p>
+        <div class="btn-row">
+          <button class="btn mini" id="btnProbarIA">Probar la conexión</button>
+        </div>
+        <p class="hint" id="avisoIA">—</p>
       </section>
 
       <!-- Cuándo preguntarte cómo va el perfume. Hoy define cuándo la app te lo

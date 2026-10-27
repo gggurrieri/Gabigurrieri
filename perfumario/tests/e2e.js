@@ -22,8 +22,19 @@ const check = (n, c, d = '') => {
   const errs = [];
   p.on('pageerror', e => errs.push(e.message));
   p.on('console', m => {
-    // net::ERR_FAILED es el corte de red que simula la prueba del clima, no un bug
-    if (m.type() === 'error' && !/net::ERR_FAILED/.test(m.text())) errs.push(m.text());
+    /* Dos ruidos que genera el propio recorrido, no la app:
+       - net::ERR_FAILED, el corte de red que simula la prueba del clima;
+       - los 4xx/5xx del intermediario de IA falso, que la sección AJ provoca
+         a propósito para ver que la app degrada bien.
+       El segundo filtro nombra el host inventado: un 429 de cualquier otro
+       lado sigue haciendo fallar la prueba. */
+    const t = m.text();
+    /* El texto del 429 no nombra el host —"Failed to load resource: …429"— así
+       que el origen hay que buscarlo en location(), que sí lo trae. Filtrar por
+       el texto dejaba pasar el ruido igual. */
+    const donde = (m.location() || {}).url || '';
+    const mio = /net::ERR_FAILED/.test(t) || /ia\.de-prueba\.test/.test(donde + ' ' + t);
+    if (m.type() === 'error' && !mio) errs.push(t + (donde ? ' @ ' + donde : ''));
   });
 
   await p.goto('file://' + path.resolve(__dirname, '..', 'index.html'));
@@ -2270,6 +2281,185 @@ const check = (n, c, d = '') => {
     !/scrollIntoView\(\s*\{[^}]*behavior:\s*'smooth'/.test(
       require('fs').readFileSync(path.resolve(__dirname, '..', 'assets', 'app.js'), 'utf8')));
 
+  await desdeCero();
+
+  console.log('\nAJ · Claude, de a dos con el motor local');
+  /* Lo que importa de esta capa no es que ande: es que cuando NO anda, no se
+     note. La app tiene que contestar igual, con su propio motor, y decir
+     quién escribió lo que estás leyendo. Casi todas las pruebas de acá son
+     de fracaso. */
+  const URL_IA = 'https://ia.de-prueba.test/recomendar';
+  const pedidosIA = [];
+
+  /* El intermediario, simulado. Devuelve el ÚLTIMO perfume de los candidatos
+     como elegido, que es justamente lo que el motor local no habría elegido:
+     así se ve si el reordenamiento llegó a la pantalla. */
+  await p.route(URL_IA, async ruta => {
+    const cuerpo = JSON.parse(ruta.request().postData() || '{}');
+    pedidosIA.push(cuerpo);
+    const ids = (cuerpo.candidatos || []).map(x => x.id);
+    await ruta.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({
+        elegido: ids[ids.length - 1],
+        orden: ids.slice().reverse(),
+        texto: 'Texto escrito por el modelo de prueba.',
+        porque: ['Una razón del modelo', 'Un pero del modelo'],
+        contraste: 'si querés algo con más fondo',
+        mezcla: null,
+        uso: { entrada: 10, salida: 5, cacheEscrito: 0, cacheLeido: 900 }
+      })
+    });
+  });
+
+  await desdeCero();
+
+  const estadoIA = () => p.evaluate(() => {
+    const m = document.querySelector('#marcaIA');
+    const h = document.querySelector('#respuesta .hero-name');
+    return {
+      marcaVisible: !!m && !m.hidden,
+      marca: m ? m.textContent.trim() : '',
+      clase: m ? m.className : '',
+      primero: h ? h.textContent.trim() : '',
+      texto: (document.querySelector('#respuesta .hero-texto') || { textContent: '' }).textContent.trim()
+    };
+  });
+
+  const primeroLocal = (await estadoIA()).primero;
+  check('de fábrica está apagada y no se ve ninguna marca',
+    !(await estadoIA()).marcaVisible && !!primeroLocal, primeroLocal);
+  check('y no se llamó a ningún servidor', pedidosIA.length === 0);
+
+  /* Encendida pero sin dirección: no es una configuración a medias que
+     intenta llamar a algo, es lo mismo que apagada. */
+  await p.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('perfumario_v1'));
+    d.ajustes.ia = true; d.ajustes.iaUrl = '';
+    localStorage.setItem('perfumario_v1', JSON.stringify(d));
+  });
+  await p.reload(); await p.waitForTimeout(900);
+  check('encendida sin dirección no llama a nada', pedidosIA.length === 0);
+  check('y sigue recomendando sola', (await estadoIA()).primero === primeroLocal);
+  /* Ajustes no es una pestaña: se abre con el engranaje, que alterna. */
+  await p.tap('#btnSettings'); await p.waitForTimeout(300);
+  check('Ajustes lo dice en vez de quedarse callado',
+    /falta la dirección/i.test(await p.textContent('#avisoIA')), await p.textContent('#avisoIA'));
+  await p.tap('#btnSettings'); await p.waitForTimeout(300);
+
+  /* Con dirección: la respuesta local se pinta primero y después la pisa
+     la del modelo. Las dos cosas se comprueban, en ese orden. */
+  await p.evaluate(u => {
+    const d = JSON.parse(localStorage.getItem('perfumario_v1'));
+    d.ajustes.ia = true; d.ajustes.iaUrl = u;
+    localStorage.setItem('perfumario_v1', JSON.stringify(d));
+  }, URL_IA);
+  await p.reload(); await p.waitForTimeout(1800);
+
+  const conIA = await estadoIA();
+  check('con la IA encendida se pide una recomendación', pedidosIA.length === 1);
+  check('la marca dice que lo escribió Claude',
+    conIA.marcaVisible && /Claude/.test(conIA.marca) && !/no contestó/.test(conIA.marca), conIA.marca);
+  check('el texto de la pantalla es el del modelo, no la plantilla',
+    /modelo de prueba/.test(conIA.texto), conIA.texto.slice(0, 60));
+  check('y el orden del modelo reemplaza al local',
+    conIA.primero !== primeroLocal, `local ${primeroLocal} · ia ${conIA.primero}`);
+
+  const env = pedidosIA[0];
+  check('viaja la colección entera, no solo el podio',
+    Array.isArray(env.coleccion) && env.coleccion.length === 25, String((env.coleccion || []).length));
+  check('viajan los puntajes del motor local como señal',
+    Array.isArray(env.candidatos) && env.candidatos.length === 3 &&
+    typeof env.candidatos[0].puntaje === 'number');
+  check('viaja un identificador de aparato al azar, no uno del usuario',
+    /^[0-9a-f]{24}$/.test(env.aparato || ''), env.aparato);
+  /* Candado: lo que no hace falta para decidir qué ponerse hoy no se manda.
+     El precio y la fecha de compra son datos de plata, no de perfume. */
+  const camposQueViajan = Object.keys(env.coleccion[0]).sort().join(',');
+  check('no viaja el precio ni la fecha de compra',
+    !/precio|comprado|foto/.test(camposQueViajan), camposQueViajan);
+
+  /* La caché: la misma pregunta no se paga dos veces. */
+  await p.reload(); await p.waitForTimeout(1600);
+  check('la misma pregunta no vuelve a salir a la red', pedidosIA.length === 1);
+  check('y aun así la pantalla muestra la respuesta del modelo',
+    /modelo de prueba/.test((await estadoIA()).texto));
+
+  /* El tope diario. 429 no es un error de la app: es el freno funcionando,
+     y se dice con esas palabras. */
+  await p.evaluate(() => { localStorage.removeItem('perfumario_v1_ia'); });
+  await p.unroute(URL_IA);
+  await p.route(URL_IA, r => r.fulfill({
+    status: 429, contentType: 'application/json',
+    headers: { 'Access-Control-Allow-Origin': '*' },
+    body: JSON.stringify({ error: 'tope diario alcanzado' })
+  }));
+  await p.reload(); await p.waitForTimeout(1600);
+  const conTope = await estadoIA();
+  check('con el tope agotado la app contesta igual, con su motor',
+    conTope.primero === primeroLocal && !/modelo de prueba/.test(conTope.texto), conTope.primero);
+  check('y lo dice con todas las letras',
+    /tope diario/i.test(conTope.marca), conTope.marca);
+
+  /* El servidor caído. Mismo trato: la app no muestra un error, muestra una
+     recomendación y una nota al pie. */
+  await p.evaluate(() => { localStorage.removeItem('perfumario_v1_ia'); });
+  await p.unroute(URL_IA);
+  await p.route(URL_IA, r => r.abort('failed'));
+  await p.reload(); await p.waitForTimeout(1600);
+  const caido = await estadoIA();
+  check('si el servidor no está, la recomendación local queda en pantalla',
+    caido.primero === primeroLocal && !!caido.texto, caido.primero);
+  check('la marca lo aclara sin alarmar',
+    /no contestó/i.test(caido.marca) && /fallo/.test(caido.clase), caido.marca);
+  check('y eso no cuenta como error de la aplicación',
+    !errs.some(e => /ia\.de-prueba/.test(e)));
+
+  /* Una respuesta mal armada —ids que no existen— no puede dejar la pantalla
+     vacía. Se prueba en seco porque es la parte que rompe. */
+  await p.evaluate(() => { localStorage.removeItem('perfumario_v1_ia'); });
+  const degrada = await p.evaluate(() => {
+    const D = window.PERFUMARIO_DEBUG;
+    const lista = D.listaFalsa();
+    const reales = lista.map(x => x.p.id);
+    return {
+      inventados: D.ordenarSegunIA(lista, { orden: ['no-existo', 'tampoco'] }),
+      mitad: D.ordenarSegunIA(lista, { orden: [reales[2], 'no-existo'] }),
+      vacia: D.ordenarSegunIA(lista, {}),
+      reales
+    };
+  });
+  check('ids inventados se ignoran y queda el orden local',
+    degrada.inventados.join() === degrada.reales.join(), degrada.inventados.join());
+  check('un id bueno y uno inventado: vale el bueno, el resto sigue',
+    degrada.mitad[0] === degrada.reales[2] && degrada.mitad.length === degrada.reales.length,
+    degrada.mitad.join());
+  check('una respuesta sin orden no pierde ningún candidato',
+    degrada.vacia.length === degrada.reales.length);
+
+  /* Una respuesta cuyo "elegido" no existe se descarta entera: reordenar
+     por algo que no está en la colección es peor que no reordenar. */
+  await p.unroute(URL_IA);
+  await p.route(URL_IA, r => r.fulfill({
+    status: 200, contentType: 'application/json',
+    headers: { 'Access-Control-Allow-Origin': '*' },
+    body: JSON.stringify({ elegido: 'perfume-que-no-existe', orden: [], texto: 'Inventado.' })
+  }));
+  await p.reload(); await p.waitForTimeout(1600);
+  const elegidoFantasma = await estadoIA();
+  check('si elige un perfume que no existe, se descarta la respuesta entera',
+    elegidoFantasma.primero === primeroLocal && !/Inventado/.test(elegidoFantasma.texto),
+    elegidoFantasma.texto.slice(0, 40));
+
+  await p.unroute(URL_IA);
+  await p.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('perfumario_v1'));
+    d.ajustes.ia = false; d.ajustes.iaUrl = '';
+    localStorage.setItem('perfumario_v1', JSON.stringify(d));
+    localStorage.removeItem('perfumario_v1_ia');
+  });
   await desdeCero();
 
   console.log('\nAH · El archivo de pruebas, revisado por sí mismo');

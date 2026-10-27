@@ -62,6 +62,85 @@ que hay que contar qué hace. Las tres tarjetas distintivas ahora se ven siempre
 sin datos, dicen para qué sirven. Es el mismo problema de *discoverability* que
 tuvo el bloque de mezclas, aplicado como regla en vez de caso por caso.
 
+## Claude, de a dos con el motor local
+
+Encendible desde **Ajustes → Recomendar con Claude**. Apagado de fábrica, y no
+alcanza con encenderlo: hace falta desplegar el intermediario de
+[`servidor/`](servidor/README.md).
+
+### Por qué hay un servidor en el medio
+
+Perfumario se publica como archivos estáticos y se empaqueta en un `.ipa`. En los
+dos casos **todo su JavaScript está en el dispositivo de quien la usa**. Una API
+key ahí adentro es una API key pública, y Anthropic además revoca automáticamente
+las que detecta en repos públicos. No hay forma de resolverlo desde el cliente:
+el intermediario no es una preferencia de arquitectura, es el único lugar donde
+la clave puede estar.
+
+### El reparto
+
+| | Quién | Cuándo |
+|---|---|---|
+| Calcular el podio y las razones | `puntuar()`, local | Siempre, al instante, sin conexión |
+| Reordenar y reescribir | Claude | Si está encendido y contesta |
+| El puntaje, el % del frasco, la dosis | `puntuar()`, local | Siempre — son cuentas, no opiniones |
+
+Tres reglas que lo sostienen:
+
+1. **El motor local pinta primero.** La pregunta "¿qué me pongo?" se hace mientras
+   te vestís: nunca hay una pantalla esperando a un servidor.
+2. **Claude reescribe después.** Cuando llega, la pantalla cambia sola, con la
+   marca de quién la escribió.
+3. **Si no llega, no pasa nada.** Sin señal, sin intermediario, con el tope
+   agotado o con el servidor caído, lo que quedó en pantalla es una recomendación
+   completa. El fracaso de esta capa no se ve salvo que lo busques.
+
+Claude recibe el puntaje y las razones del motor local **como señal, no como
+orden**: puede apartarse de ese orden solo si nombra la razón concreta, y eso
+está en el prompt del servidor.
+
+### Lo que se ve y lo que no se mezcla
+
+La marca arriba de la respuesta dice siempre quién la escribió: *Consultando a
+Claude…*, *Ordenado y escrito por Claude*, o *Claude no contestó (…). Esta la
+calculó la app.* Un fracaso se escribe en el gris de siempre, sin rojo: la app
+contestó igual.
+
+En la ficha, las razones van en **dos listas separadas y rotuladas**: "Por qué
+hoy" (la cuenta de la app, auditable línea por línea) y "Lo que agregó Claude".
+Mezclarlas haría que la segunda herede la credibilidad de la primera sin haberla
+ganado.
+
+### Lo que viaja y lo que no
+
+Viaja la colección recortada —nombre, casa, familia, notas, longevidad, estela,
+estaciones, ocasiones, puntuación, % restante—, el contexto de ahora y los tres
+candidatos con su puntaje. **No viaja** el precio, la fecha de compra ni las
+fotos: no cambian qué ponerse hoy, y lo que no hace falta mandar no se manda. Hay
+una prueba que falla si alguno de esos campos se cuela.
+
+El identificador que acompaña cada consulta lo genera el propio teléfono al azar
+la primera vez. Sirve para que el intermediario cuente consultas y aplique el
+tope diario. Si borrás los datos, se genera otro.
+
+### Dos cachés, por dos motivos distintos
+
+- **En el teléfono, 6 horas.** La misma colección con el mismo clima y la misma
+  ocasión da la misma respuesta: volver a preguntar es pagar dos veces. La
+  temperatura entra redondeada a grados enteros, porque 22,3° y 22,4° no son dos
+  preguntas distintas. Máximo veinte entradas: es una comodidad, no un archivo.
+- **En el prompt, del lado de Anthropic.** Las reglas y la colección van en un
+  bloque marcado como cacheable, y el clima va después del corte. A partir de la
+  segunda consulta esa parte se cobra al 5 %. Para que funcione tiene que ser byte
+  por byte idéntica, y por eso el JSON se serializa con las claves ordenadas y no
+  hay ninguna fecha adentro.
+
+### Lo que cuesta
+
+Con `claude-opus-5-5`, **≈ US$ 0,011 por consulta**. Con `claude-haiku-5-5`, una
+línea de cambio en `wrangler.toml`, **≈ US$ 0,0004**: 40 veces menos. La cuenta
+completa y las dos palancas están en [`servidor/README.md`](servidor/README.md).
+
 ## El diseño: tres entradas del catálogo, no una
 
 El encargo fue "exclusividad, alto perfil, limpio, minimalista". Eso no existe

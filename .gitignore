@@ -8,3 +8,8 @@ package.json
 # El package.json del envoltorio nativo sí va: no es un archivo de trabajo,
 # es la lista de plugins con la que se compila la app.
 !perfumario/nativo/package.json
+
+# Y el del intermediario de IA, por lo mismo: es la lista de dependencias con
+# la que se despliega el Worker. Las versiones van exactas, sin ^, porque de
+# ahí sale algo que gasta plata y tiene que desplegarse igual siempre.
+!perfumario/servidor/package.json

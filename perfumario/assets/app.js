@@ -63,10 +63,20 @@ const DEFAULTS = {
                 0 = no avisar. Hoy decide cuándo la app te lo pone adelante al
                 abrirla; cuando exista la versión de tienda, es la hora a la que
                 llega la notificación. La política no cambia, cambia el canal. */
-             recordar: 4 },
+             recordar: 4,
+             /* Pedirle a Claude que ordene y escriba la recomendación.
+                Apagado de fábrica: necesita un intermediario tuyo que guarde
+                la clave —ver perfumario/servidor/— porque una clave adentro
+                de una app estática es una clave pública. */
+             ia: false, iaUrl: '' },
   meta: { version: 1, ultimaCopia: null,
           lugar: null,   // {nombre, lat, lon} elegido una vez en Ajustes
-          clima: null }  // último dato traído: {temp, humedad, codigo, lugar, ts}
+          clima: null,   // último dato traído: {temp, humedad, codigo, lugar, ts}
+          /* Un número al azar que genera este teléfono la primera vez. El
+             intermediario lo usa para contar consultas y cortar en el tope
+             diario. No sale de acá y no identifica a nadie: si borrás los
+             datos, se genera otro. */
+          aparato: null }
 };
 
 let S = clonar(DEFAULTS);
@@ -1028,6 +1038,198 @@ function sugerir(n, m) {
     .slice(0, cuantos);
 }
 
+/* =====================================================================
+   Claude, de a dos con el motor local
+
+   La app ya sabe recomendar sola: `puntuar()` suma y resta puntos con
+   reglas escritas, devuelve el porqué, y funciona en un avión. Eso no se
+   toca. Claude se suma arriba.
+
+   El reparto es a propósito y conviene entenderlo antes de tocarlo:
+
+   · EL MOTOR LOCAL PINTA PRIMERO. Abrís la app y la respuesta ya está.
+     Nunca hay una pantalla esperando a que conteste un servidor, porque
+     la pregunta "¿qué me pongo?" se hace mientras te vestís.
+   · CLAUDE REESCRIBE DESPUÉS. Cuando llega —menos de dos segundos la
+     mayoría de las veces— reordena si tiene motivo y reescribe el texto.
+     La pantalla cambia sola, con la marca de quién la escribió.
+   · SI NO LLEGA, NO PASA NADA. Sin señal, sin intermediario configurado,
+     con el tope diario agotado o con el servidor caído, lo que quedó en
+     pantalla es la respuesta local, que es una respuesta completa. El
+     fracaso de esta capa no es visible salvo que lo busques.
+
+   Lo que esta capa NO hace: no manda la clave (la clave vive en el
+   intermediario), no manda nada que identifique a nadie, y no se guarda
+   la respuesta más de unas horas.
+   ===================================================================== */
+
+/* Cuánto esperamos antes de darla por perdida. Ocho segundos es largo para
+   una interfaz, pero acá nadie está esperando: la respuesta local ya está
+   en pantalla. Lo que se gana con un número alto es que la red lenta
+   todavía alcance a contestar; lo que se pierde no lo ve nadie. */
+const IA_ESPERA = 8000;
+/* Seis horas. La misma colección con el mismo clima y la misma ocasión da
+   la misma respuesta: volver a preguntar es pagar dos veces por lo mismo.
+   Seis horas es menos que el tiempo en que cambia el clima de un día. */
+const IA_CACHE_HS = 6;
+const IA_CACHE_LLAVE = KEY + '_ia';
+
+const IA = {
+
+  /* El identificador del aparato. Se genera una vez y se guarda; el
+     intermediario cuenta contra esto para aplicar el tope diario. */
+  aparato() {
+    if (!S.meta.aparato) {
+      const b = new Uint8Array(12);
+      (self.crypto || window.crypto).getRandomValues(b);
+      S.meta.aparato = Array.from(b).map(x => x.toString(16).padStart(2, '0')).join('');
+      guardar();
+    }
+    return S.meta.aparato;
+  },
+
+  activa() {
+    return !!(S.ajustes.ia && S.ajustes.iaUrl && /^https:\/\//.test(S.ajustes.iaUrl));
+  },
+
+  /* La llave de caché. Entra todo lo que puede cambiar la respuesta y nada
+     más: los candidatos con su puntaje, el contexto redondeado y cuántos
+     perfumes hay. La temperatura va redondeada a grados enteros porque
+     22,3° y 22,4° no son dos preguntas distintas. */
+  llave(lista, c) {
+    const partes = [
+      lista.map(x => x.p.id + ':' + x.score).join(','),
+      Math.round(c.temp), c.momento, c.ocasion, c.aire, c.estacion,
+      c.lluvia ? 1 : 0, c.humedad == null ? '' : Math.round(c.humedad / 10),
+      S.perfumes.length
+    ].join('|');
+    return idNumerico(partes).toString(36);
+  },
+
+  leerCache(llave) {
+    try {
+      const todo = JSON.parse(localStorage.getItem(IA_CACHE_LLAVE) || '{}');
+      const x = todo[llave];
+      if (!x) return null;
+      if (Date.now() - x.ts > IA_CACHE_HS * 3600e3) return null;
+      return x.r;
+    } catch (e) { return null; }
+  },
+
+  guardarCache(llave, r) {
+    try {
+      const todo = JSON.parse(localStorage.getItem(IA_CACHE_LLAVE) || '{}');
+      todo[llave] = { ts: Date.now(), r };
+      /* Nunca más de veinte: esto es una comodidad, no un archivo, y el
+         espacio de localStorage es el mismo que usa la colección. */
+      const llaves = Object.keys(todo).sort((a, b) => todo[b].ts - todo[a].ts);
+      const podado = {};
+      llaves.slice(0, 20).forEach(k => { podado[k] = todo[k]; });
+      localStorage.setItem(IA_CACHE_LLAVE, JSON.stringify(podado));
+    } catch (e) { /* sin espacio: que no haya caché no rompe nada */ }
+  },
+
+  /* Lo que viaja de cada perfume. No es el objeto entero: el precio, la
+     fecha de compra y las fotos no cambian qué ponerse hoy, y lo que no
+     hace falta mandar no se manda. */
+  recorte(p) {
+    return {
+      id: p.id, nombre: p.nombre, casa: p.casa, conc: p.conc || '',
+      familia: p.familia, notas: notasDe(p),
+      longevidad: p.longevidad || null, estela: p.estela || null,
+      estaciones: p.estaciones || [], ocasiones: p.ocasiones || [],
+      puntuacion: p.rating || null,
+      restante: p.ml > 0 ? porcRestante(p) : null
+    };
+  },
+
+  async pedir(lista, c) {
+    const llave = this.llave(lista, c);
+    const guardada = this.leerCache(llave);
+    if (guardada) return { r: guardada, deCache: true };
+
+    const corte = new AbortController();
+    const reloj = setTimeout(() => corte.abort(), IA_ESPERA);
+    try {
+      const res = await fetch(S.ajustes.iaUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: corte.signal,
+        body: JSON.stringify({
+          aparato: this.aparato(),
+          coleccion: S.perfumes.map(p => this.recorte(p)),
+          contexto: c,
+          candidatos: lista.map(x => ({
+            id: x.p.id, puntaje: x.score,
+            razones: x.razones.map(r => ({ txt: r.txt, bien: r.bien !== false }))
+          }))
+        })
+      });
+      if (!res.ok) {
+        const cuerpo = await res.json().catch(() => ({}));
+        return { error: res.status === 429 ? 'tope' : (cuerpo.error || 'falló'), estado: res.status };
+      }
+      const r = await res.json();
+      if (!r || !r.elegido || !perfume(r.elegido)) return { error: 'respuesta sin sentido' };
+      this.guardarCache(llave, r);
+      return { r };
+    } catch (e) {
+      return { error: e.name === 'AbortError' ? 'tardó demasiado' : 'sin conexión' };
+    } finally {
+      clearTimeout(reloj);
+    }
+  }
+};
+
+/* El estado de la consulta en curso. El contador descarta las respuestas
+   que llegan tarde: si tocaste "cita" mientras Claude pensaba sobre
+   "trabajo", la respuesta vieja no tiene que pisar la pantalla nueva. */
+let iaPedido = 0;
+let iaEstado = null;   // null | 'pidiendo' | 'listo' | 'falló'
+let iaUltima = null;   // la respuesta que está pintada
+
+function consultarIA(lista, c) {
+  if (!IA.activa() || !lista.length) { iaEstado = null; iaUltima = null; return; }
+  const mio = ++iaPedido;
+  iaEstado = 'pidiendo'; iaUltima = null;
+  marcaIA();
+  IA.pedir(lista, c).then(out => {
+    if (mio !== iaPedido) return;            // llegó tarde: ya hay otra pregunta
+    if (out.error) { iaEstado = 'falló'; iaUltima = null; marcaIA(out.error); return; }
+    iaEstado = 'listo'; iaUltima = out.r;
+    pintarRespuesta(lista, c);
+  });
+}
+
+/* Reordena la lista local según lo que dijo Claude. Si nombra un id que no
+   está entre los candidatos, se ignora ese id y el resto conserva el orden
+   local: una respuesta parcialmente mal formada degrada, no rompe. */
+function ordenarSegunIA(lista, r) {
+  if (!r || !Array.isArray(r.orden)) return lista;
+  const porId = {};
+  lista.forEach(x => { porId[x.p.id] = x; });
+  const puestos = [];
+  r.orden.forEach(id => { if (porId[id] && puestos.indexOf(porId[id]) < 0) puestos.push(porId[id]); });
+  lista.forEach(x => { if (puestos.indexOf(x) < 0) puestos.push(x); });
+  return puestos;
+}
+
+/* La marca de quién escribió lo que estás leyendo. Va siempre que la IA
+   esté encendida, incluso cuando falla: que el texto lo haya escrito la app
+   y no Claude es información, no un detalle de implementación. */
+function marcaIA(motivo) {
+  const el = $('#marcaIA');
+  if (!el) return;
+  if (!IA.activa()) { el.hidden = true; return; }
+  el.hidden = false;
+  if (iaEstado === 'pidiendo') { el.className = 'marca-ia pensando'; el.textContent = 'Consultando a Claude…'; return; }
+  if (iaEstado === 'listo')    { el.className = 'marca-ia';          el.textContent = 'Ordenado y escrito por Claude'; return; }
+  el.className = 'marca-ia fallo';
+  el.textContent = motivo === 'tope'
+    ? 'Llegaste al tope diario de consultas a Claude. Esta la calculó la app.'
+    : 'Claude no contestó (' + (motivo || 'sin detalle') + '). Esta la calculó la app.';
+}
+
 function renderHoy() {
   ctxInicial();
   const est = estacionVigente();
@@ -1054,21 +1256,16 @@ function renderHoy() {
 
   const modelo = modeloAprendido();
   const lista = S.perfumes.length ? sugerir(3, modelo) : [];
+  const ctxHoy = contextoActual();
 
-  if (!lista.length) {
-    $('#respuesta').innerHTML = pantallaVacia();
-    $('#sugerencias').innerHTML = '';
-    $('#otras').hidden = true;
-  } else {
-    $('#respuesta').innerHTML = avisoArranque() + fichaPrincipal(lista[0], lista[1], contextoActual());
-    $('#sugerencias').innerHTML = lista.slice(1).map(x => fichaSugerencia(x)).join('');
-    $('#otras').hidden = lista.length < 2;
-    const t = $('#otrasTitulo');
-    const n = lista.length - 1;
-    if (t) t.textContent = n === 1 ? 'Otra opción' : `Otras ${n} opciones`;
-  }
-
+  /* Pintar y consultar están separados porque ocurren en momentos
+     distintos: lo local se pinta ya, y si Claude contesta se vuelve a
+     pintar lo mismo con su texto. Una sola función que haga las dos cosas
+     obliga a recalcular el contexto, y entonces la respuesta de Claude
+     puede terminar explicando un clima que ya no es el de la pantalla. */
+  pintarRespuesta(lista, ctxHoy);
   avisoEmpate(lista);
+  consultarIA(lista, ctxHoy);
 
   const hoy = S.usos.filter(u => u.fecha === today());
   $('#cardHoyUsos').hidden = !hoy.length;
@@ -1215,6 +1412,21 @@ function redactar(s, c) {
    útil, y sólo cuando hay una mezcla que de verdad vale: el corte es 70, más
    exigente que el 60 con el que la ficha lista las tres mejores, porque una
    sugerencia que aparece siempre deja de ser una sugerencia. */
+/* La mezcla: la de Claude si propuso una válida, la calculada si no.
+   Valida que los dos ids existan antes de creerle — una capa con un
+   perfume inventado es peor que ninguna capa. */
+function lineaMezclaIA(p, ia) {
+  if (ia && ia.mezcla && ia.mezcla.abajo && ia.mezcla.arriba) {
+    const a = perfume(ia.mezcla.abajo), b = perfume(ia.mezcla.arriba);
+    if (a && b && a.id !== b.id) {
+      return `<p class="hero-alt"><b>Mezclar:</b>
+        <button class="link" data-mezcla="${a.id}">${esc(a.nombre)} abajo,
+        ${esc(b.nombre)} encima</button>${ia.mezcla.porque ? ', ' + esc(ia.mezcla.porque) : ''}.</p>`;
+    }
+  }
+  return lineaMezcla(p);
+}
+
 function lineaMezcla(p) {
   const mejor = mezclasPara(p)[0];
   if (!mejor || mejor.score < 70) return '';
@@ -1276,9 +1488,38 @@ function avisoArranque() {
     y las sugerencias empiezan a valer. <b>Agregar →</b></button>`;
 }
 
-function fichaPrincipal(s, alternativa, c) {
+/* Pinta la respuesta con lo que haya: la local, o la local reordenada y
+   reescrita por Claude si ya contestó. Es la misma función en los dos
+   casos a propósito — si fueran dos, se irían separando. */
+function pintarRespuesta(lista, c) {
+  if (!lista.length) {
+    $('#respuesta').innerHTML = pantallaVacia();
+    $('#sugerencias').innerHTML = '';
+    $('#otras').hidden = true;
+    marcaIA();
+    return;
+  }
+  const r = (iaEstado === 'listo') ? iaUltima : null;
+  const orden = ordenarSegunIA(lista, r);
+  $('#respuesta').innerHTML = avisoArranque() + fichaPrincipal(orden[0], orden[1], c, r);
+  $('#sugerencias').innerHTML = orden.slice(1).map(x => fichaSugerencia(x)).join('');
+  $('#otras').hidden = orden.length < 2;
+  const t = $('#otrasTitulo');
+  const n = orden.length - 1;
+  if (t) t.textContent = n === 1 ? 'Otra opción' : `Otras ${n} opciones`;
+  marcaIA();
+}
+
+function fichaPrincipal(s, alternativa, c, ia) {
   const p = s.p, f = familia(p.familia);
   const pct = porcRestante(p);
+  /* Cuando Claude contestó, su texto reemplaza al redactado por plantilla
+     y su contraste reemplaza al calculado. El puntaje, el porcentaje del
+     frasco y la dosis NO: esos son cuentas, no opiniones, y no se le
+     preguntan a nadie. */
+  const texto = (ia && ia.texto) ? esc(ia.texto) : redactar(s, c);
+  const contra = (ia && ia.contraste) ? esc(ia.contraste)
+               : (alternativa ? esc(contraste(alternativa, s)) : '');
   return `<article class="hero">
     <div class="hero-cab">
       ${miniatura(p, 'frasquito-h')}
@@ -1288,10 +1529,10 @@ function fichaPrincipal(s, alternativa, c) {
         <div class="hero-house">${esc(p.casa)}</div>
       </div>
     </div>
-    <p class="hero-texto">${redactar(s, c)}</p>
-    ${alternativa ? `<p class="hero-alt"><b>Alternativa:</b> ${esc(alternativa.p.nombre)},
-      ${esc(contraste(alternativa, s))}.</p>` : ''}
-    ${lineaMezcla(p)}
+    <p class="hero-texto">${texto}</p>
+    ${alternativa ? `<p class="hero-alt"><b>Alternativa:</b> ${esc(alternativa.p.nombre)}${
+      contra ? ', ' + contra : ''}.</p>` : ''}
+    ${lineaMezclaIA(p, ia)}
     <p class="hero-alt"><b>Aplicación:</b> ${esc(dosis(p, c))}</p>
     <div class="hero-pie">
       <button class="btn btn-accent" data-usar="${p.id}">Me lo pongo</button>
@@ -2461,6 +2702,21 @@ function contextoMezcla(c) {
    mostraba el porqué: las razones vivían solo en la pantalla de Hoy, y ahí
    entran dos. Acá entran todas, con el puntaje de hoy y el contexto con el
    que se calculó, que es lo que las hace entendibles. */
+/* Lo que agregó Claude, aparte y rotulado. Las dos listas se muestran
+   juntas y separadas a propósito: la de arriba es la cuenta de la app, que
+   se puede auditar línea por línea; esta es una lectura de un modelo, que
+   no. Mezclarlas haría que la segunda hereda la credibilidad de la primera
+   sin haberla ganado. */
+function razonesDeClaude(p) {
+  if (!iaUltima || iaUltima.elegido !== p.id) return '';
+  const r = (iaUltima.porque || []).filter(x => typeof x === 'string' && x.trim());
+  if (!r.length) return '';
+  return `<div class="porque-ia">
+    <h3>Lo que agregó Claude</h3>
+    <ul class="razones">${r.map(x => `<li>✦ <b>${esc(x)}</b></li>`).join('')}</ul>
+  </div>`;
+}
+
 function porQueHoy(p) {
   const c = contextoActual();
   const s = puntuar(p, modeloAprendido(), c);
@@ -2474,6 +2730,7 @@ function porQueHoy(p) {
     <ul class="razones">${orden.map(r =>
       `<li${r.aprendido ? ' class="aprendida"' : ''}>${r.aprendido ? '✦' : (r.bien ? '✓' : '·')} <b>${esc(r.txt)}</b></li>`).join('')}</ul>
     <div class="porque-total"><b>${s.score}</b> de puntaje con este contexto</div>
+    ${razonesDeClaude(p)}
   </section>`;
 }
 
@@ -3596,6 +3853,15 @@ function renderAjustes() {
   $('#setClima').checked = !!S.ajustes.clima;
   $$('#setTema .chip').forEach(c => c.classList.toggle('on', c.dataset.val === (S.ajustes.tema || 'sistema')));
   $('#setRecordar').value = String(S.ajustes.recordar || 0);
+  $('#setIA').checked = !!S.ajustes.ia;
+  $('#setIAUrl').value = S.ajustes.iaUrl || '';
+  $('#avisoIA').textContent = !S.ajustes.ia
+    ? 'Apagado. La app recomienda con su propio motor, que anda sin conexión.'
+    : !S.ajustes.iaUrl
+      ? 'Falta la dirección del intermediario: hasta que la pongas, sigue recomendando sola.'
+      : !/^https:\/\//.test(S.ajustes.iaUrl)
+        ? 'La dirección tiene que empezar con https://. Mientras tanto sigue recomendando sola.'
+        : 'Encendido. Cada consulta cuesta plata en tu cuenta de Anthropic; el tope diario se configura en el intermediario.';
   /* Decir qué puede y qué no puede hacer la app es parte del producto: una
      opción que promete una notificación que nunca llega es peor que no tenerla. */
   $('#avisoRecordar').textContent = !S.ajustes.recordar
@@ -3940,6 +4206,41 @@ function conectar() {
     if (!c) return;
     S.ajustes.tema = c.dataset.val; guardar(); aplicarTema(); render();
   });
+  $('#setIA').addEventListener('change', e => {
+    S.ajustes.ia = e.target.checked; guardar(); render();
+    toast(S.ajustes.ia
+      ? (IA.activa() ? 'Le pregunto a Claude' : 'Encendido, pero falta la dirección del intermediario')
+      : 'Vuelvo a recomendar sola');
+  });
+  /* En 'change' y no en 'input': guardar en cada tecla deja medio enlace
+     guardado como configuración válida, y la app intentaría llamarlo. */
+  $('#setIAUrl').addEventListener('change', e => {
+    S.ajustes.iaUrl = e.target.value.trim(); guardar(); render();
+  });
+  $('#btnProbarIA').addEventListener('click', async () => {
+    const av = $('#avisoIA');
+    if (!IA.activa()) { av.textContent = 'Primero encendelo y poné una dirección https://.'; return; }
+    if (!S.perfumes.length) { av.textContent = 'Cargá al menos un perfume para poder probar.'; return; }
+    av.textContent = 'Probando…';
+    /* La prueba es una consulta de verdad, no un ping: lo que puede fallar
+       —CORS, la clave, el tope, el modelo— solo falla en el camino completo.
+       Se salta la caché para que probar dos veces pruebe dos veces. */
+    const lista = sugerir(3, modeloAprendido());
+    const c = contextoActual();
+    try { localStorage.removeItem(IA_CACHE_LLAVE); } catch (err) { /* da igual */ }
+    const out = await IA.pedir(lista, c);
+    if (out.error) {
+      av.textContent = out.estado === 429
+        ? 'Contesta, pero llegaste al tope diario de consultas.'
+        : 'No anduvo: ' + out.error + (out.estado ? ' (HTTP ' + out.estado + ')' : '') +
+          '. Revisá que la dirección sea la del Worker y que tu origen esté en ORIGENES.';
+      return;
+    }
+    const u = out.r.uso || {};
+    av.textContent = 'Anduvo. Eligió ' + ((perfume(out.r.elegido) || {}).nombre || out.r.elegido) +
+      '. Entrada ' + (u.entrada || 0) + ' tokens, salida ' + (u.salida || 0) +
+      ', de caché ' + (u.cacheLeido || 0) + '.';
+  });
   $('#setRecordar').addEventListener('change', e => {
     S.ajustes.recordar = +e.target.value || 0; guardar();
     if (S.ajustes.recordar && Nativo.disponible()) {
@@ -4163,7 +4464,14 @@ window.PERFUMARIO_DEBUG = {
   idNumerico: x => idNumerico(x),
   nativoDisponible: () => Nativo.disponible(),
   marcarCopia: () => marcarCopia(),
-  sinCopiar: () => sinCopiar()
+  sinCopiar: () => sinCopiar(),
+  iaActiva: () => IA.activa(),
+  iaLlave: (l, c) => IA.llave(l, c),
+  iaCacheLlave: IA_CACHE_LLAVE,
+  /* Reordenar según Claude es la parte que puede romper la pantalla si la
+     respuesta viene mal armada, así que se prueba sola y en seco. */
+  ordenarSegunIA: (ids, r) => ordenarSegunIA(ids, r).map(x => x.p.id),
+  listaFalsa: () => sugerir(3, modeloAprendido())
 };
 
 cargar();
